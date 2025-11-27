@@ -6,6 +6,18 @@ Tracking changes to all skills in `~/skills/`.
 
 ## rg-inventory
 
+### 2025-11-27 (v3)
+#### Restored
+- Phase 6 now includes full label format specs (was just "use product-labeler skill")
+- CSV format with columns: Product Name, Attributes, Price, Condition, Condition Notes, SKU, QR Code URL
+- Label types (2"×1" standard, 2"×2" with QR)
+- QR code decision guidance
+- Attributes format and condition abbreviations
+
+#### Changed
+- QR code now links to info card URL (not payment link) - customer reads story first, then clicks Buy
+- Updated `references/label-format.md` to match
+
 ### 2025-11-27 (v2)
 #### Changed
 - Replaced rigid shipping decision tree with judgment-based guidance

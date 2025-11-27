@@ -209,14 +209,84 @@ After creating the catalog item, set the initial stock count to 1:
 
 **Short link format:** `https://square.link/u/XXXXXXXX`
 
-### Phase 6: Label & File Organization
+### Phase 6: Labels & Batch CSV
 
-**Label specs (thermal printer):**
-- Size: 2" × 1" (standard price label)
-- Fields: Item name, Price, SKU
-- QR code: Payment link (NOT product URL)
+**Workflow order matters:** Labels need SKU (from Phase 3) AND payment link (from Phase 5) before they can be complete.
 
-**Use product-labeler skill** for generating labels.
+#### Print Master CSV Format
+
+**Batch file:** `/Users/scottybe/items/rg-labels-batch.csv`
+
+| Column | Description | Example |
+|--------|-------------|--------|
+| Product Name | Full item title | Kings of the Forest - W.A. Foster |
+| Attributes | Era • Type • Features (bullet-separated) | Antique Book • 1892 • 235 Engravings |
+| Price | Decimal, no $ | 34.99 |
+| Condition | Grade | Fair |
+| Condition Notes | Brief description | Cover worn, pages intact |
+| SKU | RG-XXXX | RG-0002 |
+| QR Code URL | Info card URL (for items with story) | https://richmondgeneral.github.io/items/RG-0002/ |
+
+**CSV Header:**
+```csv
+Product Name,Attributes,Price,Condition,Condition Notes,SKU,QR Code URL
+```
+
+**Example Row:**
+```csv
+"Pressed-Back Oak Swivel Bar Stool","Early 1900s • American Oak • Victorian",55.00,Good,"Some wear to seat, finish stable",RG-0003,https://richmondgeneral.github.io/items/RG-0003/
+```
+
+#### Label Types
+
+**Standard Price Tag (2" × 1"):**
+- Product Name (truncated if needed)
+- Price (large, left-aligned)
+- SKU (small, right-aligned)
+- No QR code
+
+**Interesting Item Tag (2" × 2" or larger):**
+- Full product name
+- Attributes line  
+- Price
+- Condition + notes
+- SKU
+- QR code linking to info card
+
+#### QR Code Decision
+
+**Include QR when:**
+- Antiques (pre-1950)
+- Collectibles with story/provenance
+- Items with info cards on GitHub Pages
+- Anything worth telling a story about
+
+**Skip QR when:**
+- Basic/common items
+- Quick-flip low-value items without unique story
+
+**QR links to info card** (not payment link directly) - customer scans → reads story → clicks Buy Now
+
+#### Attributes Format
+
+Use bullet separator (•) between attributes:
+- `Era • Type • Feature`
+- `Material • Style • Decade`
+- `Maker • Pattern • Color`
+
+#### Condition Abbreviations
+
+| Full | Abbrev |
+|------|--------|
+| Mint | Mint |
+| Like New | Like New |
+| Excellent | Exc |
+| Very Good | VG |
+| Good | Good |
+| Fair | Fair |
+| Poor | Poor |
+
+See `references/label-format.md` for Print Master settings and full style guide.
 
 **File organization:**
 ```

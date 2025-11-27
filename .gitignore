@@ -16,3 +16,6 @@
 # Temporary files
 *.tmp
 *.temp
+
+# Skill archives
+*.zip

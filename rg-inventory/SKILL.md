@@ -237,21 +237,30 @@ Product Name,Attributes,Price,Condition,Condition Notes,SKU,QR Code URL
 "Pressed-Back Oak Swivel Bar Stool","Early 1900s • American Oak • Victorian",55.00,Good,"Some wear to seat, finish stable",RG-0003,https://richmondgeneral.github.io/items/RG-0003/
 ```
 
-#### Label Types
+#### Label Layouts (both 2" × 1")
 
-**Standard Price Tag (2" × 1"):**
-- Product Name (truncated if needed)
-- Price (large, left-aligned)
-- SKU (small, right-aligned)
-- No QR code
+**Default Layout** - All items:
+```
+┌─────────────────────────────────────┐
+│ Product Name                        │
+│ Attributes • Line • Here            │
+│ $55.00              Condition       │
+│ Condition notes here       RG-0003  │
+└─────────────────────────────────────┘
+```
 
-**Interesting Item Tag (2" × 2" or larger):**
-- Full product name
-- Attributes line  
-- Price
-- Condition + notes
-- SKU
-- QR code linking to info card
+**QR Layout** - Interesting items with info cards:
+```
+┌─────────────────────────────────────┐
+│ Short Product Name        ┌─────┐  │
+│ Attributes • Here         │ QR  │  │
+│ $55.00        Condition   │     │  │
+│                  RG-0003  └─────┘  │
+└─────────────────────────────────────┘
+```
+- Drops: Condition Notes
+- Shortens: Product Name (truncate to ~20 chars)
+- QR links to info card URL
 
 #### QR Code Decision
 

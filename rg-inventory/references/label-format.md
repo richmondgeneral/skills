@@ -28,21 +28,31 @@ Product Name,Attributes,Price,Condition,Condition Notes,SKU,QR Code URL
 "Kings of the Forest & Kindred Tribes - W.A. Foster","Antique Book • 1892 • 235 Engravings",34.99,Fair,"Cover worn, spine frayed, pages intact",RG-0002,https://richmondgeneral.github.io/items/RG-0002/
 ```
 
-## Label Types
+## Label Layouts (both 2" × 1")
 
-### Standard Price Tag (2" × 1")
-- Product Name (truncated if needed)
-- Price (large, left-aligned)
-- SKU (small, right-aligned)
-- No QR code
+### Default Layout - All items
+```
+┌─────────────────────────────────────┐
+│ Product Name                        │
+│ Attributes • Line • Here            │
+│ $55.00              Condition       │
+│ Condition notes here       RG-0003  │
+└─────────────────────────────────────┘
+```
+Fields: Product Name, Attributes, Price, Condition, Condition Notes, SKU
 
-### Interesting Item Tag (2" × 2" or larger)
-- Full product name
-- Attributes line
-- Price
-- Condition + notes
-- SKU
-- QR code linking to payment
+### QR Layout - Interesting items with info cards
+```
+┌─────────────────────────────────────┐
+│ Short Product Name        ┌─────┐  │
+│ Attributes • Here         │ QR  │  │
+│ $55.00        Condition   │     │  │
+│                  RG-0003  └─────┘  │
+└─────────────────────────────────────┘
+```
+- Drops: Condition Notes
+- Shortens: Product Name (truncate to ~20 chars)
+- QR links to info card URL (not payment link)
 
 ## QR Code Decision
 
@@ -105,8 +115,11 @@ Use bullet separator (•) between attributes:
 
 ## Print Master Settings
 
-- Label size: 2" × 1" (standard) or 2" × 2" (with QR)
+- Label size: 2" × 1" (both layouts)
 - Font: Arial or Helvetica
-- Price font size: 24pt bold
-- SKU font size: 8pt
-- QR code size: 0.75" × 0.75"
+- Product Name: 10pt bold (QR layout: truncate to ~20 chars)
+- Attributes: 8pt regular
+- Price: 14pt bold
+- Condition: 8pt regular
+- SKU: 7pt regular
+- QR code size: 0.5" × 0.5" (right side of label)

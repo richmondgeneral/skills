@@ -6,11 +6,17 @@ Tracking changes to all skills in `~/skills/`.
 
 ## rg-inventory
 
+### 2025-11-27 (v4)
+#### Changed
+- Both label layouts now 2"×1" (was 2"×1" default + 2"×2" QR)
+- QR layout: drops Condition Notes, shortens Product Name to ~20 chars
+- Added ASCII art label diagrams to skill and reference
+- Updated Print Master settings with font sizes
+
 ### 2025-11-27 (v3)
 #### Restored
 - Phase 6 now includes full label format specs (was just "use product-labeler skill")
 - CSV format with columns: Product Name, Attributes, Price, Condition, Condition Notes, SKU, QR Code URL
-- Label types (2"×1" standard, 2"×2" with QR)
 - QR code decision guidance
 - Attributes format and condition abbreviations
 

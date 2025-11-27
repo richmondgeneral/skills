@@ -85,6 +85,11 @@ Complete workflow for processing vintage and antique items from acquisition thro
       "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
       "is_taxable": true,
       "ecom_visibility": "VISIBLE",
+      "ecom_seo_data": {
+        "page_title": "[Era] [Item Type] - [Key Feature] | Richmond General",
+        "page_description": "Concise description with keywords. Include era, maker, condition. End with location for local SEO.",
+        "permalink": "descriptive-url-slug-with-keywords"
+      },
       "variations": [{
         "type": "ITEM_VARIATION",
         "id": "#RG-XXXX-var",
@@ -135,10 +140,19 @@ After creating the catalog item, set the initial stock count to 1:
 
 **Why this matters:** Without setting inventory count, items show as "sold out" in Square Online even with `track_inventory: true`.
 
-**SEO Title Formula:**
-`[Era] [Maker] [Item Type] - [Key Feature] | [Condition]`
+**SEO Fields (in ecom_seo_data):**
+- `page_title`: `[Era] [Item Type] - [Key Feature] | Richmond General` (max ~60 chars)
+- `page_description`: Concise, keyword-rich description ending with "Richmond, IL" for local SEO (max ~160 chars)
+- `permalink`: lowercase-hyphenated-descriptive-slug
 
-Example: `1930s Harold Gray Little Orphan Annie - Dover Reprint | Very Good`
+**Example:**
+```json
+"ecom_seo_data": {
+  "page_title": "1930s Little Orphan Annie Comic Collection | Richmond General",
+  "page_description": "Vintage Harold Gray Little Orphan Annie comic strip collection from the Depression era. Very good condition. Richmond, IL.",
+  "permalink": "1930s-little-orphan-annie-comic-collection"
+}
+```
 
 ### Phase 4: Fulfillment Setup
 

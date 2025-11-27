@@ -142,18 +142,26 @@ Example: `1930s Harold Gray Little Orphan Annie - Dover Reprint | Very Good`
 
 ### Phase 4: Fulfillment Setup
 
-**Shipping decision tree:**
-```
-Is item fragile OR >5 lbs OR >$100?
-├─ YES → Pickup only OR custom shipping quote
-└─ NO → Standard shipping enabled
-    └─ Fits in flat rate box?
-        ├─ Small (8⅝" × 5⅜" × 1⅝") → $10.20
-        ├─ Medium (11" × 8½" × 5½") → $17.10
-        └─ Large (12" × 12" × 5½") → $21.90
-```
+**Use judgment** - don't apply rigid rules. Price is NOT a factor; a $200 book ships just as easily as a $5 one.
 
-**Square Dashboard steps** (manual):
+**Ships easily:**
+- Books, paper goods, small collectibles
+- Items that fit in a standard box without complex packing
+- Sturdy items that won't break in transit
+- Most things a reasonable person would drop at the post office
+
+**Pickup/local delivery only:**
+- Furniture (chairs, tables, cabinets - size and weight make shipping impractical)
+- Large or awkward shapes that don't box well
+- Extremely fragile items where shipping risk outweighs convenience
+- Heavy items where shipping cost approaches or exceeds item value
+
+**Flat rate box reference** (when shipping applies):
+- Small (8⅝" × 5⅜" × 1⅝") → $10.20
+- Medium (11" × 8½" × 5½") → $17.10  
+- Large (12" × 12" × 5½") → $21.90
+
+**Square Dashboard steps** (manual - for shippable items):
 1. Open catalog item
 2. Enable "Available for shipping"
 3. Set weight and dimensions

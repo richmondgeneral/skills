@@ -6,6 +6,13 @@ Tracking changes to all skills in `~/skills/`.
 
 ## rg-inventory
 
+### 2025-11-27 (v2)
+#### Changed
+- Replaced rigid shipping decision tree with judgment-based guidance
+- Removed price threshold ($100) from shipping criteria - price doesn't determine shippability
+- Clarified: furniture = pickup/local, easily boxable items = ship regardless of price
+- Philosophy: don't make rules/filters for things that require actual judgment
+
 ### 2025-11-27
 #### Changed
 - `track_inventory` changed from `false` to `true` in Phase 3 catalog creation

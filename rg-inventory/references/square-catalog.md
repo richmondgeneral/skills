@@ -64,7 +64,7 @@ Query all categories with: `catalog.searchObjects` with `object_types: ["CATEGOR
               "amount": 1999,
               "currency": "USD"
             },
-            "track_inventory": false,
+            "track_inventory": true,
             "sellable": true,
             "stockable": true
           }
@@ -74,6 +74,31 @@ Query all categories with: `catalog.searchObjects` with `object_types: ["CATEGOR
   }]
 }
 ```
+
+### Set Inventory Count (Required after item creation)
+
+**Endpoint:** `inventory.batchChange`
+
+```json
+{
+  "idempotency_key": "uuid-v4-here",
+  "changes": [{
+    "type": "PHYSICAL_COUNT",
+    "physical_count": {
+      "catalog_object_id": "VARIATION_ID",
+      "state": "IN_STOCK",
+      "location_id": "B87BAEZ0NWV34",
+      "quantity": "1",
+      "occurred_at": "2025-01-01T12:00:00Z"
+    }
+  }]
+}
+```
+
+**⚠️ Important:** 
+- Do NOT include `catalog_object_type` - Square sets this automatically
+- Use the VARIATION ID, not the ITEM ID
+- `occurred_at` must be within 24 hours and in RFC 3339 format
 
 ### Updating Existing Items
 

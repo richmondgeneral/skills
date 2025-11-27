@@ -97,7 +97,7 @@ Complete workflow for processing vintage and antique items from acquisition thro
             "amount": 1999,
             "currency": "USD"
           },
-          "track_inventory": false,
+          "track_inventory": true,
           "sellable": true,
           "stockable": true
         }
@@ -108,6 +108,32 @@ Complete workflow for processing vintage and antique items from acquisition thro
 ```
 
 **⚠️ CRITICAL:** Both categories AND reporting_category are REQUIRED for proper sales tracking and online visibility.
+
+### Phase 3b: Set Inventory Count
+
+After creating the catalog item, set the initial stock count to 1:
+
+**API Endpoint:** `inventory.batchChange`
+
+```json
+{
+  "idempotency_key": "unique-uuid",
+  "changes": [{
+    "type": "PHYSICAL_COUNT",
+    "physical_count": {
+      "catalog_object_id": "VARIATION_ID_FROM_STEP_3",
+      "state": "IN_STOCK",
+      "location_id": "B87BAEZ0NWV34",
+      "quantity": "1",
+      "occurred_at": "2025-01-01T12:00:00Z"
+    }
+  }]
+}
+```
+
+**⚠️ NOTE:** Do NOT include `catalog_object_type` in the request - Square sets this automatically.
+
+**Why this matters:** Without setting inventory count, items show as "sold out" in Square Online even with `track_inventory: true`.
 
 **SEO Title Formula:**
 `[Era] [Maker] [Item Type] - [Key Feature] | [Condition]`
@@ -249,9 +275,9 @@ Physical Store → QR on label/card
 - **product-labeler**: Thermal label generation, Square catalog descriptions
 
 ### Square API Services
-- `catalog`: Create/update items
-- `checkout`: Generate payment links
-- `inventory`: Track stock (if enabled)
+- `catalog`: Create/update items (batchInsertObjects, batchUpdateObjects)
+- `checkout`: Generate payment links (createPaymentLink)
+- `inventory`: **REQUIRED** - Set stock count after catalog creation (batchChange)
 - `orders`: View payment link orders
 
 ### External Resources

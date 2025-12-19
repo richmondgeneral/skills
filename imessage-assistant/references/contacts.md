@@ -7,7 +7,7 @@
 | Freeman (Dad) | +12242308079 | RCS | Father |
 | Dawn Zurick | +18472871148 | iMessage | Partner, Richmond General |
 | Jennifer Long | +16305444884 | iMessage | Close friend + biz partner, agent-OK |
-| Mike (Richmond) | +13129143889 | RCS | Store ops |
+| Mike Giba | +13129143889 | RCS | Store ops, flea market |
 | Jeff Thompson | +18475677182 | iMessage | Close tech friend, agent-OK |
 | Amy D (HOA) | +17736763930 | iMessage | HOA neighbor |
 | Gary Goza Sr | +18474179386 | iMessage | 20+ year friend |
@@ -55,10 +55,12 @@
 - **"Forewarn"**: = pre-qualify/lookup a contact. She knows what this means.
 - **Note**: For complex replies, pull 100-150 messages. Be supportive re: family stress.
 
-### Mike (Richmond/Flea Market)
-- **Phone**: +13129143889
+### Mike Giba (Richmond/Flea Market)
+- **Phone**: +13129143889 (iMessage)
+- **Alt Phone**: +17085970480 (Square signup)
 - **Service**: RCS
 - **Context**: Store operations, flea market, food truck.
+- **Square**: ✅ Linked (signed up Dec 18)
 - **⚠️ Note**: Multiple "Mike" contacts — verify by last message date.
 
 ### Jeff Thompson

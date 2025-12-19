@@ -73,38 +73,65 @@ def run_applescript(script, verbose=False):
 
 
 def find_contact_by_phone(phone, verbose=False):
-    """Find contact in Apple Contacts by phone number."""
+    """Find contact in Apple Contacts by phone number.
+    
+    Note: Contacts.app AppleScript has limitations, so we iterate through contacts.
+    This may be slow for large contact lists.
+    """
     normalized = format_phone(phone)
     
-    # AppleScript to find contact by phone
+    # Build script to iterate through contacts and find by phone
     script = f'''
     tell application "Contacts"
-        set matchedContact to null
-        repeat with contactItem in every person
-            repeat with phoneValue in phones of contactItem
-                if value of phoneValue is "{normalized}" then
-                    set matchedContact to contactItem
+        activate
+        
+        set foundName to "NOT_FOUND"
+        
+        repeat with person in (every person)
+            repeat with phoneEntry in (every phone of person)
+                set phoneValue to value of phoneEntry
+                
+                if phoneValue = "{normalized}" then
+                    set foundName to name of person
                     exit repeat
                 end if
             end repeat
-            if matchedContact is not null then
+            
+            if foundName is not "NOT_FOUND" then
                 exit repeat
             end if
         end repeat
-        if matchedContact is not null then
-            return name of matchedContact
-        else
-            return "NOT_FOUND"
-        end if
+        
+        return foundName
     end tell
     '''
     
-    result = run_applescript(script, verbose)
-    
-    if result == "NOT_FOUND":
+    # Increase timeout for full contact list scan
+    try:
+        result = subprocess.run(
+            ['osascript', '-e', script],
+            capture_output=True,
+            text=True,
+            timeout=30  # Longer timeout for contact list
+        )
+        
+        if result.returncode != 0:
+            if verbose:
+                print(f"[AppleScript lookup failed: {result.stderr}", file=sys.stderr)
+            return None
+        
+        result_text = result.stdout.strip()
+        if result_text == "NOT_FOUND":
+            return None
+        return result_text
+        
+    except subprocess.TimeoutExpired:
+        print(f"⚠️  Contact lookup timed out (large contact list?)", file=sys.stderr)
         return None
-    
-    return result
+    except Exception as e:
+        if verbose:
+            print(f"[Error in contact lookup: {e}", file=sys.stderr)
+        return None
 
 
 def update_contact_name(phone, new_name, dry_run=False, verbose=False):

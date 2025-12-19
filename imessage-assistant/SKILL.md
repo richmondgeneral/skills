@@ -19,7 +19,7 @@ Scripts run on Scotty's Mac via `osascript do shell script "python3 ..."` to que
 | Dawn | +18472871148 | iMessage |
 | Jennifer | +16305444884 | iMessage |
 | Jeff Thompson | +18475677182 | iMessage |
-| Mike (Richmond) | +13129143889 | RCS |
+| Mike Giba | +13129143889 | RCS |
 | Amy D (HOA) | +17736763930 | iMessage |
 | Gary Goza Sr | +18474179386 | iMessage |
 | Jamie Boutain | +16519834441 | iMessage |

@@ -62,7 +62,18 @@ python3 ~/skills/imessage-assistant/scripts/get_imessage_convo.py --service +1XX
 
 # List group chats
 python3 ~/skills/imessage-assistant/scripts/get_imessage_convo.py --groups
+
+# Check database date range (important for historical queries)
+python3 ~/skills/imessage-assistant/scripts/get_imessage_convo.py --check-range
 ```
+
+**⚠️ iCloud Messages Limitation:**
+
+If "Messages in iCloud" is enabled, the local database typically only contains ~30-90 days of recent messages. Older messages remain in iCloud but aren't accessible via scripts.
+
+- Scripts automatically warn when querying with limited history
+- To access full history: Temporarily disable iCloud Messages sync (see `--check-range` output)
+- No automation available - this is a manual process due to Apple's iCloud encryption
 
 ### Send Messages
 

@@ -1,5 +1,6 @@
 ---
 name: imessage-assistant
+version: 0.2.0
 description: Check and respond to iMessages with full context. Use when user asks to check messages, read texts, respond to texts, send messages, check today's messages, or mentions specific contacts. Queries chat.db directly for BOTH sent and received messages. Supports 1:1, group chats, and RCS/SMS/iMessage smart sending. Can identify unknown numbers and match to contacts.
 ---
 
@@ -93,6 +94,8 @@ python3 ~/skills/imessage-assistant/scripts/sent_today.py --failed
 
 ### Daily Briefing (v0.2)
 
+#### Usage
+
 ```bash
 # Full daily briefing to stdout
 python3 ~/skills/imessage-assistant/scripts/daily_briefing.py
@@ -112,7 +115,8 @@ python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --date 2025-11-24
 
 **Runs daily at 7am via cron → Apple Notes**
 
-**Full Briefing Sections:**
+#### Full Briefing Sections
+
 - 🚨 Urgent (time-sensitive items + property alerts from Sue)
 - 🏢 Property/Building (Sue Miller messages with: alley, water, utility, village, building, maintenance, etc.)
 - 💬 Today's Messages (activity table with 📩 unread flags)
@@ -121,7 +125,8 @@ python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --date 2025-11-24
 - 🟢 Nurture (no action)
 - ⚠️ Don't Forget (reminders)
 
-**CRM Quick Check (`--crm`):**
+#### CRM Quick Check (`--crm`)
+
 - I Owe (promises with TOMORROW/TODAY hints)
 - Waiting On (with days + ⚠️ cold warnings)
 - Don't Forget

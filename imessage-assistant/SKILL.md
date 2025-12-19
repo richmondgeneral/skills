@@ -196,6 +196,53 @@ python3 send_message.py +1234567890 "Don't forget!"
 
 ---
 
+## Sync with Square CRM & Contacts
+
+When discovering customer info from iMessages, keep all 4 systems in sync:
+
+```
+iMessage → Apple Contacts → contacts.md → Square CRM
+```
+
+### Example: New Customer Discovery
+
+**Scenario:** Customer messages with their name, and you discover it from the iMessage thread.
+
+**Step 1: Update Apple Contacts (iPhone)**
+```bash
+# Scott's iMessage shows "Mike" + phone +13129143889
+# But his last name is "Giba" (from company context)
+python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --last-name "Giba"
+```
+
+**Step 2: Update contacts.md (reference)**
+```markdown
+### Mike Giba (Richmond)
+- **Phone**: +13129143889
+- **Service**: RCS
+- **Context**: Store operations, flea market
+- **Source**: Discovered via iMessage + Square CRM
+```
+
+**Step 3: Sync to Square CRM**
+```bash
+# Using square-crm skill to update
+python3 ~/skills/square-crm/scripts/parse_contacts.py --phone +13129143889
+```
+
+**Result:** All 4 systems updated, data flows in both directions
+
+### Sync Scripts Available
+
+See `~/skills/square-crm/scripts/` for:
+- `sync_to_apple_contacts.py` - Update iPhone from Square discoveries
+- `parse_contacts.py` - Export contacts.md for Square sync
+- `lookup_customer.py` - Search Square by phone
+
+Full documentation: `~/skills/square-crm/references/sync-to-contacts-guide.md`
+
+---
+
 ## Spam Filter
 
 Ignore patterns in `references/spam_numbers.md`:

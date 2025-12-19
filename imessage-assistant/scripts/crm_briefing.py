@@ -226,11 +226,35 @@ def generate_briefing(contacts):
     return '\n'.join(out)
 
 
+def check_accessibility():
+    """Check if System Events has accessibility permissions for UI automation."""
+    check_script = '''
+    tell application "System Events"
+        try
+            set frontApp to name of first process whose frontmost is true
+            return "ok"
+        on error errMsg
+            return "error: " & errMsg
+        end try
+    end tell
+    '''
+    result = subprocess.run(['osascript', '-e', check_script], 
+                           capture_output=True, text=True)
+    return 'ok' in result.stdout.lower()
+
+
 def save_to_apple_notes_macos26(markdown_content):
     """
     Save briefing to Apple Notes using macOS 26 markdown import.
     This provides rich formatting (tables, headers, bold, etc.)
+    Returns: True on success, False on failure, None if accessibility missing
     """
+    # Pre-flight: Check accessibility permissions
+    if not check_accessibility():
+        print("❌ System Events lacks accessibility permissions.", file=sys.stderr)
+        print("   Grant access in: System Settings → Privacy & Security → Accessibility", file=sys.stderr)
+        return None  # Signal to skip to legacy without retry
+    
     # Step 1: Write markdown to temp file
     with open(TEMP_MD_FILE, 'w') as f:
         f.write(markdown_content)
@@ -381,11 +405,21 @@ if __name__ == '__main__':
     
     if '--note' in sys.argv:
         # Use macOS 26 markdown import for rich formatting
-        if save_to_apple_notes_macos26(briefing):
+        result = save_to_apple_notes_macos26(briefing)
+        
+        if result is True:
             print("✅ Briefing saved to Apple Notes (CRM Briefings folder)")
+        elif result is None:
+            # Accessibility missing — go straight to legacy (no retry)
+            print("Falling back to legacy method...", file=sys.stderr)
+            if save_to_apple_notes_legacy(briefing):
+                print("✅ Saved via legacy method (no rich formatting)")
+            else:
+                print("❌ Failed to save to Apple Notes")
+                print(briefing)
         else:
-            print("❌ Failed to save to Apple Notes")
-            # Fallback to legacy method
+            # result is False — import failed, try legacy
+            print("❌ macOS 26 import failed")
             print("Trying legacy method...", file=sys.stderr)
             if save_to_apple_notes_legacy(briefing):
                 print("✅ Saved via legacy method (no rich formatting)")

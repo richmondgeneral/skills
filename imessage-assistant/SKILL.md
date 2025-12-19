@@ -91,7 +91,31 @@ python3 ~/skills/imessage-assistant/scripts/sent_today.py
 python3 ~/skills/imessage-assistant/scripts/sent_today.py --failed
 ```
 
-### CRM Daily Briefing
+### Daily Briefing (v0.2)
+
+```bash
+# Generate unified briefing to stdout
+python3 ~/skills/imessage-assistant/scripts/daily_briefing.py
+
+# Save to Apple Notes (Daily Briefings folder)
+python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --note
+
+# Test with historical date
+python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --date 2025-11-24
+```
+
+**Runs daily at 7am via cron → Apple Notes**
+
+Sections:
+- 🚨 Urgent (time-sensitive items + property alerts from Sue)
+- 🏢 Property/Building (Sue Miller messages with: alley, water, utility, village, building, maintenance, etc.)
+- 💬 Today's Messages (activity table with 📩 unread flags)
+- 🔴 Promises to Keep
+- 🟡 Their Turn (with cold warnings >7 days)
+- 🟢 Nurture (no action)
+- ⚠️ Don't Forget (reminders)
+
+### CRM Briefing (legacy)
 
 ```bash
 # Generate briefing to stdout

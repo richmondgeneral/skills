@@ -11,6 +11,7 @@ Meta-skill for collaboratively developing and maintaining Claude skills with Sco
 
 **Skills Directory:** `/Users/scottybe/skills/`
 **Git Repo:** Yes (skills folder is version controlled)
+**Last synced:** 2025-12-19 (testing Save Skill button trigger)
 
 ## Workflow: Updating Skills
 
@@ -119,12 +120,64 @@ The skills directory contains mixed formats:
 
 Preferred format: **Folder structure** for maintainability.
 
+## .skill File Format Specification
+
+**Discovery Date:** 2025-12-19
+
+The `.skill` file format is a ZIP archive with a specific internal structure:
+
+```
+.skill file = ZIP archive renamed to .skill extension
+              └── skill-name/
+                  └── SKILL.md
+```
+
+### Creating Exportable .skill Files
+
+To trigger Claude's "Copy to your skills" button:
+
+```bash
+# 1. Create folder with SKILL.md
+mkdir skill-name
+cp SKILL.md skill-name/
+
+# 2. ZIP the folder (not just the file)
+zip -r skill-name.zip skill-name/
+
+# 3. Rename .zip to .skill
+mv skill-name.zip skill-name.skill
+
+# 4. Use present_files tool to offer download
+# Claude will show "Copy to your skills" button
+```
+
+### Critical Requirements
+
+- ✅ **Must** have folder as top-level in ZIP
+- ✅ **Must** contain `SKILL.md` inside folder
+- ✅ **Must** use `.skill` extension
+- ❌ **Won't work** if SKILL.md is at ZIP root
+- ❌ **Won't work** without folder wrapper
+
+### Workflow: Export Updated Skill
+
+When Scotty asks to export a skill:
+
+```
+1. Create temporary folder: mkdir <skill-name>
+2. Copy SKILL.md: cp ~/skills/<skill-name>/SKILL.md <skill-name>/
+3. ZIP folder: zip -r <skill-name>.zip <skill-name>/
+4. Rename: mv <skill-name>.zip <skill-name>.skill
+5. Present: Use present_files to trigger download button
+6. Cleanup: rm -rf <skill-name>/ (optional)
+```
+
 ## Commands for Claude
 
 When asked to update a skill:
 
 ```
-1. Read: Filesystem:read_text_file on ~/skills/<name>/SKILL.md
+1. Read: Filesystem:read_text_file on ~/skills/<n>/SKILL.md
 2. Edit: Filesystem:write_file with updated content
 3. Confirm: Show diff or summary of changes
 4. Remind: "Click 'Save Skill' in Claude UI to sync"
@@ -133,7 +186,7 @@ When asked to update a skill:
 When asked to create a skill:
 
 ```
-1. Create: Filesystem:create_directory for ~/skills/<name>/
+1. Create: Filesystem:create_directory for ~/skills/<n>/
 2. Write: SKILL.md with frontmatter + content
 3. (Optional) Create references/ subdirectory
 4. Remind: "Click 'Save Skill' in Claude UI to register"

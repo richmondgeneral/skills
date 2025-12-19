@@ -6,6 +6,8 @@ description: Check and respond to iMessages with full context. Use when user ask
 
 # iMessage Assistant
 
+**Current Date:** December 19, 2025 (Q4 2025)
+
 Scripts run on Scotty's Mac via `osascript do shell script "python3 ..."` to query Messages database directly.
 
 **Scripts location:** `~/skills/imessage-assistant/scripts/`

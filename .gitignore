@@ -17,5 +17,7 @@
 *.tmp
 *.temp
 
-# Skill archives
+# Skill archives (generated, not committed)
+archive/
 *.zip
+*.skill

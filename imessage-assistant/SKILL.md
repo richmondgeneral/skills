@@ -25,7 +25,7 @@ Scripts run on Scotty's Mac via `osascript do shell script "python3 ..."` to que
 | Gary Goza Sr | +18474179386 | iMessage |
 | Jamie Boutain | +16519834441 | iMessage |
 
-**Group Chats:** Dawn & Jennifer = 980 | RG Building Mgmt (Dawn + Sue) = TBD | HOA Drywall = 1343 | Shagbark = 1053
+**Group Chats:** Dawn & Jennifer = 980 | RG Building Mgmt (Dawn + Sue) = 1022 | HOA Drywall = 1343 | Shagbark = 1053
 
 **Service IDs:** 
 - iMessage = `33900AA6-BFB5-49A8-B34A-2A8F783BE2F4`

@@ -229,7 +229,7 @@
 | Name | Chat ID | Participants |
 |------|---------|--------------|
 | Dawn & Jennifer | 980 | Dawn, Jennifer |
-| RG Building Mgmt | TBD | Dawn, Sue Miller |
+| RG Building Mgmt | 1022 | Dawn, Sue Miller |
 | HOA Drywall | 1343 | Dawn, Amy, neighbors |
 | Shagbark Neighbors | 1053 | Dawn, Amy, multiple |
 

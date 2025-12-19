@@ -4,8 +4,11 @@ Daily Briefing Generator v0.2
 Unified briefing: iMessage activity + property alerts + CRM
 
 Usage:
-  python3 daily_briefing.py           # Generate briefing to stdout
-  python3 daily_briefing.py --note    # Generate and save to Apple Notes
+  python3 daily_briefing.py           # Full daily briefing to stdout
+  python3 daily_briefing.py --note    # Save full briefing to Apple Notes
+  python3 daily_briefing.py --crm     # CRM-only compact briefing
+  python3 daily_briefing.py --crm --note  # Save CRM briefing to Apple Notes
+  python3 daily_briefing.py --date 2025-11-24  # Historical date
 """
 
 import sqlite3
@@ -442,6 +445,96 @@ def generate_briefing(test_date=None):
     return '\n'.join(out)
 
 
+def generate_crm_briefing(test_date=None):
+    """Generate a compact CRM-only briefing.
+    
+    Args:
+        test_date: Optional YYYY-MM-DD string for testing historical dates
+    """
+    if test_date:
+        target_date = datetime.strptime(test_date, '%Y-%m-%d')
+        today_display = target_date.strftime('%b %d')
+    else:
+        target_date = datetime.now()
+        today_display = target_date.strftime('%b %d')
+    
+    # Gather CRM data only
+    contacts = parse_contacts()
+    
+    # Process CRM data
+    promises = []
+    waiting = []
+    alerts = []
+    
+    for c in contacts:
+        msg_info = get_last_message_info(c['phone'])
+        
+        if msg_info:
+            days = days_since(msg_info['last_date'].split()[0])
+        else:
+            days = None
+        
+        if c['promise']:
+            # Extract key info for compact display
+            status = c.get('status', '') or ''
+            time_hint = ''
+            if 'TOMORROW' in status.upper():
+                time_hint = ' (TOMORROW)'
+            elif 'TODAY' in status.upper():
+                time_hint = ' (TODAY)'
+            promises.append({
+                'name': c['name'].split('(')[0].strip(),  # Remove parenthetical
+                'promise': c['promise'],
+                'time_hint': time_hint
+            })
+        
+        if c['waiting']:
+            cold = ' ⚠️' if days and days > 7 else ''
+            days_str = f" ({days}d{cold})" if days else ""
+            waiting.append({
+                'name': c['name'].split('(')[0].strip(),
+                'waiting': c['waiting'],
+                'days_str': days_str
+            })
+        
+        if c['reminder']:
+            alerts.append({
+                'name': c['name'].split('(')[0].strip(),
+                'reminder': c['reminder']
+            })
+    
+    # Build compact output
+    out = []
+    out.append(f"# 🎯 CRM Quick Check — {today_display}\n")
+    
+    # I Owe section
+    out.append("## I Owe")
+    if promises:
+        for p in promises:
+            out.append(f"- {p['name']}: {p['promise']}{p['time_hint']}")
+    else:
+        out.append("- *All caught up!*")
+    out.append("")
+    
+    # Waiting On section
+    out.append("## Waiting On")
+    if waiting:
+        for w in waiting:
+            out.append(f"- {w['name']}: {w['waiting']}{w['days_str']}")
+    else:
+        out.append("- *Nothing pending*")
+    out.append("")
+    
+    # Don't Forget section
+    if alerts:
+        out.append("## Don't Forget")
+        for a in alerts:
+            out.append(f"- {a['name']}: {a['reminder']}")
+        out.append("")
+    
+    return '\n'.join(out)
+
+
 def check_accessibility():
     """Check if System Events has accessibility permissions."""
     check_script = '''
@@ -599,29 +692,69 @@ def save_to_apple_notes_legacy(content, title="Daily Briefing"):
 
 
 if __name__ == '__main__':
-    # Parse optional --date YYYY-MM-DD for testing historical dates
+    # Parse arguments
     test_date = None
+    crm_mode = '--crm' in sys.argv
+    note_mode = '--note' in sys.argv
+    
     for i, arg in enumerate(sys.argv):
         if arg == '--date' and i + 1 < len(sys.argv):
             test_date = sys.argv[i + 1]
     
-    briefing = generate_briefing(test_date=test_date)
-    
-    # Generate note title based on date
-    if test_date:
-        note_date = datetime.strptime(test_date, '%Y-%m-%d')
-        note_title = f"Daily Briefing — {note_date.strftime('%b %d, %Y')}"
-    else:
-        note_title = f"Daily Briefing — {datetime.now().strftime('%b %d, %Y')}"
-    
-    if '--note' in sys.argv:
-        # For historical dates, use legacy method to avoid overwriting today's note
+    # Generate appropriate briefing
+    if crm_mode:
+        briefing = generate_crm_briefing(test_date=test_date)
+        note_folder = "CRM Briefings"
         if test_date:
-            if save_to_apple_notes_legacy(briefing, title=note_title):
-                print(f"✅ {note_title} saved to Apple Notes")
+            note_date = datetime.strptime(test_date, '%Y-%m-%d')
+            note_title = f"CRM Quick Check — {note_date.strftime('%b %d, %Y')}"
+        else:
+            note_title = f"CRM Quick Check — {datetime.now().strftime('%b %d, %Y')}"
+    else:
+        briefing = generate_briefing(test_date=test_date)
+        note_folder = "Daily Briefings"
+        if test_date:
+            note_date = datetime.strptime(test_date, '%Y-%m-%d')
+            note_title = f"Daily Briefing — {note_date.strftime('%b %d, %Y')}"
+        else:
+            note_title = f"Daily Briefing — {datetime.now().strftime('%b %d, %Y')}"
+    
+    if note_mode:
+        # CRM mode always uses legacy (compact, no rich formatting needed)
+        # Historical dates also use legacy to avoid overwriting today's note
+        if crm_mode or test_date:
+            # Use legacy method with custom folder for CRM
+            if crm_mode:
+                # Custom save for CRM briefings folder
+                escaped = briefing.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+                script = f'''
+                tell application "Notes"
+                    tell account "iCloud"
+                        if not (exists folder "CRM Briefings") then
+                            make new folder with properties {{name:"CRM Briefings"}}
+                        end if
+                        tell folder "CRM Briefings"
+                            set existingNotes to (notes whose name is "{note_title}")
+                            if (count of existingNotes) > 0 then
+                                delete (item 1 of existingNotes)
+                            end if
+                            make new note with properties {{name:"{note_title}", body:"{escaped}"}}
+                        end tell
+                    end tell
+                end tell
+                '''
+                try:
+                    subprocess.run(['osascript', '-e', script], check=True, capture_output=True)
+                    print(f"✅ {note_title} saved to Apple Notes (CRM Briefings folder)")
+                except subprocess.CalledProcessError as e:
+                    print(f"❌ Failed to save: {e.stderr.decode()}", file=sys.stderr)
+                    print(briefing)
             else:
-                print("❌ Failed to save")
-                print(briefing)
+                if save_to_apple_notes_legacy(briefing, title=note_title):
+                    print(f"✅ {note_title} saved to Apple Notes")
+                else:
+                    print("❌ Failed to save")
+                    print(briefing)
         else:
             result = save_to_apple_notes_macos26(briefing)
             

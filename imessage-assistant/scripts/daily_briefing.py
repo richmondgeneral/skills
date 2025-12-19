@@ -607,23 +607,38 @@ if __name__ == '__main__':
     
     briefing = generate_briefing(test_date=test_date)
     
+    # Generate note title based on date
+    if test_date:
+        note_date = datetime.strptime(test_date, '%Y-%m-%d')
+        note_title = f"Daily Briefing — {note_date.strftime('%b %d, %Y')}"
+    else:
+        note_title = f"Daily Briefing — {datetime.now().strftime('%b %d, %Y')}"
+    
     if '--note' in sys.argv:
-        result = save_to_apple_notes_macos26(briefing)
-        
-        if result is True:
-            print("✅ Daily Briefing saved to Apple Notes (Daily Briefings folder)")
-        elif result is None:
-            print("Falling back to legacy method...", file=sys.stderr)
-            if save_to_apple_notes_legacy(briefing):
-                print("✅ Saved via legacy method")
+        # For historical dates, use legacy method to avoid overwriting today's note
+        if test_date:
+            if save_to_apple_notes_legacy(briefing, title=note_title):
+                print(f"✅ {note_title} saved to Apple Notes")
             else:
                 print("❌ Failed to save")
                 print(briefing)
         else:
-            print("❌ macOS 26 import failed, trying legacy...", file=sys.stderr)
-            if save_to_apple_notes_legacy(briefing):
-                print("✅ Saved via legacy method")
+            result = save_to_apple_notes_macos26(briefing)
+            
+            if result is True:
+                print("✅ Daily Briefing saved to Apple Notes (Daily Briefings folder)")
+            elif result is None:
+                print("Falling back to legacy method...", file=sys.stderr)
+                if save_to_apple_notes_legacy(briefing, title=note_title):
+                    print("✅ Saved via legacy method")
+                else:
+                    print("❌ Failed to save")
+                    print(briefing)
             else:
-                print(briefing)
+                print("❌ macOS 26 import failed, trying legacy...", file=sys.stderr)
+                if save_to_apple_notes_legacy(briefing, title=note_title):
+                    print("✅ Saved via legacy method")
+                else:
+                    print(briefing)
     else:
         print(briefing)

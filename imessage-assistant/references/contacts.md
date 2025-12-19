@@ -64,13 +64,20 @@
 ### Jeff Thompson
 - **Phone**: +18475677182
 - **Service**: iMessage
-- **Relationship**: Close tech friend, 20+ years
-- **Context**: App developer, shares ChatGPT/Claude accounts with Scott, repos (Avallon-playground, flipcard)
-- **Current**: Job hunting after company bankruptcy (Medicare fraud fallout, Nov 2025). Building **SafeTabz** - safety check-in app (dead man's switch → broadcast location)
+- **Relationship**: CO-FOUNDER & close friend, 10+ years building together
+- **History**: Co-founded **ThreeBatDrone (3BD)** in 2014 → built **Snaplistings.io** together
+  - Real estate ML platform for listing agents
+  - ~120 paying agents in Chicagoland
+  - Scraped Zillow/Trulia/Redfin, MRED integration, Alexa skill (AVA)
+  - Dawn was a paid user (MRED ID: 51259)
+  - Scott's MRED ID: 55103
+  - Full startup journey: MEAN stack, Appgyver, Google App Engine, AWS
+- **Shared repos**: Avallon-playground, flipcard, ChatGPT/Claude accounts
+- **Current**: Job hunting after company bankruptcy (Medicare fraud fallout, Nov 2025). Building **SafeTabz** - safety check-in app (dead man's switch → broadcast location → nav-to-me)
 - **Style**: Casual, deep tech talk, Claude/AI discussion, pirate jokes land well
 - **Agent-OK**: ✅ Knows Scott sends agents. Play with Turing test angle. Can message AS the agent directly.
 - **⚠️ IMPORTANT**: Knows about Scott's "retail automation project" but NOT the store/flea market specifically. Don't mention Richmond General or flea market details.
-- **Note**: For complex replies, pull 100-150 messages. Reference shared repos, AI tools, job hunt.
+- **Note**: For complex replies, pull 100-150 messages. Reference shared startup history, co-founder bond, AI tools, job hunt. This is a decade-long technical partnership.
 
 ### Amy D (HOA)
 - **Phone**: +17736763930
@@ -112,71 +119,90 @@
 ### Walid Bandar
 - **Phone**: +13124483219
 - **Service**: iMessage
-- **Category**: Vinyl buyer
+- **Category**: Customer
+- **Promise**: Keep eye out for New Wave vinyl
+- **Waiting**: null
 - **Interest**: New Wave records
-- **Status**: Hot — returning Christmas to NYE with brother
+- **Status**: Visit scheduled Dec 28-30 with brother
 - **Last Contact**: Dec 19, 2025
 - **Note**: Wants notification on new vinyl arrivals. Inventory rollover after new year.
 
 ### Lynn
 - **Phone**: +18473383408
 - **Service**: RCS
-- **Category**: Books prospect
-- **Status**: Pending — waiting for pics
+- **Category**: Lead
+- **Promise**: null
+- **Waiting**: Book pics from her
+- **Interest**: Books
+- **Status**: Pending — said "next week" (holidays)
 - **Last Contact**: Dec 19, 2025
 - **Note**: Has books to discuss. Reached out Dec 13.
 
 ### Steven (Elmhurst)
 - **Phone**: +12623082827
 - **Service**: iMessage
-- **Category**: Estate sourcing
+- **Category**: Partner
+- **Promise**: Research/ID glasses from Elmhurst pickup
+- **Waiting**: null
+- **Interest**: Estate cleanouts, sourcing
 - **Status**: Active relationship
 - **Last Contact**: Dec 19, 2025
-- **Note**: Estate cleanout contact. Did Elmhurst pickup Dec 17. Has glasses to ID.
+- **Note**: Estate cleanout contact. Did Elmhurst pickup Dec 17.
 
 ### 414 Contact (GET NAME!)
 - **Phone**: +14148757568
 - **Service**: iMessage
-- **Category**: Trade opportunity
+- **Category**: Lead
+- **Promise**: Bring horror VHS to trade
+- **Waiting**: His name (Jen forewarning)
 - **Inventory**:
   - 200-300 vinyl LPs (sleeve condition ~half damaged) — Elvis, Isley Brothers, rock compilations
   - ~100 pulp novels 30s-60s (great condition) — Erskine Caldwell, Frank G. Slaughter, Luke Short
   - ~300 laserdiscs (sealed, box sets, westerns, musicals, Disney)
 - **Wants**: Horror VHS, 80s stuff, weird VHS, laserdiscs
-- **Status**: Trade in progress
+- **Status**: Trade TOMORROW 9:30am flea market
 - **Last Contact**: Dec 19, 2025
-- **⚠️ REMINDER**: Get his name next contact!
+- **⚠️ REMINDER**: Get his name!
 
 ### Laura (First REO Sale)
 - **Phone**: +12246276323
 - **Service**: iMessage
-- **Category**: Historical connection
-- **Status**: Nurturing
+- **Category**: Nurture
+- **Promise**: null
+- **Waiting**: null
+- **Status**: Relationship maintenance
 - **Last Contact**: Dec 19, 2025
-- **Note**: First REO sale as a brokerage in Richmond. Still lives in Richmond.
+- **Note**: First REO sale as a brokerage in Richmond. Still lives in Richmond. Merry Christmas exchanged ✓
 
 ### Bill North - North Construction
 - **Phone**: +18477747698
 - **Service**: SMS
-- **Category**: Business connection
+- **Category**: Lead
+- **Promise**: null
+- **Waiting**: Response to intro message
 - **Company**: North Construction
-- **Status**: Potential partnership
+- **Status**: Initial outreach sent
 - **Last Contact**: Dec 19, 2025
-- **Note**: Looking for contractors in trades. Wife bought items, liked the store. Dawn & Scotty are RE brokers too — good cross-connection.
+- **Note**: Looking for contractors in trades. Wife bought items, liked the store. Dawn & Scotty are RE brokers too.
 
 ### Josh (White Dually)
 - **Phone**: +18479803301
 - **Service**: SMS
-- **Category**: Neighbor/helper
+- **Category**: Nurture
+- **Promise**: Owes him one (helped with truck)
+- **Waiting**: null
 - **Location**: Lives by the turn lane near Wonder Lake
 - **Last Contact**: Dec 9, 2025
-- **Note**: Helped when truck broke down Dec 8-9. Owes him one.
+- **Note**: Helped when truck broke down Dec 8-9.
 
 ### Pete (eBay Reseller)
 - **Phone**: +18082228761
 - **Service**: RCS
-- **Category**: Reseller partner
-- **Status**: Active
+- **Category**: Partner
+- **Promise**: null
+- **Waiting**: Response re: moving to area
+- **Status**: Going cold (13 days)
+- **Last Contact**: Dec 6, 2025
 - **Note**: Has 75+ RG items on his eBay shop. Considering moving to the area. Trixy connection.
 
 ---

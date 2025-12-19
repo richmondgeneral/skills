@@ -41,8 +41,9 @@ Meta-skill for collaboratively developing and maintaining Claude skills with Sco
 | **vintage-appraiser** | `~/skills/vintage-appraiser/` | Maker's marks, carnival glass, pricing | - |
 | **book-appraiser** | `~/skills/book-appraiser/` | Antiquarian books, LOC cross-reference | - |
 | **product-labeler** | `~/skills/product-labeler/` | Thermal labels, Square descriptions | - |
-| **imessage-assistant** | `~/skills/imessage-assistant/` | iMessage/RCS/SMS automation | - |
-| **skill-manager** | `~/skills/skill-manager/` | This meta-skill | 2025-11-27 |
+| **imessage-assistant** | `~/skills/imessage-assistant/` | iMessage/RCS/SMS automation, CRM briefings | 2025-12-19 |
+| **square-crm** | `~/skills/square-crm/` | Square customer sync from contacts.md | 2025-12-19 |
+| **skill-manager** | `~/skills/skill-manager/` | This meta-skill | 2025-12-19 |
 
 ## Creating New Skills
 

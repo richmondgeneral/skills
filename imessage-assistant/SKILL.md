@@ -90,6 +90,27 @@ python3 ~/skills/imessage-assistant/scripts/sent_today.py
 python3 ~/skills/imessage-assistant/scripts/sent_today.py --failed
 ```
 
+### CRM Daily Briefing
+
+```bash
+# Generate briefing to stdout
+python3 ~/skills/imessage-assistant/scripts/crm_briefing.py
+
+# Generate and save to Apple Notes (CRM Briefings folder)
+python3 ~/skills/imessage-assistant/scripts/crm_briefing.py --note
+```
+
+Reads `references/contacts.md` for:
+- **Promise**: What I owe them
+- **Waiting**: What they owe me
+- **Category**: Lead / Customer / Partner / Nurture
+
+Outputs sections:
+- 🔴 Promises to Keep
+- 🟡 Their Turn (with cold warnings >7 days)
+- 🟢 Nurture (no action)
+- ⚠️ Don't Forget (reminders)
+
 ### Daily Message Audit
 
 1. Run `get_imessage_convo.py --today`
@@ -141,6 +162,37 @@ python3 ~/skills/imessage-assistant/scripts/sent_today.py --failed
 | `is_delivered=0` | Pending/failed | Check with `sent_today.py --failed` |
 | osascript fails | Messages not running | Open Messages.app |
 | Wrong contact | Multiple same name | Verify last message date |
+
+---
+
+## Agent-Friendly Contacts
+
+These contacts know Scott uses AI agents and can receive messages directly FROM the agent:
+
+| Contact | Style Notes |
+|---------|-------------|
+| Jeff Thompson | "Badass!" - loves it. Turing test jokes. Co-founder bond. |
+| Jennifer Long | Plays along. Use "forewarn" = lookup/pre-qualify a contact. |
+| Jamie Boutain | Bot detection jokes. "We won't know till the cutting starts." |
+
+**When messaging as agent:**
+- Identify as "Scott's AI" or "Claude"
+- Reference that Scott asked you to reach out
+- Joke about Eleven Labs voice clones
+- Keep it playful
+
+---
+
+## Message Escaping
+
+**Use double quotes for messages containing apostrophes:**
+```bash
+# WRONG - will fail
+python3 send_message.py +1234567890 'Don\'t forget!'
+
+# RIGHT
+python3 send_message.py +1234567890 "Don't forget!"
+```
 
 ---
 

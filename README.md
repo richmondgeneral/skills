@@ -25,20 +25,43 @@ Specialist skill for identifying maker's marks, carnival glass, pottery, silver,
 skills/
 ├── rg-inventory/
 │   ├── SKILL.md
+│   ├── scripts/
 │   └── references/
-│       ├── lot-tracking.md
-│       ├── pricing-guidelines.md
-│       └── square-catalog.md
 ├── book-appraiser/
 │   ├── SKILL.md
 │   └── references/
-│       └── condition-grading.md
-└── vintage-appraiser.skill    # Zip archive format
+├── imessage-assistant/
+│   ├── SKILL.md
+│   ├── scripts/
+│   └── references/
+├── square-crm/
+│   ├── SKILL.md
+│   ├── scripts/
+│   └── references/
+├── build-skill.sh          # Build script for generating ZIP archives
+└── archive/                # Generated ZIP files (not in git)
 ```
 
 ## Usage
 
 These skills are designed to be loaded by AI assistants (Claude, Warp, etc.) to provide specialized knowledge and workflows for Richmond General inventory management.
+
+## Building Skills
+
+Skills are packaged as ZIP files for distribution. Use the build script to generate archives:
+
+```bash
+# Build a single skill
+./build-skill.sh imessage-assistant
+
+# Build all skills
+./build-skill.sh --all
+
+# List available skills
+./build-skill.sh
+```
+
+Generated ZIP files are placed in `archive/` and are excluded from version control.
 
 ## Related Repositories
 

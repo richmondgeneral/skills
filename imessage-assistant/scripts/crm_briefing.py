@@ -3,9 +3,11 @@
 CRM Daily Briefing Generator
 Reads contacts.md, queries chat.db for activity, outputs to Apple Notes.
 
+Uses macOS 26+ native markdown import for rich formatting (tables, headers, etc.)
+
 Usage:
   python3 crm_briefing.py           # Generate briefing to stdout
-  python3 crm_briefing.py --note    # Generate and save to Apple Notes
+  python3 crm_briefing.py --note    # Generate and save to Apple Notes (rich formatting)
 """
 
 import sqlite3
@@ -13,16 +15,18 @@ import os
 import sys
 import re
 import subprocess
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 DB = os.path.expanduser('~/Library/Messages/chat.db')
 CONTACTS_FILE = os.path.expanduser('~/skills/imessage-assistant/references/contacts.md')
+TEMP_MD_FILE = '/tmp/crm_daily_briefing.md'
+
 
 def parse_contacts():
     """Parse contacts.md for customer profiles with Promise/Waiting fields."""
     contacts = []
-    current_contact = None
     
     with open(CONTACTS_FILE, 'r') as f:
         content = f.read()
@@ -119,7 +123,6 @@ def days_since(date_str):
     try:
         if not date_str:
             return None
-        # Handle both "Dec 19, 2025" and "2025-12-19" formats
         for fmt in ['%b %d, %Y', '%Y-%m-%d', '%Y-%m-%d %H:%M:%S']:
             try:
                 dt = datetime.strptime(date_str.split()[0] if ' ' in date_str and ':' in date_str else date_str, fmt)
@@ -132,7 +135,7 @@ def days_since(date_str):
 
 
 def generate_briefing(contacts):
-    """Generate the CRM briefing markdown."""
+    """Generate the CRM briefing in markdown format for macOS 26 Notes import."""
     today = datetime.now().strftime('%b %d, %Y')
     
     promises = []
@@ -141,7 +144,6 @@ def generate_briefing(contacts):
     alerts = []
     
     for c in contacts:
-        # Get live data from chat.db
         msg_info = get_last_message_info(c['phone'])
         
         if msg_info:
@@ -151,21 +153,12 @@ def generate_briefing(contacts):
             days = None
             whose_turn = "unknown"
         
-        # Categorize
         if c['promise']:
-            promises.append({
-                **c,
-                'days': days,
-                'whose_turn': whose_turn
-            })
+            promises.append({**c, 'days': days, 'whose_turn': whose_turn})
         
         if c['waiting']:
             cold_warning = " ⚠️" if days and days > 7 else ""
-            waiting.append({
-                **c,
-                'days': days,
-                'cold_warning': cold_warning
-            })
+            waiting.append({**c, 'days': days, 'cold_warning': cold_warning})
         
         if c['category'] == 'Nurture':
             nurture.append(c)
@@ -173,40 +166,48 @@ def generate_briefing(contacts):
         if c['reminder']:
             alerts.append(c)
     
-    # Build output
+    # Build markdown
     out = []
-    out.append(f"# 📬 Daily Briefing — {today}\n")
+    out.append(f"# 📬 Daily CRM Briefing — {today}\n")
     
-    # Promises section
+    # Priority callout if there are urgent items
+    urgent = [p for p in promises if 'TOMORROW' in (p.get('status', '') or '').upper()]
+    if urgent:
+        out.append(f"> **Priority Focus:** {urgent[0]['promise']}\n")
+    
+    out.append("---\n")
+    
+    # Promises section with table
     out.append("## 🔴 PROMISES TO KEEP\n")
     if promises:
-        out.append("| Who | What I Owe Them | Status |")
-        out.append("|-----|-----------------|--------|")
+        out.append("| Contact | What I Owe | Status |")
+        out.append("|---------|-----------|--------|")
         for p in promises:
             status = p.get('status', '') or ''
-            out.append(f"| {p['name']} | {p['promise']} | {status} |")
+            out.append(f"| **{p['name']}** | {p['promise']} | {status} |")
     else:
         out.append("*None — you're all caught up!*")
     out.append("")
     
-    # Waiting section
+    # Waiting section with table
     out.append("## 🟡 THEIR TURN\n")
     if waiting:
-        out.append("| Who | Waiting For | Days |")
-        out.append("|-----|-------------|------|")
+        out.append("| Contact | Waiting For | Days |")
+        out.append("|---------|-------------|------|")
         for w in waiting:
             days_str = str(w['days']) if w['days'] is not None else "?"
-            out.append(f"| {w['name']} | {w['waiting']} | {days_str}{w['cold_warning']} |")
+            bold_days = f"**{days_str}**" if w['days'] and w['days'] > 7 else days_str
+            out.append(f"| {w['name']} | {w['waiting']} | {bold_days}{w['cold_warning']} |")
     else:
         out.append("*Nothing pending*")
     out.append("")
     
-    # Nurture section
+    # Nurture section as list
     out.append("## 🟢 NURTURE (no action needed)\n")
     if nurture:
-        for n in nurture:
-            note = n.get('status', '') or n.get('note', '') or ''
-            out.append(f"- {n['name']} — {note}")
+        for i, n in enumerate(nurture, 1):
+            note = n.get('status', '') or ''
+            out.append(f"{i}. **{n['name']}** — {note}")
     else:
         out.append("*None*")
     out.append("")
@@ -225,9 +226,128 @@ def generate_briefing(contacts):
     return '\n'.join(out)
 
 
-def save_to_apple_notes(content, title="Daily CRM Briefing"):
-    """Save briefing to Apple Notes."""
-    # Escape for AppleScript
+def save_to_apple_notes_macos26(markdown_content):
+    """
+    Save briefing to Apple Notes using macOS 26 markdown import.
+    This provides rich formatting (tables, headers, bold, etc.)
+    """
+    # Step 1: Write markdown to temp file
+    with open(TEMP_MD_FILE, 'w') as f:
+        f.write(markdown_content)
+    
+    # Step 2: Quit Notes if running (cleaner import)
+    subprocess.run(['osascript', '-e', 'tell application "Notes" to quit'], 
+                   capture_output=True)
+    time.sleep(0.5)
+    
+    # Step 3: Open markdown file with Notes (triggers import dialog)
+    subprocess.run(['open', '-a', 'Notes', TEMP_MD_FILE], capture_output=True)
+    time.sleep(1.5)
+    
+    # Step 4: Click the Import button
+    click_import_script = '''
+    tell application "System Events"
+        tell process "Notes"
+            try
+                click button "Import" of sheet 1 of window 1
+                return "clicked"
+            on error
+                try
+                    keystroke return
+                    return "keystroke"
+                on error errMsg
+                    return "error: " & errMsg
+                end try
+            end try
+        end tell
+    end tell
+    '''
+    result = subprocess.run(['osascript', '-e', click_import_script], 
+                           capture_output=True, text=True)
+    
+    if 'error' in result.stdout.lower():
+        print(f"Warning: Import click issue: {result.stdout}", file=sys.stderr)
+    
+    time.sleep(1)
+    
+    # Step 5: Find and move the imported note to CRM Briefings
+    # NOTE: Direct folder reference works; iteration over folders/notes is buggy in Notes AppleScript
+    move_script = '''
+    tell application "Notes"
+        tell account "iCloud"
+            -- Ensure CRM Briefings folder exists
+            if not (exists folder "CRM Briefings") then
+                make new folder with properties {name:"CRM Briefings"}
+            end if
+            
+            -- Delete existing daily briefings in CRM Briefings
+            tell folder "CRM Briefings"
+                set existingNotes to (notes whose name contains "Daily CRM Briefing")
+                repeat with n in existingNotes
+                    delete n
+                end repeat
+            end tell
+            
+            -- Find and move from Imported Notes folders (direct reference, not iteration)
+            set movedNote to false
+            set sourceFolder to ""
+            
+            -- Try each possible Imported Notes folder directly
+            repeat with i from 0 to 10
+                try
+                    if i = 0 then
+                        set folderName to "Imported Notes"
+                    else
+                        set folderName to "Imported Notes " & i
+                    end if
+                    
+                    set n to first note of folder folderName whose name contains "Daily CRM Briefing"
+                    move n to folder "CRM Briefings"
+                    set movedNote to true
+                    set sourceFolder to folderName
+                    exit repeat
+                end try
+            end repeat
+            
+            -- Clean up empty Imported Notes folders
+            repeat with i from 0 to 10
+                try
+                    if i = 0 then
+                        set folderName to "Imported Notes"
+                    else
+                        set folderName to "Imported Notes " & i
+                    end if
+                    
+                    set f to folder folderName
+                    if (count of notes of f) = 0 then
+                        delete f
+                    end if
+                end try
+            end repeat
+            
+            if movedNote then
+                return "✅ Moved to CRM Briefings from " & sourceFolder
+            else
+                return "⚠️ Note not found in Imported Notes folders"
+            end if
+        end tell
+    end tell
+    '''
+    
+    result = subprocess.run(['osascript', '-e', move_script], 
+                           capture_output=True, text=True)
+    
+    # Step 6: Clean up temp file
+    try:
+        os.remove(TEMP_MD_FILE)
+    except:
+        pass
+    
+    return "✅" in result.stdout
+
+
+def save_to_apple_notes_legacy(content, title="Daily CRM Briefing"):
+    """Legacy method: Save briefing using AppleScript text injection (raw, no formatting)."""
     escaped = content.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
     
     script = f'''
@@ -260,10 +380,26 @@ if __name__ == '__main__':
     briefing = generate_briefing(contacts)
     
     if '--note' in sys.argv:
-        if save_to_apple_notes(briefing):
+        # Use macOS 26 markdown import for rich formatting
+        if save_to_apple_notes_macos26(briefing):
             print("✅ Briefing saved to Apple Notes (CRM Briefings folder)")
         else:
             print("❌ Failed to save to Apple Notes")
+            # Fallback to legacy method
+            print("Trying legacy method...", file=sys.stderr)
+            if save_to_apple_notes_legacy(briefing):
+                print("✅ Saved via legacy method (no rich formatting)")
+            else:
+                print(briefing)
+    
+    elif '--legacy' in sys.argv:
+        # Force legacy method (raw text, no formatting)
+        if save_to_apple_notes_legacy(briefing):
+            print("✅ Briefing saved to Apple Notes (legacy mode)")
+        else:
+            print("❌ Failed to save to Apple Notes")
             print(briefing)
+    
     else:
+        # Default: output markdown to stdout
         print(briefing)

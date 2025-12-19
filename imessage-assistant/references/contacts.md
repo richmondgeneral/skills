@@ -6,9 +6,9 @@
 |------|-------|---------|--------------|
 | Freeman (Dad) | +12242308079 | RCS | Father |
 | Dawn Zurick | +18472871148 | iMessage | Partner, Richmond General |
-| Jennifer Long | +16305444884 | iMessage | Business partner |
+| Jennifer Long | +16305444884 | iMessage | Close friend + biz partner, agent-OK |
 | Mike (Richmond) | +13129143889 | RCS | Store ops |
-| Jeff Thompson | +18475677182 | iMessage | Store visits |
+| Jeff Thompson | +18475677182 | iMessage | Close tech friend, agent-OK |
 | Amy D (HOA) | +17736763930 | iMessage | HOA neighbor |
 | Gary Goza Sr | +18474179386 | iMessage | 20+ year friend |
 | Jamie Boutain | +16519834441 | iMessage | Long-time friend |
@@ -47,8 +47,13 @@
 ### Jennifer Long
 - **Phone**: +16305444884
 - **Service**: iMessage
-- **Context**: Richmond General finances, accounting, reimbursements.
-- **Style**: Professional, detail-oriented.
+- **Relationship**: Close friend AND business partner
+- **Context**: Richmond General finances, accounting, reimbursements. Also handles BPOs, property services, rekeys.
+- **Family**: 4 kids including Sammie (health issues Dec 2025 - reactive arthritis scare). Often overwhelmed juggling work + family.
+- **Style**: Professional but playful. Back to the Future jokes ("Great Scott!", "1.21 jigowatts"). Detail-oriented.
+- **Agent-OK**: ✅ Knows Scott sends agents. Can message AS the agent directly. Plays along.
+- **"Forewarn"**: = pre-qualify/lookup a contact. She knows what this means.
+- **Note**: For complex replies, pull 100-150 messages. Be supportive re: family stress.
 
 ### Mike (Richmond/Flea Market)
 - **Phone**: +13129143889
@@ -59,8 +64,13 @@
 ### Jeff Thompson
 - **Phone**: +18475677182
 - **Service**: iMessage
-- **Context**: App developer, Avallon project, TestFlight testing. Tech banter.
-- **Style**: Casual, lots of tech talk, Claude/AI discussion
+- **Relationship**: Close tech friend, 20+ years
+- **Context**: App developer, shares ChatGPT/Claude accounts with Scott, repos (Avallon-playground, flipcard)
+- **Current**: Job hunting after company bankruptcy (Medicare fraud fallout, Nov 2025). Building **SafeTabz** - safety check-in app (dead man's switch → broadcast location)
+- **Style**: Casual, deep tech talk, Claude/AI discussion, pirate jokes land well
+- **Agent-OK**: ✅ Knows Scott sends agents. Play with Turing test angle. Can message AS the agent directly.
+- **⚠️ IMPORTANT**: Knows about Scott's "retail automation project" but NOT the store/flea market specifically. Don't mention Richmond General or flea market details.
+- **Note**: For complex replies, pull 100-150 messages. Reference shared repos, AI tools, job hunt.
 
 ### Amy D (HOA)
 - **Phone**: +17736763930
@@ -188,6 +198,26 @@
 | iMessage | `33900AA6-BFB5-49A8-B34A-2A8F783BE2F4` |
 | SMS | `E0595A22-53AF-4ECC-93BE-D717796D445F` |
 | RCS | `E91298EB-BC75-4C35-9F62-8FADC3564235` |
+
+---
+
+---
+
+## Agent-Friendly Contacts
+
+These contacts know Scott uses AI agents and are OK receiving messages directly from the agent (not pretending to be Scott):
+
+| Contact | Notes |
+|---------|-------|
+| Jeff Thompson | Plays along with Turing test jokes. Deep AI/tech discussions. |
+| Jennifer Long | Plays along. "Forewarn" = lookup/pre-qualify a contact. |
+| Jamie Boutain | Running joke about bot detection. "We won't truly know till the cutting starts." |
+
+For these contacts, feel free to:
+- Identify as "Scott's AI" or "Claude"
+- Play with the agent angle humorously
+- Reference that Scott asked you to reach out
+- Joke about making sure Scott doesn't send an Eleven Labs voice clone
 
 ---
 

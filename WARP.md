@@ -6,6 +6,22 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 This is a skills library for AI assistants managing Richmond General's vintage and antique inventory system. Each skill provides specialized workflows for specific aspects of inventory management, from appraisal and cataloging to pricing and publishing.
 
+### Agent Skills Standard Compliance
+
+This repository follows the **Agent Skills open standard** (published Dec 18, 2025) from Anthropic. Skills are portable across Claude and other Agent Skills-compatible platforms including:
+- Claude (claude.ai, Claude Code, API)
+- VS Code & GitHub (Microsoft)
+- Cursor, Goose, Amp, OpenCode
+- Any platform implementing the agentskills.io specification
+
+**Key Principle: Progressive Disclosure**  
+Skills use a three-tier loading strategy:
+1. **Metadata** (name + description) - Loaded at startup (~100 tokens)
+2. **Instructions** (SKILL.md body) - Loaded when relevant (~5k tokens)
+3. **Resources** (scripts, references) - Loaded on-demand only
+
+This means skills can include comprehensive documentation without context penalty.
+
 ## Skills Architecture
 
 ### Three-Tier Skill System
@@ -39,11 +55,20 @@ skill-name/
 ```
 
 Each SKILL.md includes:
-- YAML frontmatter with `name`, `description`, and trigger conditions
+- **YAML frontmatter** (required by Agent Skills standard):
+  - `name`: Lowercase, hyphenated, max 64 chars (e.g., `rg-inventory`, `book-appraiser`)
+  - `description`: What the skill does AND when to use it (critical for discovery)
+  - Include trigger keywords users would naturally mention
 - Core workflow with numbered phases/steps
 - Integration points with other skills
 - Quick reference tables for IDs, categories, formats
 - External API/service details where applicable
+
+**Description Best Practices:**
+- Include both capabilities and use cases
+- Use specific terms, avoid vague descriptions like "helps with" or "manages"
+- Good: `"Extract text and tables from PDF files, fill forms. Use when working with PDFs or document extraction."`
+- Bad: `"PDF processing tool"` (too vague, won't be discovered)
 
 ### Critical Integration Points
 
@@ -161,3 +186,16 @@ Do NOT reorganize without updating cross-references:
 - Include examples in code blocks (JSON for API, CSV for labels)
 - Keep "Quick Reference" sections at top of long workflows
 - Date-sensitive information (e.g., tax IDs) should be clearly marked
+
+### Agent Skills References
+
+For the latest official documentation, see files in this repository:
+- `agent-skills-specification.html` - Official open standard specification
+- `claude-skills-docs.html` - Complete implementation guide
+- `anthropic-skills-README.md` - GitHub repository README
+- `CLAUDE-SKILLS-DOCS-INDEX.md` - Summary with links to all resources
+
+Key resources:
+- Specification: https://agentskills.io/specification
+- Official GitHub: https://github.com/anthropics/skills
+- Platform docs: https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview

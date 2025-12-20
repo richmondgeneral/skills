@@ -4,6 +4,11 @@ AI assistant skills for managing Richmond General's vintage and antique inventor
 
 ## Skills
 
+### rg-new-item
+Claude-supervised workflow for processing new items from a single photo to live listing. Complete 7-phase automation with user approval at key steps.
+
+**Use when:** User provides a product photo, says "new item", "add to inventory", or "create listing". Handles appraisal, background removal, Square catalog, payment links, and GitHub Pages publishing.
+
 ### rg-inventory
 Main orchestrator skill for the complete inventory workflow from appraisal through GitHub Pages publishing.
 
@@ -34,6 +39,10 @@ Generate product labels for Richmond General Square inventory and thermal printi
 
 ```
 skills/
+├── rg-new-item/            # Claude-supervised new item workflow
+│   ├── SKILL.md
+│   ├── scripts/
+│   └── references/
 ├── rg-inventory/           # Main orchestrator
 │   ├── SKILL.md
 │   └── references/

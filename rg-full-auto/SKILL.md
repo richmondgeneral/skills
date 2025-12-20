@@ -1,8 +1,9 @@
 ---
 name: rg-full-auto
-description: End-to-end 7-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, fulfillment, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
+description: End-to-end 7-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, fulfillment, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "1.0"
+  version: "1.1"
+  author: scottybe
 ---
 
 # Richmond General Full Auto
@@ -27,6 +28,35 @@ Complete 7-phase workflow for onboarding new vintage/antique items from acquisit
 | The New Finds | `P34KX3L7XRZJJ5RP6W35K4YO` | Regular new inventory arrivals |
 
 **Decision:** Is this genuinely rare/special → The Real Rarities. Standard new stock → The New Finds.
+
+## Phase 0: Image Processing
+
+**Get next SKU:**
+```bash
+# Check highest existing SKU in Square cache
+square_cache_search | grep -oE 'RG-[0-9]+' | sort -t'-' -k2 -n | tail -1
+```
+
+**Copy uploaded image to working directory:**
+```bash
+mkdir -p ~/Workspace/items/RG-XXXX
+cp /path/to/uploaded/image.jpg ~/Workspace/items/RG-XXXX/original.jpg
+```
+
+**Remove background (use gemini-chat skill):**
+```bash
+python3 ~/.claude/skills/gemini-chat/chat.py process \
+  ~/Workspace/items/RG-XXXX/original.jpg \
+  --output ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png \
+  --quality high
+```
+
+**Alternative via scripts:**
+```bash
+python3 ~/.claude/skills/rg-full-auto/scripts/remove_background.py \
+  ~/Workspace/items/RG-XXXX/original.jpg \
+  ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
+```
 
 ## Phase 1: Appraisal, Lot Assignment & Research
 
@@ -68,88 +98,81 @@ See `references/pricing-guidelines.md` for category-specific margins.
 
 **File naming:** `RG-XXXX-01.png`, `RG-XXXX-02.png`
 
-### Image Upload (MCP Limitation)
+### Image Upload
 
-Square MCP doesn't support multipart uploads. Generate curl commands for user to run locally where `SQUARE_ACCESS_TOKEN` is stored in `~/.zshrc`.
-
-**⚠️ WebP not supported** - reconvert if needed:
+**Via square-image-upload skill:**
 ```bash
-sips -s format jpeg RG-XXXX-hero.jpeg --out RG-XXXX-hero-converted.jpeg
+python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
+  --image ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png \
+  --item-id CATALOG_ITEM_ID \
+  --name "RG-XXXX Hero" \
+  --caption "Front view" \
+  --primary
 ```
 
-**Curl template:**
+**⚠️ WebP not supported** - convert if needed:
 ```bash
-curl -X POST "https://connect.squareup.com/v2/catalog/images" \
-  -H "Authorization: Bearer $SQUARE_ACCESS_TOKEN" \
-  -H "Accept: application/json" \
-  -F "request={
-    \"idempotency_key\": \"rg-XXXX-hero-$(date +%s)\",
-    \"image\": {
-      \"type\": \"IMAGE\",
-      \"id\": \"#temp-rg-XXXX\",
-      \"image_data\": {
-        \"name\": \"Item Title - Hero\",
-        \"caption\": \"Front view\"
-      }
-    },
-    \"object_id\": \"CATALOG_ITEM_ID\"
-  };type=application/json" \
-  -F "image_file=@RG-XXXX-hero.jpeg;type=image/jpeg"
+sips -s format jpeg RG-XXXX-hero.webp --out RG-XXXX-hero.jpeg
 ```
 
 ## Phase 3: Square Catalog Creation
 
-**Endpoint:** `catalog.batchInsertObjects`
+**Use Square MCP:**
+```
+Square:make_api_request
+  service: catalog
+  method: batchUpsertCatalogObjects
+```
 
 ```json
 {
-  "idempotency_key": "unique-uuid",
-  "object": {
-    "type": "ITEM",
-    "id": "#RG-XXXX",
-    "present_at_all_locations": false,
-    "present_at_location_ids": ["B87BAEZ0NWV34"],
-    "item_data": {
-      "name": "Item Title",
-      "description": "HTML description with <br> tags",
-      "categories": [
-        {"id": "CHOSEN_CATEGORY_ID"}
-      ],
-      "reporting_category": {"id": "CHOSEN_CATEGORY_ID"},
-      "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
-      "is_taxable": true,
-      "ecom_visibility": "VISIBLE",
-      "ecom_seo_data": {
-        "page_title": "[Era] [Item] - [Feature] | Richmond General",
-        "page_description": "Keyword-rich, ends with Richmond, IL",
-        "permalink": "lowercase-hyphenated-slug"
-      },
-      "variations": [{
-        "type": "ITEM_VARIATION",
-        "id": "#RG-XXXX-var",
-        "item_variation_data": {
-          "item_id": "#RG-XXXX",
-          "name": "Regular",
-          "sku": "RG-XXXX",
-          "pricing_type": "FIXED_PRICING",
-          "price_money": {"amount": 1999, "currency": "USD"},
-          "track_inventory": true,
-          "sellable": true,
-          "stockable": true
-        }
-      }]
-    }
-  }
+  "idempotency_key": "rg-XXXX-create-TIMESTAMP",
+  "batches": [{
+    "objects": [{
+      "type": "ITEM",
+      "id": "#RG-XXXX",
+      "present_at_all_locations": false,
+      "present_at_location_ids": ["B87BAEZ0NWV34"],
+      "item_data": {
+        "name": "Item Title",
+        "description": "HTML description with <br> tags",
+        "categories": [{"id": "CHOSEN_CATEGORY_ID"}],
+        "reporting_category": {"id": "CHOSEN_CATEGORY_ID"},
+        "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
+        "is_taxable": true,
+        "ecom_visibility": "VISIBLE",
+        "ecom_seo_data": {
+          "page_title": "[Era] [Item] - [Feature] | Richmond General",
+          "page_description": "Keyword-rich, ends with Richmond, IL",
+          "permalink": "lowercase-hyphenated-slug"
+        },
+        "variations": [{
+          "type": "ITEM_VARIATION",
+          "id": "#RG-XXXX-var",
+          "item_variation_data": {
+            "item_id": "#RG-XXXX",
+            "name": "Regular",
+            "sku": "RG-XXXX",
+            "pricing_type": "FIXED_PRICING",
+            "price_money": {"amount": 1999, "currency": "USD"},
+            "track_inventory": true,
+            "sellable": true,
+            "stockable": true
+          }
+        }]
+      }
+    }]
+  }]
 }
 ```
 
-### Set Inventory Count (Required)
+**Capture from response:** `id_mappings[0].object_id` → ITEM_ID, `id_mappings[1].object_id` → VARIATION_ID
 
-**Endpoint:** `inventory.batchChange`
+### Set Inventory Count (Required)
 
 ```json
 {
-  "idempotency_key": "unique-uuid",
+  "idempotency_key": "rg-XXXX-inv-TIMESTAMP",
   "changes": [{
     "type": "PHYSICAL_COUNT",
     "physical_count": {
@@ -157,15 +180,13 @@ curl -X POST "https://connect.squareup.com/v2/catalog/images" \
       "state": "IN_STOCK",
       "location_id": "B87BAEZ0NWV34",
       "quantity": "1",
-      "occurred_at": "2025-01-01T12:00:00Z"
+      "occurred_at": "ISO_TIMESTAMP"
     }
   }]
 }
 ```
 
 Without this, items show "sold out" online.
-
-See `references/square-catalog.md` for API details.
 
 ## Phase 4: Fulfillment Setup
 
@@ -181,11 +202,9 @@ Configure in Square Dashboard: enable shipping, set weight/dimensions, assign pr
 
 ## Phase 5: Payment Link Generation
 
-**Endpoint:** `checkout.createPaymentLink`
-
 ```json
 {
-  "idempotency_key": "unique-uuid",
+  "idempotency_key": "rg-XXXX-pay-TIMESTAMP",
   "quick_pay": {
     "name": "Item Title",
     "price_money": {"amount": 1999, "currency": "USD"},
@@ -199,8 +218,6 @@ Returns: `payment_link.url` → `https://square.link/u/XXXXXXXX`
 
 ## Phase 6: Labels & Batch CSV
 
-**Dependency:** Needs SKU (Phase 3) + payment link (Phase 5)
-
 **Batch file:** `/Users/scottybe/Workspace/items/rg-labels-batch.csv`
 
 ```csv
@@ -208,9 +225,10 @@ Product Name,Attributes,Price,Condition,Condition Notes,SKU,QR Code URL
 "Item Title","Era • Type • Feature",55.00,Good,"Wear notes",RG-0003,https://richmondgeneral.github.io/items/RG-0003/
 ```
 
-**Layouts (2" × 1"):**
-- Default: Full info, no QR
-- QR Layout: Shortened name, drops condition notes, adds QR linking to info card
+**Append row:**
+```bash
+echo '"Item Title","Era • Type • Feature",55.00,Good,"Wear notes",RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/' >> ~/Workspace/items/rg-labels-batch.csv
+```
 
 **Include QR when:** Antiques (pre-1950), collectibles with story, items with info cards
 
@@ -228,16 +246,71 @@ See `references/label-format.md` for Print Master settings.
 
 **Customer flow:** QR on label → Info card → Read story → Buy Now → Square checkout
 
+## Quick Tasks (Single Phase)
+
+| Request | Action |
+|---------|--------|
+| "make a label for..." | Phase 6 only |
+| "price this" / "what's this worth" | Phase 1 only |
+| "upload this image to Square" | Phase 2 image upload only |
+| "create a payment link" | Phase 5 only |
+| "what's the SKU for..." | Cache lookup only |
+
+## Workflow Summary Output
+
+After completing full workflow:
+
+```
+✅ NEW ITEM ADDED: RG-XXXX
+
+📦 Square Catalog
+   Item ID: {CATALOG_ITEM_ID}
+   Variation: {VARIATION_ID}
+   Price: ${PRICE}
+   Inventory: 1 in stock
+
+🖼️ Image
+   Hero: ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
+   Square URL: {IMAGE_URL}
+
+🚚 Fulfillment: Shippable / Pickup only
+
+💳 Payment Link: {PAYMENT_LINK_URL}
+
+🏷️ Label: Added to rg-labels-batch.csv
+
+📄 Info Card: https://richmondgeneral.github.io/items/RG-XXXX/
+
+Next: Print label, place item on floor
+```
+
+## Troubleshooting
+
+**Background removal fails:**
+- Check API keys: `echo $REMOVEBG_API_KEY` or `echo $GEMINI_API_KEY`
+- Try alternative model: `--model removebg` or `--model gemini25`
+
+**Square 401 Unauthorized:**
+- Token expired: `echo $SQUARE_ACCESS_TOKEN`
+
+**Image upload 413 Too Large:**
+- Compress: `sips -Z 2000 image.jpeg`
+
+**Item shows "sold out":**
+- Missing inventory count (Phase 3 step 2)
+
 ## Related Skills
 
 | Skill | Use For |
 |-------|---------|
 | `rg-item-update` | Quick edits to existing items |
+| `gemini-chat` | Background removal, image processing |
+| `square-image-upload` | Image upload via API |
 | `book-appraiser` | Antiquarian books, LOC cross-reference |
 | `carnival-glass-appraiser` | Pressed iridescent glass 1908-1930s |
 | `maker-mark-identifier` | Pottery, silver, furniture marks |
 | `product-labeler` | Label generation, Square descriptions |
-| `square-image-upload` | Image upload via API |
+| `square-cache` | Fast catalog lookups |
 
 ## References
 

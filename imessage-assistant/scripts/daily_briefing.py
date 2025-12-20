@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Daily Briefing Generator v0.2
-Unified briefing: iMessage activity + property alerts + CRM
+Daily Briefing Generator v0.3
+Unified briefing: iMessage activity + property alerts + CRM + engagement tracking
 
 Usage:
-  python3 daily_briefing.py           # Full daily briefing to stdout
-  python3 daily_briefing.py --note    # Save full briefing to Apple Notes
-  python3 daily_briefing.py --crm     # CRM-only compact briefing
-  python3 daily_briefing.py --crm --note  # Save CRM briefing to Apple Notes
+  python3 daily_briefing.py                    # Full daily briefing to stdout
+  python3 daily_briefing.py --note             # Save full briefing to Apple Notes
+  python3 daily_briefing.py --crm              # CRM-only compact briefing
+  python3 daily_briefing.py --crm --note       # Save CRM briefing to Apple Notes
+  python3 daily_briefing.py --engagement       # Engagement report (stale contacts)
+  python3 daily_briefing.py --engagement --days 45  # Custom threshold (default: 30)
   python3 daily_briefing.py --date 2025-11-24  # Historical date
 """
 
@@ -286,6 +288,55 @@ def days_since(date_str):
         return None
 
 
+def get_stale_contacts(days_threshold=30):
+    """Get contacts with no iMessage activity beyond threshold.
+    
+    Args:
+        days_threshold: Number of days without activity to flag (default: 30)
+    
+    Returns:
+        List of contacts with: name, phone, category, last_date, days_since
+    """
+    contacts = parse_contacts()
+    stale = []
+    
+    for c in contacts:
+        # Skip Nurture category (low engagement expected)
+        if c.get('category') == 'Nurture':
+            continue
+        
+        msg_info = get_last_message_info(c['phone'])
+        
+        if not msg_info:
+            # Never contacted via iMessage
+            stale.append({
+                'name': c['name'],
+                'phone': c['phone'],
+                'category': c.get('category', 'Unknown'),
+                'last_date': 'Never',
+                'days_since': None,
+                'whose_turn': 'unknown'
+            })
+            continue
+        
+        days = days_since(msg_info['last_date'].split()[0])
+        
+        if days and days >= days_threshold:
+            stale.append({
+                'name': c['name'],
+                'phone': c['phone'],
+                'category': c.get('category', 'Unknown'),
+                'last_date': msg_info['last_date'].split()[0],
+                'days_since': days,
+                'whose_turn': 'us' if not msg_info['last_was_me'] else 'them'
+            })
+    
+    # Sort by days descending (oldest first)
+    stale.sort(key=lambda x: x['days_since'] if x['days_since'] else 9999, reverse=True)
+    
+    return stale
+
+
 def extract_urgent_items(contacts, property_messages, todays_activity):
     """Extract time-sensitive urgent items."""
     urgent = []
@@ -331,6 +382,7 @@ def generate_briefing(test_date=None):
     property_messages = get_sue_property_messages()
     contacts = parse_contacts()
     urgent_items = extract_urgent_items(contacts, property_messages, todays_activity)
+    stale_contacts = get_stale_contacts(30)  # 30 days threshold
     
     # Process CRM data
     promises = []
@@ -438,7 +490,63 @@ def generate_briefing(test_date=None):
             out.append(f"- **{a['name']}**: {a['reminder']}")
         out.append("")
     
+    # ENGAGEMENT ALERTS section
+    if stale_contacts:
+        out.append("## 🔔 ENGAGEMENT ALERTS\n")
+        out.append("⚠️ No iMessage activity in 30+ days:\n")
+        for s in stale_contacts[:10]:  # Limit to top 10
+            if s['days_since']:
+                days_str = f"{s['days_since']}d ago"
+            else:
+                days_str = "Never"
+            category_str = s['category'] if s['category'] != 'Unknown' else ''
+            out.append(f"- **{s['name']}** - Last: {days_str} - {category_str}")
+        out.append("")
+    
     # Footer
+    out.append("---")
+    out.append(f"*Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}*")
+    
+    return '\n'.join(out)
+
+
+def generate_engagement_report(days_threshold=30):
+    """Generate engagement-only report showing stale contacts.
+    
+    Args:
+        days_threshold: Number of days without activity to flag (default: 30)
+    
+    Returns:
+        Formatted markdown string with stale contacts
+    """
+    stale_contacts = get_stale_contacts(days_threshold)
+    
+    out = []
+    out.append(f"# 🔔 Customer Engagement Report\n")
+    out.append(f"**Threshold:** {days_threshold} days without iMessage activity\n")
+    
+    if stale_contacts:
+        out.append(f"**Found {len(stale_contacts)} contacts requiring follow-up:**\n")
+        out.append("| Contact | Category | Last Activity | Days | Whose Turn |")
+        out.append("|---------|----------|---------------|------|------------|")
+        
+        for s in stale_contacts:
+            if s['days_since']:
+                days_str = f"{s['days_since']}d"
+                last_str = s['last_date']
+            else:
+                days_str = "∞"
+                last_str = "Never"
+            
+            category = s['category'] if s['category'] != 'Unknown' else '-'
+            whose_turn = s['whose_turn'].title()
+            
+            out.append(f"| {s['name']} | {category} | {last_str} | {days_str} | {whose_turn} |")
+        
+        out.append("")
+    else:
+        out.append("✅ **All contacts active!** No contacts exceed threshold.\n")
+    
     out.append("---")
     out.append(f"*Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}*")
     
@@ -696,13 +804,25 @@ if __name__ == '__main__':
     test_date = None
     crm_mode = '--crm' in sys.argv
     note_mode = '--note' in sys.argv
+    engagement_mode = '--engagement' in sys.argv
+    days_threshold = 30
     
     for i, arg in enumerate(sys.argv):
         if arg == '--date' and i + 1 < len(sys.argv):
             test_date = sys.argv[i + 1]
+        elif arg == '--days' and i + 1 < len(sys.argv):
+            try:
+                days_threshold = int(sys.argv[i + 1])
+            except ValueError:
+                print(f"Error: --days requires integer value", file=sys.stderr)
+                sys.exit(1)
     
     # Generate appropriate briefing
-    if crm_mode:
+    if engagement_mode:
+        briefing = generate_engagement_report(days_threshold)
+        note_folder = "Engagement Reports"
+        note_title = f"Engagement Report — {datetime.now().strftime('%b %d, %Y')}"
+    elif crm_mode:
         briefing = generate_crm_briefing(test_date=test_date)
         note_folder = "CRM Briefings"
         if test_date:

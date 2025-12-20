@@ -38,10 +38,13 @@ Meta-skill for collaboratively developing and maintaining Claude skills with Sco
 
 | Skill | Path | Purpose | Last Updated |
 |-------|------|---------|--------------|
-| **rg-inventory** | `~/skills/rg-inventory/` | Richmond General inventory workflow | 2025-11-27 |
-| **vintage-appraiser** | `~/skills/vintage-appraiser/` | Maker's marks, carnival glass, pricing | - |
+| **rg-inventory** | `~/skills/rg-inventory/` | Richmond General inventory workflow | 2025-12-20 |
+| **carnival-glass-appraiser** | `~/skills/carnival-glass-appraiser/` | Carnival glass pattern ID & valuation | 2025-12-19 |
+| **maker-mark-identifier** | `~/skills/maker-mark-identifier/` | Pottery, silver, furniture maker's marks | 2025-12-19 |
 | **book-appraiser** | `~/skills/book-appraiser/` | Antiquarian books, LOC cross-reference | - |
 | **product-labeler** | `~/skills/product-labeler/` | Thermal labels, Square descriptions | - |
+| **square-cache** | `~/skills/square-cache/` | MongoDB cache for Square catalog (100x faster) | 2025-12-19 |
+| **square-image-upload** | `~/skills/square-image-upload/` | Image upload via multipart form data | 2025-12-19 |
 | **imessage-assistant** | `~/skills/imessage-assistant/` | iMessage/RCS/SMS automation, CRM briefings | 2025-12-19 |
 | **square-crm** | `~/skills/square-crm/` | Square customer sync from contacts.md | 2025-12-19 |
 | **skill-manager** | `~/skills/skill-manager/` | This meta-skill | 2025-12-19 |
@@ -115,10 +118,11 @@ When updating skills, add entry to `references/changelog.md`:
 
 The skills directory contains mixed formats:
 - **Folders** (`rg-inventory/`): Multi-file skills with SKILL.md + references
-- **Single files** (`vintage-appraiser.skill`): Standalone skill files
-- **Zips** (`rg-inventory.zip`): Archived/backup versions
+- **Zips** (`.zip` archives): Archived/backup versions
 
 Preferred format: **Folder structure** for maintainability.
+
+**Deprecated skills:** vintage-appraiser (replaced by carnival-glass-appraiser + maker-mark-identifier)
 
 ## .skill File Format Specification
 

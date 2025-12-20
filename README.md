@@ -14,29 +14,55 @@ Specialized skill for antiquarian and antique book appraisal, edition identifica
 
 **Use when:** Appraising pre-1970 books, identifying first editions, researching book value, checking Library of Congress holdings, or determining public domain status.
 
-### vintage-appraiser
-Specialist skill for identifying maker's marks, carnival glass, pottery, silver, and other vintage collectibles.
+### carnival-glass-appraiser
+Complete appraisal workflow for carnival glass (pressed iridescent glass from 1908-1930s).
 
-**Use when:** Items need maker's mark identification, pattern identification, dating, or researching carnival glass, pottery, or antiques.
+**Use when:** Identifying carnival glass patterns, authenticating pieces, attributing makers (Northwood, Fenton, Imperial), or valuing bowls, plates, water sets.
+
+### maker-mark-identifier *(planned - TVM-25)*
+Focused identification skill for pottery, silver, furniture, and jewelry marks.
+
+**Use when:** Examining stamps, hallmarks, signatures, or labels to determine manufacturer and date range. Returns ID only—defers valuation to rg-inventory.
+
+### product-labeler
+Generate product labels for Richmond General Square inventory and thermal printing.
+
+**Use when:** Creating thermal printer labels (CSV for Print Master), Square catalog descriptions, or price tags.
+
+### vintage-appraiser *(deprecated)*
+> **Note:** Being replaced by focused skills: `carnival-glass-appraiser` (TVM-24) and `maker-mark-identifier` (TVM-25). Will be removed after migration complete.
+
+Legacy skill for identifying maker's marks, carnival glass, pottery, silver, and other vintage collectibles.
 
 ## Structure
 
 ```
 skills/
-├── rg-inventory/
+├── rg-inventory/           # Main orchestrator
+│   ├── SKILL.md
+│   └── references/
+├── book-appraiser/         # Full appraisal: books
+│   ├── SKILL.md
+│   └── references/
+├── carnival-glass-appraiser/  # Full appraisal: carnival glass
+│   ├── SKILL.md
+│   └── references/
+├── product-labeler/        # Labels & Square descriptions
+│   ├── SKILL.md
+│   ├── assets/
+│   └── references/
+├── imessage-assistant/     # iMessage integration
 │   ├── SKILL.md
 │   ├── scripts/
 │   └── references/
-├── book-appraiser/
-│   ├── SKILL.md
-│   └── references/
-├── imessage-assistant/
+├── square-crm/             # Square customer management
 │   ├── SKILL.md
 │   ├── scripts/
 │   └── references/
-├── square-crm/
+├── skill-manager/          # Meta-skill for skill updates
+│   └── SKILL.md
+├── vintage-appraiser/      # (deprecated)
 │   ├── SKILL.md
-│   ├── scripts/
 │   └── references/
 ├── build-skill.sh          # Build script for generating ZIP archives
 └── archive/                # Generated ZIP files (not in git)

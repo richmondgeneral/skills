@@ -46,12 +46,18 @@ export SQUARE_ACCESS_TOKEN="your_production_token_here"
 
 ### Phase 1: Appraisal & Research
 
-**Route to appropriate skill:**
+**Route to domain appraiser when applicable:**
 - Books pre-1970 or antiquarian → Load `book-appraiser` skill
-- Maker's marks, pottery, glass, silver → Load `vintage-appraiser` skill
+- Carnival glass (iridescent pressed glass, marigold, amethyst, Northwood, Fenton) → Load `carnival-glass-appraiser` skill
+- Other maker's marks (pottery, silver, furniture) → Load `maker-mark-identifier` skill (returns ID only; continue Phase 1 for valuation)
 - General vintage items → Continue with this workflow
 
-**Research checklist:**
+**When using a domain appraiser:**
+- Appraiser handles full research cycle: identification → authentication → condition → valuation
+- Resume workflow at Phase 2 (Photography) using appraiser's output
+- Skip research checklist below (appraiser covers it)
+
+**Research checklist (general items only):**
 1. Identify maker/manufacturer
 2. Date the piece (era, production dates)
 3. Assess condition
@@ -476,7 +482,8 @@ Physical Store → QR on label/card
 ## Integration Points
 
 ### Related Skills
-- **vintage-appraiser**: Maker's mark identification, carnival glass, pricing research
+- **carnival-glass-appraiser**: Complete appraisal for iridescent pressed glass (pattern ID, manufacturer attribution, authentication, valuation)
+- **maker-mark-identifier**: Identify pottery, silver, furniture marks (defers valuation to Phase 1)
 - **book-appraiser**: Antiquarian books, LOC cross-reference, edition identification
 - **product-labeler**: Thermal label generation, Square catalog descriptions
 

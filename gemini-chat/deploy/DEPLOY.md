@@ -2,12 +2,12 @@
 
 ## 📋 Pre-Deployment
 
-All files are ready in `/tmp/gemini-chat-deploy/`:
-- ✅ app.py (updated for HF secrets)
-- ✅ models/ directory
-- ✅ router.py
-- ✅ requirements.txt
-- ✅ README.md (with Space metadata)
+All files are ready in `~/skills/gemini-chat/deploy/`:
+- ✅ app.py (HF Spaces optimized)
+- ✅ models/ directory (all 3 models)
+- ✅ router.py (smart routing logic)
+- ✅ requirements.txt (Gradio dependencies)
+- ✅ HF_README.md (Space metadata)
 
 ## 🚀 Deployment Steps
 
@@ -42,8 +42,12 @@ https://huggingface.co/spaces/YOUR_USERNAME/gemini-chat.git
 git clone https://huggingface.co/spaces/YOUR_USERNAME/gemini-chat
 cd gemini-chat
 
-# Copy deployment files
-cp -r /tmp/gemini-chat-deploy/* .
+# Copy deployment files from your local repo
+cp ~/skills/gemini-chat/deploy/app.py .
+cp ~/skills/gemini-chat/deploy/requirements.txt .
+cp ~/skills/gemini-chat/deploy/HF_README.md README.md
+cp -r ~/skills/gemini-chat/deploy/models .
+cp ~/skills/gemini-chat/deploy/router.py .
 
 # Commit and push
 git add .
@@ -68,15 +72,15 @@ git push
 
 **Secret 1:**
 - Name: `NANO_BANANA_API_KEY`
-- Value: `AIzaSyAvjBCoEKfsaOEni94y2Q93fWakndF5zGM`
+- Value: [Your Nano Banana API key from https://aistudio.google.com]
 
 **Secret 2:**
 - Name: `GEMINI_API_KEY`
-- Value: [Your Gemini API key]
+- Value: [Your Gemini API key from https://aistudio.google.com]
 
 **Secret 3 (Optional):**
 - Name: `REMOVE_BG_API_KEY`
-- Value: [Your remove.bg key, if you have one]
+- Value: [Your remove.bg API key from https://remove.bg]
 
 ### Step 5: Wait for Build (2-3 minutes)
 

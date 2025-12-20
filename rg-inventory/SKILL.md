@@ -191,9 +191,32 @@ Square:make_api_request
 
 **Capture:** Image URL from response for info card.
 
-### Phase 5: Payment Link
+### Phase 5: Fulfillment & Payment Link
 
-**Use Square MCP:**
+**Fulfillment is automatic:** Items in "The New Finds" category with `ecom_visibility: "VISIBLE"` automatically inherit the site's fulfillment profiles (Shipping, Pickup, Local Delivery). No per-item Dashboard configuration needed.
+
+**Shippability Assessment (use judgment, not rules):**
+
+Price is NOT a factor—a $200 book ships as easily as a $5 one.
+
+**Ships easily:**
+- Books, paper goods, small collectibles
+- Items that fit in a standard box without complex packing
+- Sturdy items that won't break in transit
+- Most things a reasonable person would drop at the post office
+
+**Pickup only:**
+- Furniture (chairs, tables, cabinets—size/weight make shipping impractical)
+- Large or awkward shapes that don't box well
+- Extremely fragile items where shipping risk outweighs convenience
+- Heavy items where shipping cost approaches item value
+
+**Flat rate box reference** (when shipping applies):
+- Small (8⅝" × 5⅜" × 1⅝") → $10.20
+- Medium (11" × 8½" × 5½") → $17.10
+- Large (12" × 12" × 5½") → $21.90
+
+**Create Payment Link:**
 
 ```
 Square:make_api_request
@@ -207,12 +230,14 @@ Square:make_api_request
       "location_id": "B87BAEZ0NWV34"
     },
     "checkout_options": {
-      "ask_for_shipping_address": true
+      "ask_for_shipping_address": true   // false for pickup-only items
     }
   }
 ```
 
 **Capture:** `payment_link.url` for info card and QR code.
+
+**Manual note for pickup-only items:** Include in workflow summary that item is pickup-only so user knows to communicate this to customers.
 
 ### Phase 6: Generate Label
 
@@ -279,6 +304,10 @@ After completing full workflow, provide summary:
 🖼️ Image
    Hero: ~/items/RG-XXXX/RG-XXXX-hero.png
    Square URL: {IMAGE_URL}
+
+🚚 Fulfillment
+   Shippable: YES/NO
+   [If NO: "Pickup only - note for customers"]
 
 💳 Payment Link
    {PAYMENT_LINK_URL}

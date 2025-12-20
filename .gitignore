@@ -25,3 +25,13 @@ archive/
 # Logs
 */logs/
 *.log
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*key*
+*secret*
+env/
+venv/
+.venv/

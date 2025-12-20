@@ -4,11 +4,7 @@ Gemini Chat Web UI - Beautiful interface for AI background removal.
 Optimized for Hugging Face Spaces deployment.
 """
 import os
-import sys
 import gradio as gr
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from models import TaskConfig, NanaBananaModel, Gemini25FlashModel, RemoveBgModel
 from router import ModelRouter

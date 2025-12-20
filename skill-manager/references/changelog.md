@@ -6,6 +6,20 @@ Tracking changes to all skills in `~/skills/`.
 
 ## rg-inventory
 
+### 2025-12-20 (v5)
+#### Changed
+- Phase 5 renamed to "Fulfillment & Payment Link"
+- Added fulfillment automation note: items in "The New Finds" with `ecom_visibility: "VISIBLE"` auto-inherit site fulfillment profiles
+- Added shippability guidance with judgment-based criteria (not rules)
+- Added flat rate box reference for shippable items
+- Made `ask_for_shipping_address` conditional on shippability assessment
+- Added fulfillment status to workflow summary output
+- Removed obsolete manual Dashboard steps for fulfillment (it's automatic via category)
+
+#### Philosophy
+- Fulfillment is automatic via category membership, not per-item configuration
+- Shippability is a judgment call, controlled by `ask_for_shipping_address` in payment link
+
 ### 2025-11-27 (v4)
 #### Changed
 - Both label layouts now 2"×1" (was 2"×1" default + 2"×2" QR)

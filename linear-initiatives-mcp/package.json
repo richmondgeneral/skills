@@ -1,0 +1,25 @@
+{
+  "name": "linear-initiatives-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for managing Linear initiatives",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "linear-initiatives-mcp": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "mcp",
+    "linear",
+    "initiatives",
+    "model-context-protocol"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "node-fetch": "^3.3.2"
+  }
+}

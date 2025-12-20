@@ -4,7 +4,7 @@ emoji: 🍌
 colorFrom: purple
 colorTo: blue
 sdk: gradio
-sdk_version: 4.0.0
+sdk_version: 3.50.2
 app_file: app.py
 pinned: false
 license: mit
@@ -12,18 +12,18 @@ license: mit
 
 # 🍌 Gemini Chat - AI Background Removal
 
-Smart, multi-model background removal with automatic routing across multiple AI models.
+Production-quality AI background removal using remove.bg with experimental free model alternatives.
 
 ## Features
 
 - **Drag & Drop Upload** - Easy image upload interface
-- **Auto Model Selection** - Intelligently selects the best model for your image
-- **Multiple Models:**
-  - 🍌 Nano Banana Pro (Gemini 3): 98% confidence, ~8s, free
-  - Gemini 2.5 Flash: 95% confidence, ~8s, free  
-  - remove.bg: Premium quality, ~3s, $0.009/image
-- **Real-time Processing** - See results instantly
-- **Free to Use** - Default models are completely free
+- **Production Quality** - Uses remove.bg for professional results
+- **Multiple Models Available**:
+  - **remove.bg** (Default): Premium quality, ~3s, $0.009/image
+  - 🍌 **Nano Banana Pro** (Experimental): Free, ~8s, bounding box only
+  - **Gemini 2.5 Flash** (Experimental): Free, ~8s, bounding box only
+- **Real-time Metrics** - View confidence, processing time, and cost
+- **Reliable Results** - Production-tested background removal
 
 ## How to Use
 

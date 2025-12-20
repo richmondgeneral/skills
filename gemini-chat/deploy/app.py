@@ -70,7 +70,16 @@ def process_image(image_path, model_choice, quality_mode):
     
     # Select model
     if model_choice == 'auto':
-        model = router.select_model(task)
+        # Auto now prefers remove.bg for quality
+        model_map = {
+            'removebg': RemoveBgModel,
+            'nano-banana': NanaBananaModel,
+            'gemini25': Gemini25FlashModel,
+        }
+        # Try remove.bg first, fallback to free models
+        model = next((m for m in models if isinstance(m, RemoveBgModel)), None)
+        if not model:
+            model = router.select_model(task)
         if not model:
             return None, "No suitable model found", "0s", "Free"
     else:
@@ -111,16 +120,16 @@ with gr.Blocks() as demo:
     with gr.Row():
         with gr.Column():
             input_img = gr.Image(
-                type="filepath",
                 label="📸 Upload Image",
+                type="filepath",
                 height=400
             )
             
             model_choice = gr.Dropdown(
-                choices=["auto", "nano-banana", "gemini25", "removebg"],
-                value="auto",
+                choices=["removebg", "auto", "nano-banana", "gemini25"],
+                value="removebg",
                 label="🤖 Model",
-                info="Auto selects best free model (Nano Banana Pro)"
+                info="remove.bg selected for production quality ($0.009/image)"
             )
             
             quality_mode = gr.Radio(
@@ -138,22 +147,14 @@ with gr.Blocks() as demo:
         with gr.Column():
             output_img = gr.Image(
                 label="✓ Processed Image",
+                type="filepath",
                 height=400
             )
             
             with gr.Row():
-                confidence = gr.Textbox(
-                    label="Confidence",
-                    interactive=False
-                )
-                time = gr.Textbox(
-                    label="Time",
-                    interactive=False
-                )
-                cost = gr.Textbox(
-                    label="Cost",
-                    interactive=False
-                )
+                confidence = gr.Textbox(label="Confidence")
+                time = gr.Textbox(label="Time")
+                cost = gr.Textbox(label="Cost")
     
     # Connect event
     process_btn.click(
@@ -165,9 +166,9 @@ with gr.Blocks() as demo:
     gr.Markdown("""
     ---
     **Models:**
-    - 🍌 **Nano Banana Pro** (Gemini 3): 98% confidence, ~8s, free
-    - **Gemini 2.5 Flash**: 95% confidence, ~8s, free
-    - **remove.bg**: Premium quality, ~3s, $0.009/image
+    - **remove.bg** (Default): Production quality, ~3s, $0.009/image
+    - 🍌 **Nano Banana Pro** (Experimental): Free, ~8s, bounding box only
+    - **Gemini 2.5 Flash** (Experimental): Free, ~8s, bounding box only
     
     **Source:** [GitHub](https://github.com/richmondgeneral/skills/tree/main/gemini-chat)
     """)
@@ -177,9 +178,10 @@ if __name__ == "__main__":
     print(f"📊 Loaded {len(models)} models")
     print("🌐 Launching on Hugging Face Spaces\n")
     
+    # HF Spaces configuration
     demo.launch(
         server_name="0.0.0.0",
         server_port=7860,
         share=False,
-        theme=gr.themes.Soft(primary_hue="purple")
+        show_error=True
     )

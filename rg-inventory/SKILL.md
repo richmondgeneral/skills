@@ -51,6 +51,15 @@ export SQUARE_ACCESS_TOKEN="your_production_token_here"
 - Resume workflow at Phase 2 (Photography) using appraiser's output
 - Skip research checklist below (appraiser covers it)
 
+**Check square-cache first (optional but recommended):**
+```bash
+# Search for similar items (100x faster than API)
+square_cache.sh search "item keywords"
+
+# Check if SKU already exists
+square_cache.sh search "RG-XXXX"
+```
+
 **Research checklist (general items only):**
 1. Identify maker/manufacturer
 2. Date the piece (era, production dates)
@@ -81,6 +90,12 @@ export SQUARE_ACCESS_TOKEN="your_production_token_here"
 **File naming:** `RG-XXXX-01.png`, `RG-XXXX-02.png`, etc.
 
 ### Phase 2b: Image Upload to Square
+
+**Verify item exists (recommended):**
+```bash
+# Check cache for item before uploading
+square_cache.sh item CATALOG_ITEM_ID
+```
 
 **Use the `square-image-upload` skill** for image uploads (Square MCP doesn't support multipart form data).
 
@@ -123,6 +138,12 @@ export SQUARE_ACCESS_TOKEN="your_production_token_here"
 **See `square-image-upload` skill for:** full options, replacing existing images, troubleshooting.
 
 ### Phase 3: Square Catalog Creation
+
+**Pre-creation duplicate check (recommended):**
+```bash
+# Verify SKU doesn't already exist
+square_cache.sh search "RG-XXXX"
+```
 
 **API Endpoint:** `catalog.batchInsertObjects` (use `batchUpdateObjects` with `sparse_update: true` for updates)
 
@@ -174,6 +195,15 @@ export SQUARE_ACCESS_TOKEN="your_production_token_here"
 ```
 
 **⚠️ CRITICAL:** Both categories AND reporting_category are REQUIRED for proper sales tracking and online visibility.
+
+**Post-creation sync (recommended):**
+```bash
+# Sync cache to capture new item and enable change tracking
+square_cache.sh sync
+
+# Verify item was captured
+square_cache.sh item CATALOG_ITEM_ID
+```
 
 **SEO Title Formula:**
 `[Era] [Maker] [Item Type] - [Key Feature] | [Condition]`
@@ -278,6 +308,12 @@ After creating the catalog item, set the initial stock count to 1:
 ### Phase 6: Labels & Batch CSV
 
 **Workflow order matters:** Labels need SKU (from Phase 3) AND payment link (from Phase 5) before they can be complete.
+
+**Use cache for label data (optional, 100x faster):**
+```bash
+# Get item details from cache instead of API
+square_cache.sh item CATALOG_ITEM_ID --json
+```
 
 #### Print Master CSV Format
 
@@ -437,6 +473,7 @@ Physical Store → QR on label/card
 ## Integration Points
 
 ### Related Skills
+- **square-cache**: MongoDB cache for Square catalog with change tracking (100x faster searches, offline access)
 - **square-image-upload**: Upload product images to Square Catalog (multipart form data)
 - **carnival-glass-appraiser**: Complete appraisal for iridescent pressed glass (pattern ID, manufacturer attribution, authentication, valuation)
 - **maker-mark-identifier**: Identify pottery, silver, furniture marks (defers valuation to Phase 1)
@@ -466,8 +503,29 @@ For estate/auction purchases, track provenance:
 - Total lot cost
 - Item allocation (for margin calculation)
 
+## Square Cache Integration
+
+The `square-cache` skill provides MongoDB caching of the Square catalog with change tracking:
+
+**When to use:**
+- Phase 1: Search for similar items, check SKU availability
+- Phase 3: Pre-creation duplicate check, post-creation verification
+- Phase 2b: Verify item exists before image upload
+- Phase 6: Fast label data retrieval
+
+**When to sync:**
+- After creating new items (Phase 3)
+- After uploading images (Phase 2b)
+- After bulk catalog updates
+- Periodically to track changes
+
+**Performance:** Cache searches are instant vs API calls (100x faster). Reduces API rate limit concerns.
+
+**See `square-cache` skill for:** status checks, change history, advanced queries, MongoDB schema.
+
 ## References
 
 - `references/square-catalog.md` - API details and category IDs
 - `references/lot-tracking.md` - Lot management and allocation
 - `references/pricing-guidelines.md` - Margin targets by category
+- `references/marketplace-templates.md` - Listing templates, SEO guidelines, condition language

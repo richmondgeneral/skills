@@ -6,6 +6,8 @@ Unified briefing: iMessage activity + property alerts + CRM + engagement trackin
 Usage:
   python3 daily_briefing.py                    # Full daily briefing to stdout
   python3 daily_briefing.py --note             # Save full briefing to Apple Notes
+  python3 daily_briefing.py --weekly           # Weekly summary (7 days)
+  python3 daily_briefing.py --weekly --note    # Save weekly summary to Apple Notes
   python3 daily_briefing.py --crm              # CRM-only compact briefing
   python3 daily_briefing.py --crm --note       # Save CRM briefing to Apple Notes
   python3 daily_briefing.py --engagement       # Engagement report (stale contacts)
@@ -510,6 +512,137 @@ def generate_briefing(test_date=None):
     return '\n'.join(out)
 
 
+def get_weekly_messages(start_date, end_date):
+    """Get message activity aggregated over a date range.
+    
+    Args:
+        start_date: YYYY-MM-DD string (inclusive)
+        end_date: YYYY-MM-DD string (inclusive)
+    
+    Returns:
+        List of dicts with: phone, name, inbound, outbound, total
+    """
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    
+    c.execute('''
+        SELECT 
+            h.id,
+            SUM(CASE WHEN m.is_from_me = 0 THEN 1 ELSE 0 END) as inbound,
+            SUM(CASE WHEN m.is_from_me = 1 THEN 1 ELSE 0 END) as outbound,
+            COUNT(*) as total
+        FROM message m
+        JOIN handle h ON m.handle_id = h.ROWID
+        WHERE date(m.date/1000000000+978307200,'unixepoch','localtime') BETWEEN ? AND ?
+        GROUP BY h.id
+        HAVING total > 0
+        ORDER BY total DESC
+    ''', (start_date, end_date))
+    
+    results = c.fetchall()
+    conn.close()
+    
+    activity = []
+    for row in results:
+        phone = row[0]
+        # Normalize phone for lookup
+        phone_normalized = '+' + re.sub(r'[^\d]', '', phone)[-10:] if phone else phone
+        phone_full = '+1' + re.sub(r'[^\d]', '', phone)[-10:] if phone else phone
+        
+        name = KNOWN_CONTACTS.get(phone_full, KNOWN_CONTACTS.get(phone_normalized, phone))
+        
+        activity.append({
+            'phone': phone,
+            'name': name,
+            'inbound': row[1],
+            'outbound': row[2],
+            'total': row[3]
+        })
+    
+    return activity
+
+
+def generate_weekly_summary(end_date=None):
+    """Generate weekly summary briefing (7 days).
+    
+    Args:
+        end_date: YYYY-MM-DD string for end of range (default: today)
+    
+    Returns:
+        Formatted markdown string with weekly aggregated data
+    """
+    if end_date:
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+    else:
+        end_dt = datetime.now()
+    
+    start_dt = end_dt - timedelta(days=6)  # 7 days inclusive
+    
+    start_sql = start_dt.strftime('%Y-%m-%d')
+    end_sql = end_dt.strftime('%Y-%m-%d')
+    
+    date_range = f"{start_dt.strftime('%b %d')}–{end_dt.strftime('%b %d, %Y')}"
+    
+    # Gather data
+    weekly_activity = get_weekly_messages(start_sql, end_sql)
+    stale_contacts = get_stale_contacts(30)
+    
+    # Get catalog changes from square_cache.sh
+    cache_changes_cmd = f"~/square-tools/bin/square_cache.sh changes --since {start_sql} 2>/dev/null || echo 'Cache unavailable'"
+    cache_result = subprocess.run(cache_changes_cmd, shell=True, capture_output=True, text=True)
+    cache_summary = cache_result.stdout.strip()
+    
+    # Parse cache output for summary line
+    catalog_summary = "N/A"
+    if "Cache unavailable" not in cache_summary:
+        # Count lines that indicate changes (contain emoji or item names)
+        change_lines = [l for l in cache_summary.split('\n') if l.strip() and ('🔄' in l or 'Type:' in l)]
+        if change_lines:
+            catalog_summary = f"{len(change_lines)} items updated"
+        else:
+            catalog_summary = "No changes"
+    
+    # Build output
+    out = []
+    out.append(f"# 📊 Weekly Summary\n")
+    out.append(f"**{date_range}**\n")
+    
+    # Message activity
+    out.append("## 📱 Message Activity (7 days)\n")
+    if weekly_activity:
+        out.append("| Contact | In | Out | Total |")
+        out.append("|---------|---:|----:|------:|")
+        for a in weekly_activity[:20]:  # Top 20
+            out.append(f"| {a['name']} | {a['inbound']} | {a['outbound']} | {a['total']} |")
+        out.append("")
+        out.append(f"*Total conversations: {len(weekly_activity)}*\n")
+    else:
+        out.append("*No message activity this week*\n")
+    
+    # Stale contacts
+    out.append("## 🔔 Stale Contacts\n")
+    if stale_contacts:
+        out.append(f"⚠️ {len(stale_contacts)} contacts requiring follow-up (30+ days):")
+        for s in stale_contacts[:5]:  # Top 5 most stale
+            days_str = f"{s['days_since']}d" if s['days_since'] else "Never"
+            out.append(f"- **{s['name']}** ({s['category']}) - {days_str}")
+        if len(stale_contacts) > 5:
+            out.append(f"\n*...and {len(stale_contacts) - 5} more*")
+        out.append("")
+    else:
+        out.append("✅ All contacts active!\n")
+    
+    # Catalog changes
+    out.append("## 📦 Square Catalog Changes\n")
+    out.append(f"{catalog_summary}\n")
+    
+    # Footer
+    out.append("---")
+    out.append(f"*Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}*")
+    
+    return '\n'.join(out)
+
+
 def generate_engagement_report(days_threshold=30):
     """Generate engagement-only report showing stale contacts.
     
@@ -805,6 +938,7 @@ if __name__ == '__main__':
     crm_mode = '--crm' in sys.argv
     note_mode = '--note' in sys.argv
     engagement_mode = '--engagement' in sys.argv
+    weekly_mode = '--weekly' in sys.argv
     days_threshold = 30
     
     for i, arg in enumerate(sys.argv):
@@ -818,7 +952,15 @@ if __name__ == '__main__':
                 sys.exit(1)
     
     # Generate appropriate briefing
-    if engagement_mode:
+    if weekly_mode:
+        briefing = generate_weekly_summary(end_date=test_date)
+        note_folder = "Weekly Summaries"
+        if test_date:
+            week_end = datetime.strptime(test_date, '%Y-%m-%d')
+            note_title = f"Weekly Summary — {week_end.strftime('%b %d, %Y')}"
+        else:
+            note_title = f"Weekly Summary — {datetime.now().strftime('%b %d, %Y')}"
+    elif engagement_mode:
         briefing = generate_engagement_report(days_threshold)
         note_folder = "Engagement Reports"
         note_title = f"Engagement Report — {datetime.now().strftime('%b %d, %Y')}"

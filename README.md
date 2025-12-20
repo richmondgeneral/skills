@@ -19,7 +19,7 @@ Complete appraisal workflow for carnival glass (pressed iridescent glass from 19
 
 **Use when:** Identifying carnival glass patterns, authenticating pieces, attributing makers (Northwood, Fenton, Imperial), or valuing bowls, plates, water sets.
 
-### maker-mark-identifier *(planned - TVM-25)*
+### maker-mark-identifier
 Focused identification skill for pottery, silver, furniture, and jewelry marks.
 
 **Use when:** Examining stamps, hallmarks, signatures, or labels to determine manufacturer and date range. Returns ID only—defers valuation to rg-inventory.
@@ -45,6 +45,9 @@ skills/
 │   ├── SKILL.md
 │   └── references/
 ├── carnival-glass-appraiser/  # Full appraisal: carnival glass
+│   ├── SKILL.md
+│   └── references/
+├── maker-mark-identifier/  # ID only: marks on pottery, silver, furniture
 │   ├── SKILL.md
 │   └── references/
 ├── product-labeler/        # Labels & Square descriptions

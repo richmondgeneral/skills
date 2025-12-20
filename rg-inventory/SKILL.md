@@ -1,6 +1,8 @@
 ---
 name: rg-inventory
 description: Richmond General inventory management system. Use when processing items for the store, creating Square catalog entries, pricing vintage/antique items, generating labels, or tracking purchase lots and provenance. Triggers on inventory, pricing, labeling, Square catalog, or Richmond General store tasks.
+metadata:
+  version: "1.0"
 ---
 
 # Richmond General Inventory System

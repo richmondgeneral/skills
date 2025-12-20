@@ -1,6 +1,8 @@
 ---
 name: square-cache
 description: Access MongoDB-cached Square catalog with change tracking and audit trails. Use when checking catalog status, searching items (faster than API), viewing change history, monitoring updates, or querying cached data. Triggers on "Square cache", "catalog changes", "what changed", "search cached items", "sync catalog", "item history", "cache status". Required for offline catalog access and automated change detection.
+metadata:
+  version: "1.0"
 ---
 
 # Square Cache Management

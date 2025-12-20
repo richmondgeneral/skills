@@ -1,6 +1,8 @@
 ---
 name: maker-mark-identifier
 description: Identify maker's marks on pottery, silver, furniture, and jewelry. Use when examining stamps, hallmarks, signatures, or labels to determine manufacturer, origin, and date range. Returns identification only—defers valuation to calling workflow.
+metadata:
+  version: "1.0"
 ---
 
 # Maker's Mark Identifier

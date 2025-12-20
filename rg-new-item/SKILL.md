@@ -1,6 +1,8 @@
 ---
 name: rg-new-item
 description: Process new Richmond General items from photo to live listing. Use when the user provides an item photo and wants to create a complete listing including Square catalog, payment link, and GitHub Pages card. Triggers on "new item", "process this photo", "add to inventory", "create listing", or when user uploads a product photo for Richmond General. Claude-supervised workflow with user approval at key phases.
+metadata:
+  version: "1.0"
 ---
 
 # Richmond General - New Item Workflow

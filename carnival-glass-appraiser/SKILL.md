@@ -1,6 +1,8 @@
 ---
 name: carnival-glass-appraiser
 description: Complete appraisal workflow for carnival glass (pressed iridescent glass from 1908-1930s). Use when identifying carnival glass patterns, authenticating pieces, attributing makers (Northwood, Fenton, Imperial), or valuing bowls, plates, water sets. Handles pattern recognition, manufacturer attribution, reproduction detection, condition assessment, and valuation.
+metadata:
+  version: "1.0"
 ---
 
 # Carnival Glass Appraiser

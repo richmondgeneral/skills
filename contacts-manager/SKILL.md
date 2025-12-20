@@ -1,6 +1,8 @@
 ---
 name: contacts-manager
 description: Contact lookup, quick reference, and spam filtering. Use when user asks who a phone number belongs to, needs contact info, wants to lookup or add a contact, identify unknown numbers, or check if a number is spam. Contains detailed profiles with communication style notes for composing personalized replies.
+metadata:
+  version: "1.0"
 ---
 
 # Contacts Manager

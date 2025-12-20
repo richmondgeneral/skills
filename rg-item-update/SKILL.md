@@ -1,6 +1,8 @@
 ---
 name: rg-item-update
 description: Quick edits to existing Richmond General catalog items. Use for price changes, description updates, SEO tweaks, adding/replacing images, category changes, or fixing typos. Triggers on "update item", "change price", "edit description", "fix", "modify existing". NOT for new items—use rg-full-auto for complete onboarding workflow.
+metadata:
+  version: "1.0"
 ---
 
 # Richmond General Item Update

@@ -1,6 +1,8 @@
 ---
 name: square-crm
 description: Sync Richmond General contacts with Square CRM. Use when creating/updating Square customers, looking up customers by phone, adding notes, or syncing contact data from iMessage assistant to Square. Triggers on "add to Square", "customer lookup", "sync contacts", "Square customer".
+metadata:
+  version: "1.0"
 ---
 
 # Square CRM Skill
@@ -13,7 +15,7 @@ Bridges `iMessage-assistant` contacts with Square customer records. Enables bidi
 
 **Location ID**: `B87BAEZ0NWV34` (Richmond General - ACTIVE)
 
-**Dependency**: Requires `~/.claude/skills/imessage-assistant/references/contacts.md` with Richmond General Customers section.
+**Dependency**: Requires `~/.claude/skills/contacts-manager/references/contacts.md` with Richmond General Customers section.
 
 **New:** Apple Contacts now sync automatically when discovering customer info from Square signups or iMessages.
 

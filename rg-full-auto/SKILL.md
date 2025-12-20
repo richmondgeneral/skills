@@ -1,6 +1,8 @@
 ---
 name: rg-full-auto
 description: End-to-end 7-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, fulfillment, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
+metadata:
+  version: "1.0"
 ---
 
 # Richmond General Full Auto

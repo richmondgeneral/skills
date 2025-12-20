@@ -1,6 +1,8 @@
 ---
 name: skill-manager
 description: Meta-skill for managing and updating Claude skills. Use when creating new skills, updating existing skills, or tracking skill versions. Triggers on "update skill", "create skill", "skill changelog", or references to skill management.
+metadata:
+  version: "1.0"
 ---
 
 # Skill Manager

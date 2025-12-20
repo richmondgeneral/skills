@@ -1,6 +1,8 @@
 ---
 name: product-labeler
 description: Generate product labels for Richmond General Square inventory. Use when creating thermal printer labels (CSV for Print Master batch import), Square catalog descriptions, or price tags. Handles imported Asian snacks, vintage items, and wellness products. Supports batch label generation, style guide compliance, and measurement conversions.
+metadata:
+  version: "1.0"
 ---
 
 # Product Labeler for Richmond General Square

@@ -1,6 +1,8 @@
 ---
 name: book-appraiser
 description: Antiquarian and antique book appraisal, identification, and valuation. Use when the user presents a book that appears to be from before 1970, asks about old/antique/vintage books, needs help identifying publisher/edition/printing, wants to research book value, or asks about Library of Congress holdings or public domain status.
+metadata:
+  version: "1.0"
 ---
 
 # Book Appraiser: Antiquarian & Vintage Books

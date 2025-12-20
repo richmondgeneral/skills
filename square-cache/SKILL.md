@@ -78,10 +78,17 @@ Displays changes with emoji indicators:
 ### Search Cached Items
 
 ```bash
-# Search by name pattern (case-insensitive)
+# Search by name pattern (case-insensitive, default)
 ~/square-tools/bin/square_cache.sh search "Trading Places"
 
-# Returns matching items instantly from cache
+# Search by SKU (exact or prefix)
+~/square-tools/bin/square_cache.sh search --sku RG-0005
+~/square-tools/bin/square_cache.sh search --sku "RG-"
+
+# Explicit name search
+~/square-tools/bin/square_cache.sh search --name "Bears"
+
+# Returns matching items instantly from cache (100x faster than API)
 ```
 
 ### Get Item Details

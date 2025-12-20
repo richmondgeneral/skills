@@ -10,7 +10,7 @@ description: Check and respond to iMessages with full context. Use when user ask
 
 Scripts run on Scotty's Mac via `osascript do shell script "python3 ..."` to query Messages database directly.
 
-**Scripts location:** `~/skills/imessage-assistant/scripts/`
+**Scripts location:** `~/.claude/skills/imessage-assistant/scripts/`
 
 ---
 
@@ -46,25 +46,25 @@ Scripts run on Scotty's Mac via `osascript do shell script "python3 ..."` to que
 
 ```bash
 # 1:1 conversation (default 25 messages)
-python3 ~/skills/imessage-assistant/scripts/get_imessage_convo.py +1XXXXXXXXXX 20
+python3 ~/.claude/skills/imessage-assistant/scripts/get_imessage_convo.py +1XXXXXXXXXX 20
 
 # Deep history for close friends (use 100-200 for context)
-python3 ~/skills/imessage-assistant/scripts/get_imessage_convo.py +1XXXXXXXXXX 200
+python3 ~/.claude/skills/imessage-assistant/scripts/get_imessage_convo.py +1XXXXXXXXXX 200
 
 # Group chat
-python3 ~/skills/imessage-assistant/scripts/get_imessage_convo.py --chat CHAT_ID 25
+python3 ~/.claude/skills/imessage-assistant/scripts/get_imessage_convo.py --chat CHAT_ID 25
 
 # Today's summary (for daily audits)
-python3 ~/skills/imessage-assistant/scripts/get_imessage_convo.py --today
+python3 ~/.claude/skills/imessage-assistant/scripts/get_imessage_convo.py --today
 
 # Get service type for contact
-python3 ~/skills/imessage-assistant/scripts/get_imessage_convo.py --service +1XXXXXXXXXX
+python3 ~/.claude/skills/imessage-assistant/scripts/get_imessage_convo.py --service +1XXXXXXXXXX
 
 # List group chats
-python3 ~/skills/imessage-assistant/scripts/get_imessage_convo.py --groups
+python3 ~/.claude/skills/imessage-assistant/scripts/get_imessage_convo.py --groups
 
 # Check database date range (important for historical queries)
-python3 ~/skills/imessage-assistant/scripts/get_imessage_convo.py --check-range
+python3 ~/.claude/skills/imessage-assistant/scripts/get_imessage_convo.py --check-range
 ```
 
 **⚠️ iCloud Messages Limitation:**
@@ -79,18 +79,18 @@ If "Messages in iCloud" is enabled, the local database typically only contains ~
 
 ```bash
 # 1:1 (auto-detects service from history)
-python3 ~/skills/imessage-assistant/scripts/send_message.py +1XXXXXXXXXX "message"
+python3 ~/.claude/skills/imessage-assistant/scripts/send_message.py +1XXXXXXXXXX "message"
 
 # Force specific service (for new contacts or after error=22)
-python3 ~/skills/imessage-assistant/scripts/send_message.py --service RCS +1XXXXXXXXXX "message"
-python3 ~/skills/imessage-assistant/scripts/send_message.py --service SMS +1XXXXXXXXXX "message"
-python3 ~/skills/imessage-assistant/scripts/send_message.py --service iMessage +1XXXXXXXXXX "message"
+python3 ~/.claude/skills/imessage-assistant/scripts/send_message.py --service RCS +1XXXXXXXXXX "message"
+python3 ~/.claude/skills/imessage-assistant/scripts/send_message.py --service SMS +1XXXXXXXXXX "message"
+python3 ~/.claude/skills/imessage-assistant/scripts/send_message.py --service iMessage +1XXXXXXXXXX "message"
 
 # Group chat
-python3 ~/skills/imessage-assistant/scripts/send_message.py --chat CHAT_ID "message"
+python3 ~/.claude/skills/imessage-assistant/scripts/send_message.py --chat CHAT_ID "message"
 
 # Lookup group chat details
-python3 ~/skills/imessage-assistant/scripts/send_message.py --lookup CHAT_ID
+python3 ~/.claude/skills/imessage-assistant/scripts/send_message.py --lookup CHAT_ID
 ```
 
 **Note:** MCP `send_imessage` only works for iMessage. Use scripts for RCS/Android and group chats.
@@ -99,10 +99,10 @@ python3 ~/skills/imessage-assistant/scripts/send_message.py --lookup CHAT_ID
 
 ```bash
 # All messages sent today
-python3 ~/skills/imessage-assistant/scripts/sent_today.py
+python3 ~/.claude/skills/imessage-assistant/scripts/sent_today.py
 
 # Only failed/pending messages
-python3 ~/skills/imessage-assistant/scripts/sent_today.py --failed
+python3 ~/.claude/skills/imessage-assistant/scripts/sent_today.py --failed
 ```
 
 ### Daily Briefing (v0.2)
@@ -111,19 +111,19 @@ python3 ~/skills/imessage-assistant/scripts/sent_today.py --failed
 
 ```bash
 # Full daily briefing to stdout
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py
 
 # Save to Apple Notes (Daily Briefings folder)
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --note
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --note
 
 # CRM-only compact briefing (no tables, just lists)
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --crm
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --crm
 
 # Save CRM briefing to Apple Notes (CRM Briefings folder)
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --crm --note
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --crm --note
 
 # Test with historical date
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --date 2025-11-24
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --date 2025-11-24
 ```
 
 **Runs daily at 7am via cron → Apple Notes**
@@ -148,10 +148,10 @@ python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --date 2025-11-24
 
 ```bash
 # Generate briefing to stdout
-python3 ~/skills/imessage-assistant/scripts/crm_briefing.py
+python3 ~/.claude/skills/imessage-assistant/scripts/crm_briefing.py
 
 # Generate and save to Apple Notes (CRM Briefings folder)
-python3 ~/skills/imessage-assistant/scripts/crm_briefing.py --note
+python3 ~/.claude/skills/imessage-assistant/scripts/crm_briefing.py --note
 ```
 
 Reads `references/contacts.md` for:
@@ -266,7 +266,7 @@ iMessage → Apple Contacts → contacts.md → Square CRM
 ```bash
 # Scott's iMessage shows "Mike" + phone +13129143889
 # But his last name is "Giba" (from company context)
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --last-name "Giba"
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --last-name "Giba"
 ```
 
 **Step 2: Update contacts.md (reference)**
@@ -281,19 +281,19 @@ python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --las
 **Step 3: Sync to Square CRM**
 ```bash
 # Using square-crm skill to update
-python3 ~/skills/square-crm/scripts/parse_contacts.py --phone +13129143889
+python3 ~/.claude/skills/square-crm/scripts/parse_contacts.py --phone +13129143889
 ```
 
 **Result:** All 4 systems updated, data flows in both directions
 
 ### Sync Scripts Available
 
-See `~/skills/square-crm/scripts/` for:
+See `~/.claude/skills/square-crm/scripts/` for:
 - `sync_to_apple_contacts.py` - Update iPhone from Square discoveries
 - `parse_contacts.py` - Export contacts.md for Square sync
 - `lookup_customer.py` - Search Square by phone
 
-Full documentation: `~/skills/square-crm/references/sync-to-contacts-guide.md`
+Full documentation: `~/.claude/skills/square-crm/references/sync-to-contacts-guide.md`
 
 ---
 

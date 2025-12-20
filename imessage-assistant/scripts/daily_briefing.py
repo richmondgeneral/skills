@@ -35,7 +35,7 @@ def send_notification(title, message, sound="default"):
 
 
 DB = os.path.expanduser('~/Library/Messages/chat.db')
-CONTACTS_FILE = os.path.expanduser('~/skills/imessage-assistant/references/contacts.md')
+CONTACTS_FILE = os.path.expanduser('~/.claude/skills/imessage-assistant/references/contacts.md')
 TEMP_MD_FILE = '/tmp/daily_briefing.md'
 
 # Property-related keywords to flag from Sue Miller
@@ -598,7 +598,7 @@ def generate_weekly_summary(end_date=None):
     stale_contacts = get_stale_contacts(30)
     
     # Get catalog changes from square_cache.sh
-    cache_changes_cmd = f"~/square-tools/bin/square_cache.sh changes --since {start_sql} 2>/dev/null || echo 'Cache unavailable'"
+    cache_changes_cmd = f"~/Workspace/square-tools/bin/square_cache.sh changes --since {start_sql} 2>/dev/null || echo 'Cache unavailable'"
     cache_result = subprocess.run(cache_changes_cmd, shell=True, capture_output=True, text=True)
     cache_summary = cache_result.stdout.strip()
     

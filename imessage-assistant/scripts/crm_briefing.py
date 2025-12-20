@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 DB = os.path.expanduser('~/Library/Messages/chat.db')
-CONTACTS_FILE = os.path.expanduser('~/skills/imessage-assistant/references/contacts.md')
+CONTACTS_FILE = os.path.expanduser('~/.claude/skills/imessage-assistant/references/contacts.md')
 TEMP_MD_FILE = '/tmp/crm_daily_briefing.md'
 
 

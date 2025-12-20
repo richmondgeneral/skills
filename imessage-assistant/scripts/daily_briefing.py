@@ -24,6 +24,16 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
+def send_notification(title, message, sound="default"):
+    """Send macOS notification when briefing is ready."""
+    script = f'display notification "{message}" with title "{title}" sound name "{sound}"'
+    try:
+        subprocess.run(['osascript', '-e', script], check=True, capture_output=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
 DB = os.path.expanduser('~/Library/Messages/chat.db')
 CONTACTS_FILE = os.path.expanduser('~/skills/imessage-assistant/references/contacts.md')
 TEMP_MD_FILE = '/tmp/daily_briefing.md'
@@ -1008,12 +1018,14 @@ if __name__ == '__main__':
                 try:
                     subprocess.run(['osascript', '-e', script], check=True, capture_output=True)
                     print(f"✅ {note_title} saved to Apple Notes (CRM Briefings folder)")
+                    send_notification("CRM Briefing Ready", note_title)
                 except subprocess.CalledProcessError as e:
                     print(f"❌ Failed to save: {e.stderr.decode()}", file=sys.stderr)
                     print(briefing)
             else:
                 if save_to_apple_notes_legacy(briefing, title=note_title):
                     print(f"✅ {note_title} saved to Apple Notes")
+                    send_notification("Briefing Ready", note_title)
                 else:
                     print("❌ Failed to save")
                     print(briefing)
@@ -1022,10 +1034,12 @@ if __name__ == '__main__':
             
             if result is True:
                 print("✅ Daily Briefing saved to Apple Notes (Daily Briefings folder)")
+                send_notification("Daily Briefing Ready", "Your briefing is in Apple Notes")
             elif result is None:
                 print("Falling back to legacy method...", file=sys.stderr)
                 if save_to_apple_notes_legacy(briefing, title=note_title):
                     print("✅ Saved via legacy method")
+                    send_notification("Briefing Ready", "Saved via legacy method")
                 else:
                     print("❌ Failed to save")
                     print(briefing)
@@ -1033,6 +1047,7 @@ if __name__ == '__main__':
                 print("❌ macOS 26 import failed, trying legacy...", file=sys.stderr)
                 if save_to_apple_notes_legacy(briefing, title=note_title):
                     print("✅ Saved via legacy method")
+                    send_notification("Briefing Ready", "Saved via legacy method")
                 else:
                     print(briefing)
     else:

@@ -21,3 +21,7 @@
 archive/
 *.zip
 *.skill
+
+# Logs
+*/logs/
+*.log

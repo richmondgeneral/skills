@@ -1,0 +1,393 @@
+---
+name: square-cache
+description: Access MongoDB-cached Square catalog with change tracking and audit trails. Use when checking catalog status, searching items (faster than API), viewing change history, monitoring updates, or querying cached data. Triggers on "Square cache", "catalog changes", "what changed", "search cached items", "sync catalog", "item history", "cache status". Required for offline catalog access and automated change detection.
+---
+
+# Square Cache Management
+
+Local MongoDB cache of Square catalog items with comprehensive change tracking, before/after snapshots, and field-level diff reports.
+
+## Why This Skill Exists
+
+**Performance:** Cache searches are instant vs. API calls taking seconds.
+
+**Change Detection:** Automated tracking of all catalog modifications with SHA256 content hashing.
+
+**Audit Trail:** Complete before/after snapshots with field-level diffs for every change.
+
+**Offline Access:** Query catalog data without hitting Square API limits.
+
+**Historical Data:** Track item evolution over time with complete change history.
+
+## Quick Start
+
+### Prerequisites
+
+1. MongoDB running: `brew services start mongodb-community@8.0`
+2. Python 3.7+ with pymongo, requests
+3. Set environment variable: `export SQUARE_TOKEN=your_token`
+4. Initial sync: `~/square-tools/bin/square_cache.sh sync`
+
+### Verify Setup
+
+```bash
+# Check cache status
+~/square-tools/bin/square_cache.sh status
+
+# Should show MongoDB running, items cached, last sync time
+```
+
+## Core Commands
+
+### Sync Catalog
+
+```bash
+# Full sync from Square API to MongoDB
+~/square-tools/bin/square_cache.sh sync
+```
+
+Fetches all catalog items, detects changes, creates snapshots. Run after making changes in Square dashboard or via API.
+
+### Check Status
+
+```bash
+~/square-tools/bin/square_cache.sh status
+```
+
+Shows:
+- MongoDB connection status
+- Items cached count
+- Change records count
+- Last sync timestamp and status
+
+### View Recent Changes
+
+```bash
+# All recent changes
+~/square-tools/bin/square_cache.sh changes
+
+# Changes since specific date
+~/square-tools/bin/square_cache.sh changes --since 2025-12-01
+```
+
+Displays changes with emoji indicators:
+- 🆕 = new item created
+- 🔄 = item updated (with field-level diffs)
+- ❌ = item deleted
+
+### Search Cached Items
+
+```bash
+# Search by name pattern (case-insensitive)
+~/square-tools/bin/square_cache.sh search "Trading Places"
+
+# Returns matching items instantly from cache
+```
+
+### Get Item Details
+
+```bash
+# Get cached item by ID
+~/square-tools/bin/square_cache.sh item ANE5SXKQR4JZ6AYEZDO26IMX
+```
+
+### Generate Change Report
+
+```bash
+# Detailed change report
+~/square-tools/bin/square_cache.sh report
+
+# JSON format for parsing
+~/square-tools/bin/square_cache.sh report --json
+```
+
+## Direct MongoDB Queries
+
+### Basic Queries
+
+```bash
+# Access MongoDB shell
+mongosh square_cache
+
+# Count total items
+mongosh square_cache --eval "db.catalog_items.countDocuments()"
+
+# Get items with images
+mongosh square_cache --eval "db.catalog_items.find({'item_data.image_ids': {\$exists: true}}).count()"
+
+# Get items without descriptions
+mongosh square_cache --eval "db.catalog_items.find({'item_data.description': {\$exists: false}}).count()"
+```
+
+### Change Tracking Queries
+
+```bash
+# View latest sync operation
+mongosh square_cache --eval "db.sync_log.findOne({}, {sort: {timestamp: -1}})"
+
+# View all changes for specific item
+mongosh square_cache --eval "db.change_snapshots.find({item_id: 'ITEM_ID'}).pretty()"
+
+# Changes in last 24 hours
+mongosh square_cache --eval "db.change_snapshots.find({timestamp: {\$gte: new Date(Date.now() - 24*60*60*1000)}}).pretty()"
+
+# Count changes by type
+mongosh square_cache --eval "db.change_snapshots.aggregate([{\\$group: {_id: '\\$change_type', count: {\\$sum: 1}}}])"
+```
+
+### Advanced Queries
+
+```bash
+# Items updated in last week
+mongosh square_cache --eval "db.catalog_items.find({updated_at: {\$gte: new Date(Date.now() - 7*24*60*60*1000)}}).count()"
+
+# Items by category
+mongosh square_cache --eval "db.catalog_items.find({'item_data.categories': {\$exists: true}}).pretty()"
+
+# Recent sync errors
+mongosh square_cache --eval "db.sync_log.find({error: {\$exists: true}}).sort({timestamp: -1}).limit(5).pretty()"
+```
+
+## Python Integration
+
+### Using cache_wrapper.py
+
+```python
+from skills.square_cache.scripts.cache_wrapper import SquareCacheWrapper
+
+cache = SquareCacheWrapper()
+
+# Get cache status
+status = cache.get_status()
+print(f"Items cached: {status['items_count']}")
+
+# Search items
+results = cache.search_items("vinyl")
+for item in results:
+    print(f"{item['id']}: {item['item_data']['name']}")
+
+# Get item history
+history = cache.get_item_history("ANE5SXKQR4JZ6AYEZDO26IMX")
+for change in history:
+    print(f"{change['timestamp']}: {change['change_type']}")
+
+# Recent changes
+changes = cache.get_recent_changes(since="2025-12-01")
+```
+
+### Using query_helper.py
+
+```python
+from skills.square_cache.scripts.query_helper import QueryHelper
+
+helper = QueryHelper()
+
+# Get mongosh commands as strings
+cmd = helper.items_with_images()
+cmd = helper.items_without_descriptions()
+cmd = helper.changes_by_date_range("2025-12-01", "2025-12-20")
+cmd = helper.sync_errors()
+
+# Execute via subprocess
+import subprocess
+result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+```
+
+## Integration Workflows
+
+### With rg-inventory
+
+When creating new item:
+1. Search cache first for similar items
+2. If found, clone attributes for consistency
+3. After creation via API, trigger cache sync
+4. Verify item appears in cache
+
+### With square-image-upload
+
+Before uploading image:
+1. Search cache for item by ID
+2. Verify item exists and is active
+3. After upload, sync cache to capture new image_ids
+
+### With product-labeler
+
+When generating labels:
+1. Search cache for items needing labels
+2. Pull cached data (faster than API)
+3. Generate label batch
+4. Update cache with label_generated flag
+
+## Change Detection Algorithm
+
+The cache uses SHA256 content hashing for efficient change detection:
+
+1. **Hash Calculation:** Excludes volatile fields (`updated_at`, `version`)
+2. **Comparison:** Compares hashes between Square API and cached version
+3. **Diff Generation:** Field-by-field comparison identifies exactly what changed
+4. **Snapshot Creation:** Stores complete before/after data for audit trail
+
+Example change output:
+```
+🔄 Trading Places - Rare Video 8 Format (1983)
+   Type: update
+   Changes: item_data.image_ids, version, updated_at
+   Version: 1759194139169 → 1759194200000
+   BEFORE: No images attached  
+   AFTER:  2 images attached
+```
+
+## MongoDB Schema
+
+### catalog_items Collection
+
+```javascript
+{
+  _id: ObjectId,
+  id: "SQUARE_ITEM_ID",  // unique index
+  type: "ITEM",
+  updated_at: "2025-12-20T04:00:00.000Z",
+  version: 1759194200000,
+  is_deleted: false,
+  item_data: {
+    name: "Trading Places VHS",
+    description: "1983 comedy starring Eddie Murphy...",
+    product_type: "REGULAR",
+    image_ids: ["IMAGE_ID_1", "IMAGE_ID_2"],
+    variations: [...],
+    categories: [...]
+  },
+  content_hash: "sha256_hash",  // for change detection
+  cached_at: ISODate
+}
+```
+
+### change_snapshots Collection
+
+```javascript
+{
+  _id: ObjectId,
+  item_id: "SQUARE_ITEM_ID",  // indexed
+  item_name: "Trading Places VHS",
+  change_type: "update",  // create, update, delete
+  timestamp: ISODate,  // indexed
+  before_data: {...},  // complete previous state
+  after_data: {...},   // complete new state
+  differences: {       // field-level diffs
+    "item_data.image_ids": {
+      before: [],
+      after: ["IMAGE_ID_1", "IMAGE_ID_2"]
+    }
+  },
+  square_version_before: 1759194139169,
+  square_version_after: 1759194200000
+}
+```
+
+### sync_log Collection
+
+```javascript
+{
+  _id: ObjectId,
+  timestamp: ISODate,  // indexed
+  status: "success",   // or "error"
+  items_processed: 142,
+  changes_detected: 3,
+  duration_seconds: 8.5,
+  error: null  // or error message
+}
+```
+
+## Troubleshooting
+
+### MongoDB Not Running
+
+```bash
+# Check status
+brew services list | grep mongodb
+
+# Start MongoDB
+brew services start mongodb-community@8.0
+
+# Test connection
+mongosh --eval "db.runCommand('ismaster')" --quiet
+```
+
+### Sync Errors
+
+```bash
+# Check recent sync logs
+mongosh square_cache --eval "db.sync_log.find({error: {\$exists: true}}).sort({timestamp: -1}).limit(5).pretty()"
+
+# Verify Square token
+echo $SQUARE_TOKEN
+
+# Test Square API connectivity
+curl -H "Square-Version: 2024-09-18" \
+     -H "Authorization: Bearer $SQUARE_TOKEN" \
+     "https://connect.squareup.com/v2/catalog/list?types=ITEM&limit=1"
+```
+
+### Cache Reset (Nuclear Option)
+
+```bash
+# Clear all cache data
+mongosh square_cache --eval "db.catalog_items.deleteMany({}); db.change_snapshots.deleteMany({}); db.sync_log.deleteMany({})"
+
+# Resync from scratch
+~/square-tools/bin/square_cache.sh sync
+```
+
+### Cache Out of Sync
+
+If cache doesn't match Square dashboard:
+1. Check last sync time: `square_cache.sh status`
+2. Review sync errors: query `sync_log` collection
+3. Trigger manual sync: `square_cache.sh sync`
+4. Verify with spot check: compare cache vs API
+
+## Environment Variables
+
+```bash
+# Required
+export SQUARE_TOKEN="your_square_access_token"
+
+# Optional (defaults in square-tools/config.sh)
+export SQUARE_ENVIRONMENT="production"  # or 'sandbox'
+export MONGO_URI="mongodb://localhost:27017/"
+export MONGO_DATABASE="square_cache"
+export SQUARE_LOG_LEVEL="INFO"
+```
+
+## Performance Tips
+
+1. **Use cache for searches:** 100x faster than API calls
+2. **Sync periodically:** Not every operation (API rate limits)
+3. **Leverage indexes:** Queries on `id`, `name`, `timestamp` are optimized
+4. **Batch operations:** When possible, query multiple items at once
+5. **JSON output:** Use `--json` flag for programmatic parsing
+
+## Reference Files
+
+See [references/api_reference.md](references/api_reference.md) for:
+- Complete MongoDB schema details
+- Index strategy explanation
+- Change detection internals
+- Advanced query patterns
+- Performance benchmarks
+
+## Related Skills
+
+- **rg-inventory:** Primary orchestrator using cache for item lookups
+- **square-image-upload:** Verifies items exist before image uploads
+- **product-labeler:** Pulls cached data for label generation
+- **square-crm:** May cache customer data in future
+
+## Future Enhancements
+
+- Automated sync scheduling (cron job)
+- Cache expiration policies
+- Variation-level change tracking
+- Real-time change notifications
+- Cache analytics dashboard
+- Export to CSV/JSON for reporting

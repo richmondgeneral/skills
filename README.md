@@ -29,10 +29,14 @@ Generate product labels for Richmond General Square inventory and thermal printi
 
 **Use when:** Creating thermal printer labels (CSV for Print Master), Square catalog descriptions, or price tags.
 
-### vintage-appraiser *(deprecated)*
-> **Note:** Being replaced by focused skills: `carnival-glass-appraiser` (TVM-24) and `maker-mark-identifier` (TVM-25). Will be removed after migration complete.
-
-Legacy skill for identifying maker's marks, carnival glass, pottery, silver, and other vintage collectibles.
+### vintage-appraiser ⚠️ DEPRECATED
+> **Status:** Replaced by `carnival-glass-appraiser` and `maker-mark-identifier`.
+> 
+> **Migration:** Use carnival-glass-appraiser for carnival glass appraisals, maker-mark-identifier for pottery/silver/furniture marks.
+> 
+> **Reason:** Violated Claude best practice: "Keep it focused." This skill mixed multiple workflows (carnival glass, general marks, pricing, listing copy) that compose better as separate skills.
+> 
+> **Removal:** Planned for deprecation after validation period. Kept for reference only.
 
 ## Structure
 

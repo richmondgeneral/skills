@@ -1,12 +1,25 @@
 ---
 name: vintage-appraiser
-version: 1.0.0
-description: Research and identify maker's marks on vintage and antique items. Use when the user shares an image of a mark, stamp, signature, or label and wants help identifying the maker, origin, or age. Also use when asked to research pottery marks, glass signatures, furniture stamps, silver hallmarks, or any manufacturer identification on collectibles and antiques.
+description: ⚠️ DEPRECATED - This skill has been replaced by focused skills. Use carnival-glass-appraiser for carnival glass, maker-mark-identifier for pottery/silver/furniture marks. This skill remains for reference but should not be used for new work.
 ---
 
-# Vintage Appraiser: Maker's Mark Identification
+# ⚠️ Vintage Appraiser (DEPRECATED)
 
-**Current Date:** December 19, 2025
+**This skill has been replaced by focused, composable skills:**
+
+- **carnival-glass-appraiser** → Full carnival glass appraisal (pattern ID, authentication, condition, valuation)
+- **maker-mark-identifier** → Pottery, silver, furniture mark identification (ID only, defer valuation to rg-inventory)
+- **book-appraiser** → Antiquarian books (unchanged)
+
+**Why deprecated:** This skill mixed multiple responsibilities (carnival glass, general marks, pricing, listing copy), violating Claude's best practice: "Keep it focused: Create separate Skills for different workflows."
+
+**Do not use this skill for new work.** The content below is kept for reference only.
+
+---
+
+## Original Content (Reference Only)
+
+**Original Date:** December 19, 2025
 
 ## Core Workflow
 
@@ -109,34 +122,37 @@ When confidence is not high, suggest:
 | "Japan" vs "Nippon" | Japan: 1921+, Nippon: 1891-1921 |
 | Pontil scars on glass | Pre-1860s (rough), 1860s+ (smooth/polished) |
 
-## Additional Resources
+## Migration Guide
 
-- **Research databases and sources:** See `references/research-sources.md`
-- **Carnival glass patterns:** See `references/carnival-glass.md` for Northwood, Fenton, Imperial, Dugan, Millersburg patterns and identification
-- **Pricing research:** See `references/pricing-research.md` for valuation workflow and comparable sales research
-- **Listing descriptions:** See `references/listing-descriptions.md` for title formulas, description templates, and condition language
+### For Carnival Glass
+**Use:** `carnival-glass-appraiser` skill
+- Complete appraisal workflow (pattern ID → authentication → condition → valuation)
+- Handles full Phase 1 for rg-inventory
+- Resume at Phase 2 (Photography) after appraisal
 
-### When to Load Carnival Glass Reference
+### For Maker's Marks (Pottery, Silver, Furniture)
+**Use:** `maker-mark-identifier` skill
+- Identification only (maker, location, date range, confidence)
+- Returns to rg-inventory Phase 1 for valuation
+- Continue with condition assessment and pricing research
 
-Load `references/carnival-glass.md` when:
-- User mentions carnival glass, iridescent glass, or aurora glass
-- Image shows pressed glass with iridescent surface
-- Pattern names like "Grape & Cable," "Orange Tree," "Peacock" appear
-- User asks about Northwood, Fenton, Imperial, Dugan, or Millersburg
-- Piece has characteristic carnival colors (marigold, amethyst on pressed glass)
+### For Pricing/Valuation
+**Use:** rg-inventory Phase 1 research checklist
+- Comparable sales research (eBay sold, auction records)
+- Pricing tiers by category
+- Margin targets
 
-### When to Load Pricing Reference
+### For Listing Descriptions
+**Use:** marketplace-templates.md in rg-inventory (future)
+- Title formulas by category
+- Description templates
+- Condition language standards
 
-Load `references/pricing-research.md` when:
-- User asks "what's this worth?" or "how much should I pay?"
-- User mentions buying, selling, pricing, or valuation
-- User asks about auction estimates or resale value
-- User wants to research comparable sales
+---
 
-### When to Load Listing Description Reference
+## Additional Resources (Deprecated)
 
-Load `references/listing-descriptions.md` when:
-- User asks for help writing a listing or description
-- User mentions eBay, Etsy, selling online, or posting items
-- User needs help describing condition
-- User wants to optimize titles or improve searchability
+- **Research databases and sources:** See `references/research-sources.md` → Now in maker-mark-identifier
+- **Carnival glass patterns:** See `references/carnival-glass.md` → Now in carnival-glass-appraiser
+- **Pricing research:** See `references/pricing-research.md` → Now in rg-inventory Phase 1
+- **Listing descriptions:** See `references/listing-descriptions.md` → Future: rg-inventory/references/marketplace-templates.md

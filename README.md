@@ -4,12 +4,12 @@ AI assistant skills for managing Richmond General's vintage and antique inventor
 
 ## Skills
 
-### rg-new-item
+### rg-full-auto
 Claude-supervised workflow for processing new items from a single photo to live listing. Complete 7-phase automation with user approval at key steps.
 
 **Use when:** User provides a product photo, says "new item", "add to inventory", or "create listing". Handles appraisal, background removal, Square catalog, payment links, and GitHub Pages publishing.
 
-### rg-inventory
+### rg-full-auto
 Main orchestrator skill for the complete inventory workflow from appraisal through GitHub Pages publishing.
 
 **Use when:** Processing items, creating Square catalog entries, pricing vintage/antique items, generating labels, or tracking purchase lots.
@@ -27,7 +27,7 @@ Complete appraisal workflow for carnival glass (pressed iridescent glass from 19
 ### maker-mark-identifier
 Focused identification skill for pottery, silver, furniture, and jewelry marks.
 
-**Use when:** Examining stamps, hallmarks, signatures, or labels to determine manufacturer and date range. Returns ID only—defers valuation to rg-inventory.
+**Use when:** Examining stamps, hallmarks, signatures, or labels to determine manufacturer and date range. Returns ID only—defers valuation to rg-full-auto.
 
 ### product-labeler
 Generate product labels for Richmond General Square inventory and thermal printing.
@@ -39,11 +39,11 @@ Generate product labels for Richmond General Square inventory and thermal printi
 
 ```
 skills/
-├── rg-new-item/            # Claude-supervised new item workflow
+├── rg-full-auto/            # Claude-supervised new item workflow
 │   ├── SKILL.md
 │   ├── scripts/
 │   └── references/
-├── rg-inventory/           # Main orchestrator
+├── rg-full-auto/           # Main orchestrator
 │   ├── SKILL.md
 │   └── references/
 ├── book-appraiser/         # Full appraisal: books

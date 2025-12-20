@@ -1,6 +1,6 @@
 ---
 name: gemini-chat
-description: Multi-model image processing router. Auto-selects optimal model (Gemini 3 Nano Banana Pro, Gemini 2.5 Flash, remove.bg) based on task, quality, and cost. Use for background removal, image analysis, and enhancement. Triggers on "remove background", "process image", "image enhancement", or when rg-inventory needs background removal.
+description: Multi-model image processing router. Auto-selects optimal model (Gemini 3 Nano Banana Pro, Gemini 2.5 Flash, remove.bg) based on task, quality, and cost. Use for background removal, image analysis, and enhancement. Triggers on "remove background", "process image", "image enhancement", or when rg-full-auto needs background removal.
 metadata:
   version: "1.0"
   author: scottybe
@@ -157,7 +157,7 @@ for img in *.jpg; do
 done
 ```
 
-### rg-inventory Integration
+### rg-full-auto Integration
 
 ```bash
 # Replace Phase 0b manual remove.bg call

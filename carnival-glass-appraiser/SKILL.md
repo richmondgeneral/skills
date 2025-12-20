@@ -21,7 +21,7 @@ Complete appraisal workflow for carnival glass—from pattern identification thr
 - Color terms: marigold, amethyst, radium finish, peach opal
 - Questions about iridescent bowls, plates, water sets, punch sets, vases from early 1900s
 
-**Route from rg-inventory:** When rg-inventory Phase 1 identifies carnival glass, this skill handles the complete appraisal. Return to rg-inventory Phase 2 (Photography) after appraisal.
+**Route from rg-full-auto:** When rg-full-auto Phase 1 identifies carnival glass, this skill handles the complete appraisal. Return to rg-full-auto Phase 2 (Photography) after appraisal.
 
 ## Inputs Needed
 
@@ -184,10 +184,10 @@ After completing all 5 phases, provide:
 **Notes:** [Authentication details, special features, market factors]
 
 ---
-Ready to continue with rg-inventory Phase 2 (Photography)
+Ready to continue with rg-full-auto Phase 2 (Photography)
 ```
 
-## Integration with rg-inventory
+## Integration with rg-full-auto
 
 This skill handles the complete Phase 1 (Appraisal & Research) for carnival glass items:
 - Pattern identification ✓
@@ -196,7 +196,7 @@ This skill handles the complete Phase 1 (Appraisal & Research) for carnival glas
 - Condition assessment ✓
 - Valuation with comps ✓
 
-After appraisal completes, return to rg-inventory workflow at Phase 2 (Photography).
+After appraisal completes, return to rg-full-auto workflow at Phase 2 (Photography).
 
 ## References
 

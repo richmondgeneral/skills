@@ -40,7 +40,7 @@ Meta-skill for collaboratively developing and maintaining Claude skills with Sco
 
 | Skill | Path | Purpose | Last Updated |
 |-------|------|---------|--------------|
-| **rg-inventory** | `~/.claude/skills/rg-inventory/` | Richmond General inventory workflow | 2025-12-20 |
+| **rg-full-auto** | `~/.claude/skills/rg-full-auto/` | Richmond General inventory workflow | 2025-12-20 |
 | **carnival-glass-appraiser** | `~/.claude/skills/carnival-glass-appraiser/` | Carnival glass pattern ID & valuation | 2025-12-19 |
 | **maker-mark-identifier** | `~/.claude/skills/maker-mark-identifier/` | Pottery, silver, furniture maker's marks | 2025-12-19 |
 | **book-appraiser** | `~/.claude/skills/book-appraiser/` | Antiquarian books, LOC cross-reference | - |
@@ -119,7 +119,7 @@ When updating skills, add entry to `references/changelog.md`:
 ## Skill File Formats
 
 The skills directory contains mixed formats:
-- **Folders** (`rg-inventory/`): Multi-file skills with SKILL.md + references
+- **Folders** (`rg-full-auto/`): Multi-file skills with SKILL.md + references
 - **Zips** (`.zip` archives): Archived/backup versions
 
 Preferred format: **Folder structure** for maintainability.

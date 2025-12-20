@@ -47,7 +47,7 @@ changes = cache.get_recent_changes(since="2025-12-01")
 ## Integration
 
 Use with:
-- `rg-inventory` - Fast item lookups before API calls
+- `rg-full-auto` - Fast item lookups before API calls
 - `square-image-upload` - Verify items exist before uploads
 - `product-labeler` - Pull cached data for labels
 

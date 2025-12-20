@@ -4,7 +4,7 @@ Tracking changes to all skills in `~/.claude/skills/`.
 
 ---
 
-## rg-inventory
+## rg-full-auto
 
 ### 2025-12-20 (v5)
 #### Changed

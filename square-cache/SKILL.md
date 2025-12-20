@@ -252,7 +252,7 @@ result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
 ## Integration Workflows
 
-### With rg-inventory
+### With rg-full-auto
 
 When creating new item:
 1. Search cache first for similar items
@@ -435,7 +435,7 @@ See [references/api_reference.md](references/api_reference.md) for:
 
 ## Related Skills
 
-- **rg-inventory:** Primary orchestrator using cache for item lookups
+- **rg-full-auto:** Primary orchestrator using cache for item lookups
 - **square-image-upload:** Verifies items exist before image uploads
 - **product-labeler:** Pulls cached data for label generation
 - **square-crm:** May cache customer data in future

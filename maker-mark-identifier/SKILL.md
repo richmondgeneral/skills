@@ -7,7 +7,7 @@ metadata:
 
 # Maker's Mark Identifier
 
-Focused identification skill for maker's marks on antiques and collectibles. This skill identifies the maker, origin, and date range—then returns to rg-inventory for valuation.
+Focused identification skill for maker's marks on antiques and collectibles. This skill identifies the maker, origin, and date range—then returns to rg-full-auto for valuation.
 
 ## When to Use This Skill
 
@@ -23,7 +23,7 @@ Focused identification skill for maker's marks on antiques and collectibles. Thi
 
 **NOT for carnival glass** — Use `carnival-glass-appraiser` instead (pattern-based identification, not marks).
 
-**Route from rg-inventory:** When rg-inventory Phase 1 identifies a maker's mark needing identification, this skill provides the ID. Return to rg-inventory Phase 1 to continue with condition assessment and valuation.
+**Route from rg-full-auto:** When rg-full-auto Phase 1 identifies a maker's mark needing identification, this skill provides the ID. Return to rg-full-auto Phase 1 to continue with condition assessment and valuation.
 
 ## Inputs Needed
 
@@ -131,7 +131,7 @@ After completing all 4 phases, provide:
 **Verification:** [Additional steps if confidence < High]
 
 ---
-Identification complete. Return to rg-inventory Phase 1 for:
+Identification complete. Return to rg-full-auto Phase 1 for:
 - Condition assessment
 - Comparable sales research
 - Valuation
@@ -157,7 +157,7 @@ Read left to right:
 4. **Date letter** — Changes yearly; letter style indicates cycle
 5. **Duty mark** — Monarch's head (1784-1890, optional)
 
-## Integration with rg-inventory
+## Integration with rg-full-auto
 
 This skill handles **identification only**:
 - ✅ Who made it (manufacturer)
@@ -166,12 +166,12 @@ This skill handles **identification only**:
 - ✅ Confidence level
 
 This skill does **NOT** handle:
-- ❌ Condition assessment → rg-inventory Phase 1
-- ❌ Comparable sales research → rg-inventory Phase 1
-- ❌ Valuation/pricing → rg-inventory Phase 1
+- ❌ Condition assessment → rg-full-auto Phase 1
+- ❌ Comparable sales research → rg-full-auto Phase 1
+- ❌ Valuation/pricing → rg-full-auto Phase 1
 - ❌ Listing descriptions → product-labeler
 
-After identification, return to rg-inventory to complete Phase 1 research checklist.
+After identification, return to rg-full-auto to complete Phase 1 research checklist.
 
 ## References
 

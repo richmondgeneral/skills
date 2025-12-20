@@ -163,7 +163,7 @@ Specialized appraisal workflow for books, with Library of Congress cross-referen
 
 ### Step 7: Integration with RG-Inventory
 
-After appraisal, proceed to `rg-inventory` workflow:
+After appraisal, proceed to `rg-full-auto` workflow:
 
 1. **Square Catalog**: Create listing with detailed description
 2. **Photography**: Capture title page, copyright page, binding, any defects

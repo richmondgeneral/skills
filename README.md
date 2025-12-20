@@ -29,14 +29,6 @@ Generate product labels for Richmond General Square inventory and thermal printi
 
 **Use when:** Creating thermal printer labels (CSV for Print Master), Square catalog descriptions, or price tags.
 
-### vintage-appraiser ⚠️ DEPRECATED
-> **Status:** Replaced by `carnival-glass-appraiser` and `maker-mark-identifier`.
-> 
-> **Migration:** Use carnival-glass-appraiser for carnival glass appraisals, maker-mark-identifier for pottery/silver/furniture marks.
-> 
-> **Reason:** Violated Claude best practice: "Keep it focused." This skill mixed multiple workflows (carnival glass, general marks, pricing, listing copy) that compose better as separate skills.
-> 
-> **Removal:** Planned for deprecation after validation period. Kept for reference only.
 
 ## Structure
 
@@ -68,8 +60,12 @@ skills/
 │   └── references/
 ├── skill-manager/          # Meta-skill for skill updates
 │   └── SKILL.md
-├── vintage-appraiser/      # (deprecated)
+├── square-cache/           # MongoDB cache for Square catalog
 │   ├── SKILL.md
+│   └── scripts/
+├── square-image-upload/    # Image upload for Square Catalog API
+│   ├── SKILL.md
+│   ├── scripts/
 │   └── references/
 ├── build-skill.sh          # Build script for generating ZIP archives
 └── archive/                # Generated ZIP files (not in git)

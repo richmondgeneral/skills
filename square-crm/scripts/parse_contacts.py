@@ -3,7 +3,7 @@
 Parse contacts.md and output JSON of customers ready for Square sync.
 Claude uses this output to make Square API calls via MCP.
 
-DEPENDENCY: Requires ~/skills/imessage-assistant/references/contacts.md
+DEPENDENCY: Requires ~/.claude/skills/imessage-assistant/references/contacts.md
             with "## Detailed Profiles - Richmond General Customers" section.
 
 Usage:
@@ -19,7 +19,7 @@ import sys
 import os
 
 # Path to contacts file - update if imessage-assistant skill moves
-CONTACTS_FILE = os.path.expanduser('~/skills/imessage-assistant/references/contacts.md')
+CONTACTS_FILE = os.path.expanduser('~/.claude/skills/imessage-assistant/references/contacts.md')
 
 # Square Customer Group IDs for Richmond General
 # These were created Dec 2025 and map to relationship types

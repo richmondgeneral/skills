@@ -13,7 +13,7 @@ Bridges `iMessage-assistant` contacts with Square customer records. Enables bidi
 
 **Location ID**: `B87BAEZ0NWV34` (Richmond General - ACTIVE)
 
-**Dependency**: Requires `~/skills/imessage-assistant/references/contacts.md` with Richmond General Customers section.
+**Dependency**: Requires `~/.claude/skills/imessage-assistant/references/contacts.md` with Richmond General Customers section.
 
 **New:** Apple Contacts now sync automatically when discovering customer info from Square signups or iMessages.
 
@@ -21,37 +21,37 @@ Bridges `iMessage-assistant` contacts with Square customer records. Enables bidi
 
 ### Parse Contacts for Sync
 ```bash
-python3 ~/skills/square-crm/scripts/parse_contacts.py              # All
-python3 ~/skills/square-crm/scripts/parse_contacts.py --category Lead
-python3 ~/skills/square-crm/scripts/parse_contacts.py --phone +1312...
+python3 ~/.claude/skills/square-crm/scripts/parse_contacts.py              # All
+python3 ~/.claude/skills/square-crm/scripts/parse_contacts.py --category Lead
+python3 ~/.claude/skills/square-crm/scripts/parse_contacts.py --phone +1312...
 ```
 Outputs JSON with `square_request` ready for API calls.
 
 ### Lookup Customer
 ```bash
-python3 ~/skills/square-crm/scripts/lookup_customer.py +13124483219
+python3 ~/.claude/skills/square-crm/scripts/lookup_customer.py +13124483219
 ```
 Outputs search request for Square MCP.
 
 ### Sync to Apple Contacts
 ```bash
 # Update last name from Square discovery
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --last-name "Giba"
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --last-name "Giba"
 
 # Add alternate phone (e.g., from Square signup)
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --alt-phone "+17085970480"
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --alt-phone "+17085970480"
 
 # Add note
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --note "Square signup Dec 18"
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --note "Square signup Dec 18"
 
 # All at once
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --last-name "Giba" --alt-phone "+17085970480" --note "VIP"
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --last-name "Giba" --alt-phone "+17085970480" --note "VIP"
 
 # Check if contact exists
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --check
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --check
 
 # From JSON (for Claude pipeline)
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py --json '{"phone": "+13129143889", "last_name": "Giba"}'
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py --json '{"phone": "+13129143889", "last_name": "Giba"}'
 ```
 Updates Apple Contacts with data discovered from Square signups.
 
@@ -76,7 +76,7 @@ When you discover customer info from Square signups:
 ```bash
 # Claude finds Mike Giba in Square with alt phone
 # Then runs:
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 \
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 \
   --last-name "Giba" \
   --alt-phone "+17085970480" \
   --note "Square signup Dec 18"

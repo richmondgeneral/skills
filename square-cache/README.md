@@ -6,16 +6,16 @@ Claude beta skill for accessing MongoDB-cached Square catalog with comprehensive
 
 ```bash
 # Check cache status
-~/square-tools/bin/square_cache.sh status
+~/Workspace/square-tools/bin/square_cache.sh status
 
 # Sync catalog
-~/square-tools/bin/square_cache.sh sync
+~/Workspace/square-tools/bin/square_cache.sh sync
 
 # View recent changes
-~/square-tools/bin/square_cache.sh changes
+~/Workspace/square-tools/bin/square_cache.sh changes
 
 # Search cached items
-~/square-tools/bin/square_cache.sh search "vinyl"
+~/Workspace/square-tools/bin/square_cache.sh search "vinyl"
 ```
 
 ## Python Usage

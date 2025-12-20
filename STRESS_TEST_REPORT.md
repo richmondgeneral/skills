@@ -179,22 +179,22 @@ Recommendation: APPROVED FOR DEPLOYMENT
 
 ```bash
 # Engagement detection
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --engagement
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --engagement --days 1
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --engagement --days 365
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --engagement
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --engagement --days 1
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --engagement --days 365
 
 # Weekly summaries
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --weekly
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --weekly --date 2025-01-01
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --weekly --date 2025-12-31
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --weekly
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --weekly --date 2025-01-01
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --weekly --date 2025-12-31
 
 # Auto sync
-~/skills/square-crm/scripts/auto_sync.sh --dry-run
-~/skills/square-crm/scripts/install_launchd.sh status
+~/.claude/skills/square-crm/scripts/auto_sync.sh --dry-run
+~/.claude/skills/square-crm/scripts/install_launchd.sh status
 
 # Integrated workflows
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --crm
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --crm
 ```
 
 ### Validation Criteria
@@ -218,5 +218,5 @@ This test suite should be re-run:
 ## Related Documentation
 
 - Implementation: See GitHub issues #1, #2, #3
-- Usage Guide: ~/skills/AUTOMATION.md
+- Usage Guide: ~/.claude/skills/AUTOMATION.md
 - Linear Tickets: TVM-14, TVM-15, TVM-16

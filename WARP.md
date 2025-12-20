@@ -126,9 +126,9 @@ Phase order matters in rg-full-auto:
 Labels cannot be created until both SKU and payment link exist.
 
 ### External Assets
-- **Label batch file**: `/Users/scottybe/items/rg-labels-batch.csv`
+- **Label batch file**: `/Users/scottybe/Workspace/items/rg-labels-batch.csv`
 - **Info card site**: https://richmondgeneral.github.io/items/ (static GitHub Pages)
-- **Working directory**: `/Users/scottybe/items/` (not in this repo)
+- **Working directory**: `/Users/scottybe/Workspace/items/` (not in this repo)
 
 ### Reference Documents
 The `rg-full-auto/references/` directory contains business rules that inform the main workflows:

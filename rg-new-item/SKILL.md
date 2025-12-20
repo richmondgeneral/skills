@@ -76,7 +76,7 @@ When user uploads image:
 
 ```bash
 # Claude runs background removal
-python3 ~/skills/rg-new-item/scripts/remove_background.py \
+python3 ~/.claude/skills/rg-new-item/scripts/remove_background.py \
   <image_from_user> \
   assets/working-images/RG-XXXX-hero-converted.png
 ```
@@ -117,7 +117,7 @@ Claude collects data and calls Square API:
 
 ```bash
 # Claude uploads processed image to Square item
-python3 ~/skills/square-image-upload/scripts/upload_image.py \
+python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
   --image RG-XXXX-hero-converted.png \
   --item-id <ITEM_ID_FROM_PHASE_3> \
   --name "<Item Title> - Hero" \
@@ -204,7 +204,7 @@ Claude should **pause and ask for approval** at these points:
 Remove background from product images using remove.bg API.
 
 ```bash
-python3 ~/skills/rg-new-item/scripts/remove_background.py \
+python3 ~/.claude/skills/rg-new-item/scripts/remove_background.py \
   input.jpeg \
   output.png
 ```
@@ -219,7 +219,7 @@ python3 ~/skills/rg-new-item/scripts/remove_background.py \
 Orchestrates the complete workflow (Phases 1-3 currently implemented).
 
 ```bash
-python3 ~/skills/rg-new-item/scripts/process_new_item.py \
+python3 ~/.claude/skills/rg-new-item/scripts/process_new_item.py \
   --image photo.jpeg \
   --interactive
 ```
@@ -245,7 +245,7 @@ python3 ~/skills/rg-new-item/scripts/process_new_item.py \
 
 ### File Organization
 
-**Working directory:** `/Users/scottybe/items/`
+**Working directory:** `/Users/scottybe/Workspace/items/`
 
 **Structure:**
 ```
@@ -323,11 +323,11 @@ echo $REMOVEBG_API_KEY
 
 ## API Reference
 
-See `~/skills/rg-inventory/SKILL.md` for detailed Square API documentation.
+See `~/.claude/skills/rg-inventory/SKILL.md` for detailed Square API documentation.
 
 ## Related Documentation
 
-- Parent skill: `~/skills/rg-inventory/SKILL.md`
-- Image upload: `~/skills/square-image-upload/SKILL.md`
-- Site structure: `/Users/scottybe/items/WARP.md`
-- Item validation: `/Users/scottybe/items/validate-item.sh`
+- Parent skill: `~/.claude/skills/rg-inventory/SKILL.md`
+- Image upload: `~/.claude/skills/square-image-upload/SKILL.md`
+- Site structure: `/Users/scottybe/Workspace/items/WARP.md`
+- Item validation: `/Users/scottybe/Workspace/items/validate-item.sh`

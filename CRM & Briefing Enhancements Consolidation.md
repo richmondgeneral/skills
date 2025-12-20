@@ -57,9 +57,9 @@ Three remaining Linear backlog items \(TVM\-14, TVM\-15, TVM\-16\) all relate to
 * Integrate with `square_cache.sh changes --since` for catalog section
 ### 3\. Automated CRM Sync \(TVM\-16\)
 **Implementation:** Create launchd plist for scheduled sync\.
-**New script:** `~/skills/square-crm/scripts/auto_sync.sh`
+**New script:** `~/.claude/skills/square-crm/scripts/auto_sync.sh`
 * Wrapper that runs `parse_contacts.py` → Square API update workflow
-* Logs to `~/skills/square-crm/logs/sync.log`
+* Logs to `~/.claude/skills/square-crm/logs/sync.log`
 * Sends errors to daily briefing for manual review
 * Tracks last sync timestamp in MongoDB `square_cache.sync_log`
 **Launchd config:** `~/Library/LaunchAgents/com.richmondgeneral.square-crm-sync.plist`

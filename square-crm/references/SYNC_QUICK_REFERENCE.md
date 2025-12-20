@@ -9,19 +9,19 @@
 ### Scenario 1: You find their last name via iMessage
 ```bash
 # Run this to update their Apple Contact
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --last-name "Giba"
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --last-name "Giba"
 ```
 
 ### Scenario 2: Square shows alternate phone
 ```bash
 # Add alt phone to their Apple Contact
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --alt-phone "+17085970480"
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --alt-phone "+17085970480"
 ```
 
 ### Scenario 3: Both name + alternate phone
 ```bash
 # Update Apple Contacts with both
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 \
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 \
   --last-name "Giba" \
   --alt-phone "+17085970480"
 ```
@@ -87,7 +87,7 @@ Your script handles these automatically:
 
 ```bash
 # 1️⃣ Update Apple Contacts
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +14148757568 \
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +14148757568 \
   --first-name "Bob" \
   --last-name "Mitchell"
 
@@ -99,7 +99,7 @@ python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +14148757568 \
 # ... rest of details
 
 # 3️⃣ Update Square
-python3 ~/skills/square-crm/scripts/parse_contacts.py --phone +14148757568
+python3 ~/.claude/skills/square-crm/scripts/parse_contacts.py --phone +14148757568
 
 # 4️⃣ Update SKILL.md
 # Change the Richmond General Customers quick lookup table
@@ -114,7 +114,7 @@ Done! All 4 systems now have "Bob Mitchell" instead of "414 Contact".
 Run entire batch from JSON:
 
 ```bash
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py --json '{
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py --json '{
   "phone": "+14148757568",
   "first_name": "Bob",
   "last_name": "Mitchell",
@@ -129,9 +129,9 @@ python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py --json '{
 
 | File | Purpose | When to Edit |
 |------|---------|--------------|
-| `~/skills/imessage-assistant/references/contacts.md` | Master contact reference | When discovering new customer info |
-| `~/skills/square-crm/SKILL.md` | Square skill docs | When new groups/APIs are available |
-| `~/skills/imessage-assistant/SKILL.md` | iMessage skill docs | When adding new contact style notes |
+| `~/.claude/skills/imessage-assistant/references/contacts.md` | Master contact reference | When discovering new customer info |
+| `~/.claude/skills/square-crm/SKILL.md` | Square skill docs | When new groups/APIs are available |
+| `~/.claude/skills/imessage-assistant/SKILL.md` | iMessage skill docs | When adding new contact style notes |
 
 ---
 
@@ -142,11 +142,11 @@ After syncing, verify all 4 systems match:
 ```bash
 # 1. Apple Contacts — open on iPhone, verify name + phones
 # 2. contacts.md — grep for the phone
-grep "+14148757568" ~/skills/imessage-assistant/references/contacts.md
+grep "+14148757568" ~/.claude/skills/imessage-assistant/references/contacts.md
 
 # 3. Square CRM Dashboard — search by phone
 # 4. SKILL.md — check Quick Reference tables
-grep "Bob Mitchell" ~/skills/square-crm/SKILL.md
+grep "Bob Mitchell" ~/.claude/skills/square-crm/SKILL.md
 ```
 
 ---
@@ -178,7 +178,7 @@ For now, use this quick reference to keep things synchronized manually!
 
 1. **Add to shell alias** for faster access:
    ```bash
-   alias sync-contact="python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py"
+   alias sync-contact="python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py"
    
    # Then use: sync-contact +13129143889 --last-name "Giba"
    ```
@@ -186,12 +186,12 @@ For now, use this quick reference to keep things synchronized manually!
 2. **Bulk upload after discovery:**
    ```bash
    # Once a week, update Square with all new contacts from contacts.md
-   python3 ~/skills/square-crm/scripts/parse_contacts.py
+   python3 ~/.claude/skills/square-crm/scripts/parse_contacts.py
    ```
 
 3. **Keep SKILL.md tables current:**
    - Update Quick Reference whenever someone's name changes
-   - Run validation: `python3 ~/skills/square-crm/scripts/parse_contacts.py --validate`
+   - Run validation: `python3 ~/.claude/skills/square-crm/scripts/parse_contacts.py --validate`
 
 ---
 

@@ -86,8 +86,8 @@ End of Session → Batch print all labels
 
 ## Batch File Locations
 
-- CSV: `/Users/scottybe/items/rg-labels-batch.csv`
-- Excel: `/Users/scottybe/items/rg-labels-batch.xlsx`
+- CSV: `/Users/scottybe/Workspace/items/rg-labels-batch.csv`
+- Excel: `/Users/scottybe/Workspace/items/rg-labels-batch.xlsx`
 
 ## Style Guide
 

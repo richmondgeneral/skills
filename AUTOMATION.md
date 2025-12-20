@@ -14,7 +14,7 @@ Three integrated automation systems:
 ### Required
 - MongoDB running: `brew services start mongodb-community@8.0`
 - SQUARE_TOKEN in `~/.zshrc`: `export SQUARE_TOKEN="your_token"`
-- contacts.md maintained at `~/skills/imessage-assistant/references/contacts.md`
+- contacts.md maintained at `~/.claude/skills/imessage-assistant/references/contacts.md`
 
 ### Optional
 - Apple Notes for rich briefing formatting (macOS 26+)
@@ -28,13 +28,13 @@ Automatically identifies customers with no recent iMessage activity.
 
 ```bash
 # Standalone engagement report (30-day threshold)
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --engagement
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --engagement
 
 # Custom threshold (45 days)
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --engagement --days 45
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --engagement --days 45
 
 # Save to Apple Notes
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --engagement --note
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --engagement --note
 ```
 
 ### Output Format
@@ -69,13 +69,13 @@ Contacts in "Nurture" category are skipped (low engagement expected).
 
 ```bash
 # Current week summary
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --weekly
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --weekly
 
 # Historical week (ending on specified date)
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --weekly --date 2025-12-15
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --weekly --date 2025-12-15
 
 # Save to Apple Notes
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --weekly --note
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --weekly --note
 ```
 
 ### Output Format
@@ -110,7 +110,7 @@ python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --weekly --note
 
 - **Message Activity**: iMessage chat.db (7-day aggregation)
 - **Stale Contacts**: Phase 1 detection logic
-- **Catalog Changes**: `~/square-tools/bin/square_cache.sh changes --since START_DATE`
+- **Catalog Changes**: `~/Workspace/square-tools/bin/square_cache.sh changes --since START_DATE`
 
 ### Recommended Schedule
 
@@ -118,7 +118,7 @@ Run weekly summaries on Sunday mornings:
 
 ```bash
 # Add to crontab or create launchd job
-0 8 * * 0 python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --weekly --note
+0 8 * * 0 python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --weekly --note
 ```
 
 ## 3. Automated CRM Sync (TVM-16)
@@ -128,7 +128,7 @@ Daily scheduled sync of contacts.md to Square CRM via launchd.
 ### Installation
 
 ```bash
-cd ~/skills/square-crm/scripts
+cd ~/.claude/skills/square-crm/scripts
 
 # Check prerequisites
 ./install_launchd.sh status
@@ -150,24 +150,24 @@ Expected output:
 
 ```bash
 # Dry-run (no changes)
-~/skills/square-crm/scripts/auto_sync.sh --dry-run
+~/.claude/skills/square-crm/scripts/auto_sync.sh --dry-run
 
 # Full sync (for testing)
-~/skills/square-crm/scripts/auto_sync.sh
+~/.claude/skills/square-crm/scripts/auto_sync.sh
 ```
 
 ### Monitoring
 
 ```bash
 # Check sync status
-~/skills/square-crm/scripts/install_launchd.sh status
+~/.claude/skills/square-crm/scripts/install_launchd.sh status
 
 # View sync logs
-tail -f ~/skills/square-crm/logs/sync.log
+tail -f ~/.claude/skills/square-crm/logs/sync.log
 
 # Check launchd output
-tail -f ~/skills/square-crm/logs/launchd.out.log
-tail -f ~/skills/square-crm/logs/launchd.err.log
+tail -f ~/.claude/skills/square-crm/logs/launchd.out.log
+tail -f ~/.claude/skills/square-crm/logs/launchd.err.log
 ```
 
 ### Sync Schedule
@@ -192,7 +192,7 @@ Sync operations logged to `square_cache.sync_log` collection:
 ### Uninstalling
 
 ```bash
-~/skills/square-crm/scripts/install_launchd.sh uninstall
+~/.claude/skills/square-crm/scripts/install_launchd.sh uninstall
 ```
 
 ## Integrated Workflow
@@ -236,7 +236,7 @@ Sunday 8:00 AM  →  Manual/Scheduled: Generate weekly summary
 
 **Solutions**:
 1. Ensure MongoDB running: `pgrep mongod`
-2. Run sync: `~/square-tools/bin/square_cache.sh sync`
+2. Run sync: `~/Workspace/square-tools/bin/square_cache.sh sync`
 3. Check date range: `square_cache.sh changes --since 2025-12-13`
 
 ### Auto Sync Failing
@@ -247,7 +247,7 @@ Sunday 8:00 AM  →  Manual/Scheduled: Generate weekly summary
 1. Check status: `install_launchd.sh status`
 2. Verify SQUARE_TOKEN in `~/.zshrc` (not just current shell)
 3. Test manually: `auto_sync.sh --dry-run`
-4. Check launchd logs: `~/skills/square-crm/logs/launchd.err.log`
+4. Check launchd logs: `~/.claude/skills/square-crm/logs/launchd.err.log`
 
 ### Apple Notes Import Failing
 
@@ -262,7 +262,7 @@ Sunday 8:00 AM  →  Manual/Scheduled: Generate weekly summary
 
 ### Custom Sync Times
 
-Edit `~/skills/square-crm/scripts/com.richmondgeneral.square-crm-sync.plist`:
+Edit `~/.claude/skills/square-crm/scripts/com.richmondgeneral.square-crm-sync.plist`:
 
 ```xml
 <key>StartCalendarInterval</key>
@@ -305,9 +305,9 @@ Adjust based on customer category expectations:
 
 ## Related Documentation
 
-- **daily_briefing.py**: `~/skills/imessage-assistant/scripts/daily_briefing.py` (inline docs)
-- **square-crm skill**: `~/skills/square-crm/SKILL.md`
-- **square-cache**: `~/square-tools/README.md`
+- **daily_briefing.py**: `~/.claude/skills/imessage-assistant/scripts/daily_briefing.py` (inline docs)
+- **square-crm skill**: `~/.claude/skills/square-crm/SKILL.md`
+- **square-cache**: `~/Workspace/square-tools/README.md`
 - **Linear tickets**: TVM-14 (engagement), TVM-15 (weekly), TVM-16 (automation)
 
 ---

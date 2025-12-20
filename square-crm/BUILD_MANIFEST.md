@@ -22,7 +22,7 @@ All systems stay in sync when discovering customer information.
 ### Scripts
 
 #### 1. sync_to_apple_contacts.py
-- **Path:** `~/skills/square-crm/scripts/sync_to_apple_contacts.py`
+- **Path:** `~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py`
 - **Type:** Python 3
 - **Status:** ✅ Working
 - **Test:** `python3 sync_to_apple_contacts.py +13129143889 --check` → "Found: Mike Giba"
@@ -37,7 +37,7 @@ All systems stay in sync when discovering customer information.
 - **Dependencies:** osascript (native macOS)
 
 #### 2. update_contact_simple.sh
-- **Path:** `~/skills/square-crm/scripts/update_contact_simple.sh`
+- **Path:** `~/.claude/skills/square-crm/scripts/update_contact_simple.sh`
 - **Type:** Bash
 - **Status:** ✅ Present & executable
 - **Features:**
@@ -50,7 +50,7 @@ All systems stay in sync when discovering customer information.
 ### Documentation
 
 #### 1. SYNC_QUICK_REFERENCE.md ⭐ DAILY USE
-- **Path:** `~/skills/square-crm/references/SYNC_QUICK_REFERENCE.md`
+- **Path:** `~/.claude/skills/square-crm/references/SYNC_QUICK_REFERENCE.md`
 - **Status:** ✅ Created
 - **Lines:** 199
 - **Contents:**
@@ -64,7 +64,7 @@ All systems stay in sync when discovering customer information.
   - Pro tips
 
 #### 2. manual-sync-sop.md
-- **Path:** `~/skills/square-crm/references/manual-sync-sop.md`
+- **Path:** `~/.claude/skills/square-crm/references/manual-sync-sop.md`
 - **Status:** ✅ Created
 - **Lines:** 690
 - **Contents:**
@@ -79,7 +79,7 @@ All systems stay in sync when discovering customer information.
   - Troubleshooting guide
 
 #### 3. sync-to-contacts-guide.md
-- **Path:** `~/skills/square-crm/references/sync-to-contacts-guide.md`
+- **Path:** `~/.claude/skills/square-crm/references/sync-to-contacts-guide.md`
 - **Status:** ✅ Created
 - **Lines:** 269
 - **Contents:**
@@ -92,7 +92,7 @@ All systems stay in sync when discovering customer information.
   - Troubleshooting
 
 #### 4. bidirectional-sync-design.md
-- **Path:** `~/skills/square-crm/references/bidirectional-sync-design.md`
+- **Path:** `~/.claude/skills/square-crm/references/bidirectional-sync-design.md`
 - **Status:** ✅ Created (Phase 3 planning)
 - **Lines:** 594
 - **Contents:**
@@ -202,25 +202,25 @@ All commits include co-author: `Warp <agent@warp.dev>`
 
 ### Quick Test
 ```bash
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --check
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --check
 # Output: ✅ Found: Mike Giba
 ```
 
 ### Update Name Only
 ```bash
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --last-name "Giba"
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 --last-name "Giba"
 ```
 
 ### Update Name + Add Phone
 ```bash
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 \
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 \
   --last-name "Giba" \
   --alt-phone "+17085970480"
 ```
 
 ### Complete Update
 ```bash
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 \
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 \
   --first-name "Mike" \
   --last-name "Giba" \
   --alt-phone "+17085970480" \
@@ -230,7 +230,7 @@ python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +13129143889 \
 
 ### JSON Batch Update
 ```bash
-python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py --json '{
+python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py --json '{
   "phone": "+13129143889",
   "first_name": "Mike",
   "last_name": "Giba",
@@ -243,20 +243,20 @@ python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py --json '{
 ## File Locations Summary
 
 ### Scripts
-- `~/skills/square-crm/scripts/sync_to_apple_contacts.py`
-- `~/skills/square-crm/scripts/update_contact_simple.sh`
+- `~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py`
+- `~/.claude/skills/square-crm/scripts/update_contact_simple.sh`
 
 ### Quick Reference (Use Daily)
-- `~/skills/square-crm/references/SYNC_QUICK_REFERENCE.md` ⭐
+- `~/.claude/skills/square-crm/references/SYNC_QUICK_REFERENCE.md` ⭐
 
 ### Complete Documentation
-- `~/skills/square-crm/references/manual-sync-sop.md`
-- `~/skills/square-crm/references/sync-to-contacts-guide.md`
-- `~/skills/square-crm/references/bidirectional-sync-design.md`
+- `~/.claude/skills/square-crm/references/manual-sync-sop.md`
+- `~/.claude/skills/square-crm/references/sync-to-contacts-guide.md`
+- `~/.claude/skills/square-crm/references/bidirectional-sync-design.md`
 
 ### Skill Docs
-- `~/skills/square-crm/SKILL.md`
-- `~/skills/imessage-assistant/SKILL.md`
+- `~/.claude/skills/square-crm/SKILL.md`
+- `~/.claude/skills/imessage-assistant/SKILL.md`
 
 ---
 
@@ -302,7 +302,7 @@ python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py --json '{
 
 1. **Tomorrow:** When discovering "414 guy" name, run:
    ```bash
-   python3 ~/skills/square-crm/scripts/sync_to_apple_contacts.py +14148757568 \
+   python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +14148757568 \
      --first-name "His" --last-name "Name"
    ```
 

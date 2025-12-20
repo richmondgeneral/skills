@@ -15,7 +15,7 @@ Complete 7-phase workflow for onboarding new vintage/antique items from acquisit
 | Merchant ID | 7MM9AFJAD0XHW |
 | SKU Prefix | RG-XXXX (sequential) |
 | GitHub Pages | https://richmondgeneral.github.io/items/ |
-| Working Directory | `/Users/scottybe/items/` |
+| Working Directory | `/Users/scottybe/Workspace/items/` |
 
 ### Category Assignment (choose ONE)
 
@@ -199,7 +199,7 @@ Returns: `payment_link.url` → `https://square.link/u/XXXXXXXX`
 
 **Dependency:** Needs SKU (Phase 3) + payment link (Phase 5)
 
-**Batch file:** `/Users/scottybe/items/rg-labels-batch.csv`
+**Batch file:** `/Users/scottybe/Workspace/items/rg-labels-batch.csv`
 
 ```csv
 Product Name,Attributes,Price,Condition,Condition Notes,SKU,QR Code URL

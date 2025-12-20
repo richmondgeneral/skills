@@ -12,7 +12,7 @@ pgrep mongod && echo "✅ MongoDB running" || echo "❌ Start MongoDB: brew serv
 [ -n "$SQUARE_TOKEN" ] && echo "✅ SQUARE_TOKEN set" || echo "❌ Add to ~/.zshrc: export SQUARE_TOKEN='your_token'"
 
 # Verify contacts.md exists
-[ -f ~/skills/imessage-assistant/references/contacts.md ] && echo "✅ contacts.md found" || echo "❌ Create contacts.md"
+[ -f ~/.claude/skills/imessage-assistant/references/contacts.md ] && echo "✅ contacts.md found" || echo "❌ Create contacts.md"
 ```
 
 ## 5-Minute Quick Start
@@ -21,10 +21,10 @@ pgrep mongod && echo "✅ MongoDB running" || echo "❌ Start MongoDB: brew serv
 
 ```bash
 # Find contacts with no activity in 30+ days
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --engagement
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --engagement
 
 # Try shorter threshold (7 days)
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --engagement --days 7
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --engagement --days 7
 ```
 
 **Expected Output:**
@@ -39,7 +39,7 @@ Found 1 contacts requiring follow-up:
 
 ```bash
 # View last 7 days of activity
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --weekly
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --weekly
 ```
 
 **Expected Output:**
@@ -60,10 +60,10 @@ Catalog Changes: 126 items updated
 
 ```bash
 # Dry-run to verify setup
-~/skills/square-crm/scripts/auto_sync.sh --dry-run
+~/.claude/skills/square-crm/scripts/auto_sync.sh --dry-run
 
 # Check system status
-~/skills/square-crm/scripts/install_launchd.sh status
+~/.claude/skills/square-crm/scripts/install_launchd.sh status
 ```
 
 **Expected Output:**
@@ -76,7 +76,7 @@ Catalog Changes: 126 items updated
 ### 4. (Optional) Install Daily Automation (2 minutes)
 
 ```bash
-cd ~/skills/square-crm/scripts
+cd ~/.claude/skills/square-crm/scripts
 
 # Install launchd job for 6:00 AM daily sync
 ./install_launchd.sh install
@@ -94,13 +94,13 @@ cd ~/skills/square-crm/scripts
 
 ```bash
 # Daily briefing with engagement alerts
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --note
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --note
 
 # Weekly summary
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --weekly --note
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --weekly --note
 
 # Engagement report only
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --engagement --note
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --engagement --note
 ```
 
 ## Daily Usage
@@ -109,17 +109,17 @@ python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --engagement --not
 
 ```bash
 # Generate today's briefing
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --note
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --note
 
 # Check if any contacts need follow-up
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --engagement --days 7
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --engagement --days 7
 ```
 
 ### Sunday Morning (8:00 AM)
 
 ```bash
 # Generate weekly recap
-python3 ~/skills/imessage-assistant/scripts/daily_briefing.py --weekly --note
+python3 ~/.claude/skills/imessage-assistant/scripts/daily_briefing.py --weekly --note
 ```
 
 ## Troubleshooting
@@ -143,14 +143,14 @@ source ~/.zshrc
 ### "No contacts found"
 Verify contacts.md has Richmond General Customers section:
 ```bash
-grep "Richmond General Customers" ~/skills/imessage-assistant/references/contacts.md
+grep "Richmond General Customers" ~/.claude/skills/imessage-assistant/references/contacts.md
 ```
 
 ## Next Steps
 
 **Want more details?**
-- Full documentation: `~/skills/AUTOMATION.md`
-- Stress test results: `~/skills/STRESS_TEST_REPORT.md`
+- Full documentation: `~/.claude/skills/AUTOMATION.md`
+- Stress test results: `~/.claude/skills/STRESS_TEST_REPORT.md`
 - GitHub issues: #1 (stale contacts), #2 (weekly), #3 (auto sync)
 - Linear tickets: TVM-14, TVM-15, TVM-16
 
@@ -169,7 +169,7 @@ grep "Richmond General Customers" ~/skills/imessage-assistant/references/contact
 
 ✅ Engagement reports show relevant contacts  
 ✅ Weekly summaries include catalog changes  
-✅ Auto sync logs appear in `~/skills/square-crm/logs/sync.log`  
+✅ Auto sync logs appear in `~/.claude/skills/square-crm/logs/sync.log`  
 ✅ Daily briefings saved to Apple Notes  
 ✅ MongoDB shows sync_log entries  
 

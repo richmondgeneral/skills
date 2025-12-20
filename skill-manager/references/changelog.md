@@ -1,6 +1,6 @@
 # Skills Changelog
 
-Tracking changes to all skills in `~/skills/`.
+Tracking changes to all skills in `~/.claude/skills/`.
 
 ---
 

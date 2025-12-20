@@ -17,7 +17,7 @@ from typing import Dict, List, Optional, Any
 from pymongo import MongoClient
 
 # Add square-tools to path
-sys.path.insert(0, os.path.expanduser('~/square-tools/cache-system'))
+sys.path.insert(0, os.path.expanduser('~/Workspace/square-tools/cache-system'))
 
 class SquareCacheWrapper:
     """Wrapper for Square catalog cache operations"""
@@ -175,7 +175,7 @@ class SquareCacheWrapper:
         env['SQUARE_TOKEN'] = token
         
         result = subprocess.run(
-            [os.path.expanduser('~/square-tools/bin/square_cache.sh'), 'sync'],
+            [os.path.expanduser('~/Workspace/square-tools/bin/square_cache.sh'), 'sync'],
             env=env,
             capture_output=True,
             text=True

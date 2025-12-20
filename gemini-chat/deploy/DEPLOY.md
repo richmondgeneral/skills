@@ -2,7 +2,7 @@
 
 ## 📋 Pre-Deployment
 
-All files are ready in `~/skills/gemini-chat/deploy/`:
+All files are ready in `~/.claude/skills/gemini-chat/deploy/`:
 - ✅ app.py (HF Spaces optimized)
 - ✅ models/ directory (all 3 models)
 - ✅ router.py (smart routing logic)
@@ -43,11 +43,11 @@ git clone https://huggingface.co/spaces/YOUR_USERNAME/gemini-chat
 cd gemini-chat
 
 # Copy deployment files from your local repo
-cp ~/skills/gemini-chat/deploy/app.py .
-cp ~/skills/gemini-chat/deploy/requirements.txt .
-cp ~/skills/gemini-chat/deploy/HF_README.md README.md
-cp -r ~/skills/gemini-chat/deploy/models .
-cp ~/skills/gemini-chat/deploy/router.py .
+cp ~/.claude/skills/gemini-chat/deploy/app.py .
+cp ~/.claude/skills/gemini-chat/deploy/requirements.txt .
+cp ~/.claude/skills/gemini-chat/deploy/HF_README.md README.md
+cp -r ~/.claude/skills/gemini-chat/deploy/models .
+cp ~/.claude/skills/gemini-chat/deploy/router.py .
 
 # Commit and push
 git add .
@@ -136,7 +136,7 @@ After successful deployment:
    
 2. **Update README in skills repo:**
    ```bash
-   cd ~/skills/gemini-chat
+   cd ~/.claude/skills/gemini-chat
    # Add to README.md:
    # **Live Demo:** https://huggingface.co/spaces/YOUR_USERNAME/gemini-chat
    ```

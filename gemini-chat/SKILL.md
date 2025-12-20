@@ -144,7 +144,7 @@ if result.success:
 # Batch process all JPEGs
 
 for img in *.jpg; do
-    python3 ~/skills/gemini-chat/chat.py process "$img" \
+    python3 ~/.claude/skills/gemini-chat/chat.py process "$img" \
         --output "processed/${img%.jpg}-nobg.png"
 done
 ```
@@ -153,7 +153,7 @@ done
 
 ```bash
 # Replace Phase 0b manual remove.bg call
-python3 ~/skills/gemini-chat/chat.py process \
+python3 ~/.claude/skills/gemini-chat/chat.py process \
     assets/working-images/item.jpeg \
     --output assets/working-images/item-nobg.png \
     --quality high

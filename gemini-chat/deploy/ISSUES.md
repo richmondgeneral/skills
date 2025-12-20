@@ -34,7 +34,7 @@ ModuleNotFoundError: No module named 'router'
 
 **Fix:**
 ```bash
-cd ~/skills/gemini-chat/deploy
+cd ~/.claude/skills/gemini-chat/deploy
 cp -r ../models .
 cp ../router.py .
 ```
@@ -98,15 +98,15 @@ cp -r /tmp/gemini-chat-deploy/* .
 
 **Fix:**
 ```markdown
-All files are ready in `~/skills/gemini-chat/deploy/`:
+All files are ready in `~/.claude/skills/gemini-chat/deploy/`:
 ```
 ```bash
 # Copy all deployment files
-cp ~/skills/gemini-chat/deploy/app.py .
-cp ~/skills/gemini-chat/deploy/requirements.txt .
-cp ~/skills/gemini-chat/deploy/HF_README.md README.md
-cp -r ~/skills/gemini-chat/deploy/models .
-cp ~/skills/gemini-chat/deploy/router.py .
+cp ~/.claude/skills/gemini-chat/deploy/app.py .
+cp ~/.claude/skills/gemini-chat/deploy/requirements.txt .
+cp ~/.claude/skills/gemini-chat/deploy/HF_README.md README.md
+cp -r ~/.claude/skills/gemini-chat/deploy/models .
+cp ~/.claude/skills/gemini-chat/deploy/router.py .
 ```
 
 ---

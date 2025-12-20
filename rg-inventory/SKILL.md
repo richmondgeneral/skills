@@ -42,28 +42,28 @@ When user uploads a photo and triggers full workflow, execute ALL phases automat
 **Step 1: Get next SKU**
 ```bash
 # Check highest existing SKU in cache
-cd ~/square-tools && ./bin/square_cache.sh search "RG-" | grep -oE 'RG-[0-9]+' | sort -t'-' -k2 -n | tail -1
+cd ~/Workspace/square-tools && ./bin/square_cache.sh search "RG-" | grep -oE 'RG-[0-9]+' | sort -t'-' -k2 -n | tail -1
 ```
 
 **Step 2: Copy uploaded image to working directory**
 ```bash
 # Create working directory for this item
-mkdir -p ~/items/RG-XXXX
-cp /path/to/uploaded/image.jpg ~/items/RG-XXXX/original.jpg
+mkdir -p ~/Workspace/items/RG-XXXX
+cp /path/to/uploaded/image.jpg ~/Workspace/items/RG-XXXX/original.jpg
 ```
 
 **Step 3: Remove background**
 ```bash
 # Run background removal service (uses Gemini/Remove.bg)
-cd ~/square-tools && ~/.pyenv/shims/python3 cache-system/bg_removal_service.py \
-  ~/items/RG-XXXX/original.jpg \
+cd ~/Workspace/square-tools && ~/.pyenv/shims/python3 cache-system/bg_removal_service.py \
+  ~/Workspace/items/RG-XXXX/original.jpg \
   gemini \
-  --output ~/items/RG-XXXX/RG-XXXX-hero.png
+  --output ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
 ```
 
 **Step 4: Verify output**
 ```bash
-ls -la ~/items/RG-XXXX/
+ls -la ~/Workspace/items/RG-XXXX/
 ```
 
 **If bg removal fails:** Fall back to original image, note in description that background removal is pending.
@@ -181,8 +181,8 @@ Square:make_api_request
 **Execute on user's machine:**
 
 ```bash
-~/.pyenv/shims/python3 ~/skills/square-image-upload/scripts/upload_image.py \
-  --image ~/items/RG-XXXX/RG-XXXX-hero.png \
+~/.pyenv/shims/python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
+  --image ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png \
   --item-id {CATALOG_ITEM_ID} \
   --name "RG-XXXX Hero" \
   --caption "{ITEM_TITLE}" \
@@ -249,7 +249,7 @@ Square:make_api_request
 
 **Append to batch file:**
 ```bash
-echo '"{ITEM_TITLE}","{ATTRIBUTES}",{PRICE},{CONDITION},"{NOTES}",RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/' >> ~/items/rg-labels-batch.csv
+echo '"{ITEM_TITLE}","{ATTRIBUTES}",{PRICE},{CONDITION},"{NOTES}",RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/' >> ~/Workspace/items/rg-labels-batch.csv
 ```
 
 ### Phase 7: Info Card (Optional)
@@ -258,7 +258,7 @@ echo '"{ITEM_TITLE}","{ATTRIBUTES}",{PRICE},{CONDITION},"{NOTES}",RG-XXXX,https:
 
 ```bash
 # Clone/update items repo
-cd ~/items-site
+cd ~/Workspace/items
 git pull origin main
 
 # Create item folder
@@ -302,7 +302,7 @@ After completing full workflow, provide summary:
    Inventory: 1 in stock
 
 🖼️ Image
-   Hero: ~/items/RG-XXXX/RG-XXXX-hero.png
+   Hero: ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
    Square URL: {IMAGE_URL}
 
 🚚 Fulfillment
@@ -313,7 +313,7 @@ After completing full workflow, provide summary:
    {PAYMENT_LINK_URL}
 
 🏷️ Label
-   Added to ~/items/rg-labels-batch.csv
+   Added to ~/Workspace/items/rg-labels-batch.csv
 
 📄 Info Card
    https://richmondgeneral.github.io/items/RG-XXXX/
@@ -333,9 +333,9 @@ export REMOVEBG_API_KEY="your_removebg_key"  # optional
 ```
 
 **Working Directories:**
-- `/Users/scottybe/items/` — Item images and working files
-- `/Users/scottybe/items-site/` — GitHub Pages repo clone
-- `/Users/scottybe/square-tools/` — Background removal and cache tools
+- `/Users/scottybe/Workspace/items/` — Item images and working files
+- `/Users/scottybe/Workspace/items-site/` — GitHub Pages repo clone
+- `/Users/scottybe/Workspace/square-tools/` — Background removal and cache tools
 
 ### Required Categories (BOTH must be assigned)
 | Category | ID | Purpose |
@@ -357,7 +357,7 @@ Route to appropriate appraiser or provide pricing tier estimate.
 
 ### Just Upload an Image
 ```bash
-~/.pyenv/shims/python3 ~/skills/square-image-upload/scripts/upload_image.py \
+~/.pyenv/shims/python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
   --image /path/to/image.jpg \
   --item-id CATALOG_ITEM_ID \
   --primary

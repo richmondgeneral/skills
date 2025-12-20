@@ -43,7 +43,7 @@ This skill supports **two access methods** depending on your environment:
 "What changed in the catalog today?"
 ```
 
-See MCP server setup: `~/square-tools/mcp-server/README.md`
+See MCP server setup: `~/Workspace/square-tools/mcp-server/README.md`
 
 ## Quick Start
 
@@ -52,14 +52,14 @@ See MCP server setup: `~/square-tools/mcp-server/README.md`
 1. MongoDB running: `brew services start mongodb-community@8.0`
 2. Python 3.7+ with pymongo, requests
 3. Set environment variable: `export SQUARE_TOKEN=your_token`
-4. Initial sync: `~/square-tools/bin/square_cache.sh sync`
+4. Initial sync: `~/Workspace/square-tools/bin/square_cache.sh sync`
 5. (Optional) Configure MCP server for Warp Agent Mode
 
 ### Verify Setup
 
 ```bash
 # Check cache status
-~/square-tools/bin/square_cache.sh status
+~/Workspace/square-tools/bin/square_cache.sh status
 
 # Should show MongoDB running, items cached, last sync time
 ```
@@ -70,7 +70,7 @@ See MCP server setup: `~/square-tools/mcp-server/README.md`
 
 ### 1. Bash Commands (Warp, Terminal, Scripts)
 ```bash
-~/square-tools/bin/square_cache.sh <command>
+~/Workspace/square-tools/bin/square_cache.sh <command>
 ```
 
 ### 2. MCP Tools (Claude Desktop Only)
@@ -81,7 +81,7 @@ If using Claude Desktop with MCP configured:
 - `square_cache_changes` - View recent changes
 - `square_cache_sync` - Trigger sync
 
-MCP setup: See `~/square-tools/mcp-server/README.md`
+MCP setup: See `~/Workspace/square-tools/mcp-server/README.md`
 
 ---
 
@@ -91,7 +91,7 @@ MCP setup: See `~/square-tools/mcp-server/README.md`
 
 ```bash
 # Full sync from Square API to MongoDB
-~/square-tools/bin/square_cache.sh sync
+~/Workspace/square-tools/bin/square_cache.sh sync
 ```
 
 Fetches all catalog items, detects changes, creates snapshots. Run after making changes in Square dashboard or via API.
@@ -99,7 +99,7 @@ Fetches all catalog items, detects changes, creates snapshots. Run after making 
 ### Check Status
 
 ```bash
-~/square-tools/bin/square_cache.sh status
+~/Workspace/square-tools/bin/square_cache.sh status
 ```
 
 Shows:
@@ -112,10 +112,10 @@ Shows:
 
 ```bash
 # All recent changes
-~/square-tools/bin/square_cache.sh changes
+~/Workspace/square-tools/bin/square_cache.sh changes
 
 # Changes since specific date
-~/square-tools/bin/square_cache.sh changes --since 2025-12-01
+~/Workspace/square-tools/bin/square_cache.sh changes --since 2025-12-01
 ```
 
 Displays changes with emoji indicators:
@@ -127,14 +127,14 @@ Displays changes with emoji indicators:
 
 ```bash
 # Search by name pattern (case-insensitive, default)
-~/square-tools/bin/square_cache.sh search "Trading Places"
+~/Workspace/square-tools/bin/square_cache.sh search "Trading Places"
 
 # Search by SKU (exact or prefix)
-~/square-tools/bin/square_cache.sh search --sku RG-0005
-~/square-tools/bin/square_cache.sh search --sku "RG-"
+~/Workspace/square-tools/bin/square_cache.sh search --sku RG-0005
+~/Workspace/square-tools/bin/square_cache.sh search --sku "RG-"
 
 # Explicit name search
-~/square-tools/bin/square_cache.sh search --name "Bears"
+~/Workspace/square-tools/bin/square_cache.sh search --name "Bears"
 
 # Returns matching items instantly from cache (100x faster than API)
 ```
@@ -143,17 +143,17 @@ Displays changes with emoji indicators:
 
 ```bash
 # Get cached item by ID
-~/square-tools/bin/square_cache.sh item ANE5SXKQR4JZ6AYEZDO26IMX
+~/Workspace/square-tools/bin/square_cache.sh item ANE5SXKQR4JZ6AYEZDO26IMX
 ```
 
 ### Generate Change Report
 
 ```bash
 # Detailed change report
-~/square-tools/bin/square_cache.sh report
+~/Workspace/square-tools/bin/square_cache.sh report
 
 # JSON format for parsing
-~/square-tools/bin/square_cache.sh report --json
+~/Workspace/square-tools/bin/square_cache.sh report --json
 ```
 
 ## Direct MongoDB Queries
@@ -390,7 +390,7 @@ curl -H "Square-Version: 2024-09-18" \
 mongosh square_cache --eval "db.catalog_items.deleteMany({}); db.change_snapshots.deleteMany({}); db.sync_log.deleteMany({})"
 
 # Resync from scratch
-~/square-tools/bin/square_cache.sh sync
+~/Workspace/square-tools/bin/square_cache.sh sync
 ```
 
 ### Cache Out of Sync

@@ -19,6 +19,32 @@ Local MongoDB cache of Square catalog items with comprehensive change tracking, 
 
 **Historical Data:** Track item evolution over time with complete change history.
 
+## Access Methods
+
+This skill supports **two access methods** depending on your environment:
+
+1. **Bash commands** (terminal/Warp CLI) - Use `square_cache.sh` wrapper
+2. **MCP tools** (Warp Agent Mode) - Native tool integration via MCP server
+
+### MCP Tools (Warp Agent Mode)
+
+**Available MCP tools when square-cache MCP server is configured:**
+- `square_cache_search` - Search by name or SKU
+- `square_cache_get_item` - Get full item details
+- `square_cache_status` - Check cache health
+- `square_cache_changes` - View recent changes
+- `square_cache_sync` - Trigger sync
+
+**Usage in Warp Agent Mode:**
+```
+"Search cache for Bears items"
+"Check if SKU RG-0010 exists"
+"Get details for item A55Q4TG7EJ2IJUDIFX3VHVAH"
+"What changed in the catalog today?"
+```
+
+See MCP server setup: `~/square-tools/mcp-server/README.md`
+
 ## Quick Start
 
 ### Prerequisites
@@ -27,6 +53,7 @@ Local MongoDB cache of Square catalog items with comprehensive change tracking, 
 2. Python 3.7+ with pymongo, requests
 3. Set environment variable: `export SQUARE_TOKEN=your_token`
 4. Initial sync: `~/square-tools/bin/square_cache.sh sync`
+5. (Optional) Configure MCP server for Warp Agent Mode
 
 ### Verify Setup
 

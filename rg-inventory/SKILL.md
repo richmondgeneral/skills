@@ -28,12 +28,6 @@ export SQUARE_ACCESS_TOKEN="your_production_token_here"
 - Upload scripts
 - Converted files
 
-**Why Local Keystore:**
-- Claude's MCP tools handle most Square API calls
-- Image uploads require multipart/form-data (not supported by MCP)
-- Token stays on user's machine for security
-- Claude generates curl commands, user executes locally
-
 ### Required Categories (BOTH must be assigned to every item)
 | Category | ID | Purpose |
 |----------|----|---------|
@@ -88,51 +82,33 @@ export SQUARE_ACCESS_TOKEN="your_production_token_here"
 
 ### Phase 2b: Image Upload to Square
 
-**⚠️ MCP Limitation:** The Square MCP tool does NOT support multipart image uploads. Use curl commands executed on user's local machine.
+**Use the `square-image-upload` skill** for image uploads (Square MCP doesn't support multipart form data).
 
-**Local Keystore Approach:**
-1. Claude prepares images and generates curl commands
-2. User runs commands locally where `SQUARE_ACCESS_TOKEN` is stored
-3. Token never leaves user's machine
+**Upload hero image:**
+```bash
+~/.pyenv/shims/python3 ~/skills/square-image-upload/scripts/upload_image.py \
+  --image RG-XXXX-hero.jpg \
+  --item-id CATALOG_ITEM_ID \
+  --name "Item Title - Hero" \
+  --caption "Front view description" \
+  --primary
+```
+
+**Upload additional images:**
+```bash
+~/.pyenv/shims/python3 ~/skills/square-image-upload/scripts/upload_image.py \
+  --image RG-XXXX-detail.jpg \
+  --item-id CATALOG_ITEM_ID \
+  --name "Item Title - Detail"
+```
+
+**Prerequisites:**
+- Python 3.7+ with requests: `pip install requests`
+- Token set: `export SQUARE_ACCESS_TOKEN=your_token` (in ~/.zshrc)
 
 **Image Format Requirements:**
-- Square accepts: JPEG, PNG, GIF, TIFF, BMP, HEIC
-- Minimum: 1000px on longest edge recommended
-- Maximum: 10MB per image
-- **⚠️ WebP not supported** - Claude's computer may convert to WebP, so images must be reconverted on user's machine
-
-**Reconvert WebP to proper format (macOS):**
-```bash
-# Check actual format
-file RG-XXXX-hero.jpeg
-
-# If WebP, convert to real JPEG
-sips -s format jpeg RG-XXXX-hero.jpeg --out RG-XXXX-hero-converted.jpeg
-```
-
-**Curl Command Template:**
-```bash
-# Set token once per session (or add to ~/.zshrc)
-export SQUARE_ACCESS_TOKEN="your_production_token"
-
-# Upload single image
-curl -X POST "https://connect.squareup.com/v2/catalog/images" \
-  -H "Authorization: Bearer $SQUARE_ACCESS_TOKEN" \
-  -H "Accept: application/json" \
-  -F "request={
-    \"idempotency_key\": \"rg-XXXX-hero-$(date +%s)\",
-    \"image\": {
-      \"type\": \"IMAGE\",
-      \"id\": \"#temp-rg-XXXX\",
-      \"image_data\": {
-        \"name\": \"Item Title - Hero\",
-        \"caption\": \"Front view description\"
-      }
-    },
-    \"object_id\": \"CATALOG_ITEM_ID_HERE\"
-  };type=application/json" \
-  -F "image_file=@RG-XXXX-hero.jpeg;type=image/jpeg"
-```
+- Square accepts: JPEG, PNG, GIF, TIFF, BMP, HEIC (max 10MB)
+- **⚠️ WebP not supported** - reconvert if needed: `sips -s format jpeg file.webp --out file.jpg`
 
 **Production Catalog Item IDs** (use `catalog.searchItems` to get current IDs):
 | SKU | Item ID | Description |
@@ -144,28 +120,7 @@ curl -X POST "https://connect.squareup.com/v2/catalog/images" \
 | RG-0005 | `A55Q4TG7EJ2IJUDIFX3VHVAH` | Bears Button |
 | RG-0006 | `6LNKQICZM3TAVJG3TAF4O4YB` | Disney Comics Cover |
 
-**Workflow for Claude:**
-1. Copy user's uploaded images to outputs
-2. Rename with clean `RG-XXXX-hero.ext` naming
-3. Generate curl commands with correct item IDs
-4. Provide commands to user for local execution
-5. User runs commands where token is stored
-
-**Batch Upload Script Location:** `/Users/scottybe/items/upload_square_images.py`
-
-**Response from Square (success):**
-```json
-{
-  "image": {
-    "type": "IMAGE",
-    "id": "CATALOG_IMAGE_ID",
-    "image_data": {
-      "name": "...",
-      "url": "https://items-images-production.s3.us-west-2.amazonaws.com/..."
-    }
-  }
-}
-```
+**See `square-image-upload` skill for:** full options, replacing existing images, troubleshooting.
 
 ### Phase 3: Square Catalog Creation
 
@@ -482,6 +437,7 @@ Physical Store → QR on label/card
 ## Integration Points
 
 ### Related Skills
+- **square-image-upload**: Upload product images to Square Catalog (multipart form data)
 - **carnival-glass-appraiser**: Complete appraisal for iridescent pressed glass (pattern ID, manufacturer attribution, authentication, valuation)
 - **maker-mark-identifier**: Identify pottery, silver, furniture marks (defers valuation to Phase 1)
 - **book-appraiser**: Antiquarian books, LOC cross-reference, edition identification

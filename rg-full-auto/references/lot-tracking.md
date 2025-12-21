@@ -10,8 +10,22 @@ When purchasing items in lots (estate sales, auctions, bulk buys), track provena
 
 | Lot ID | Description | Date | Total Cost |
 |--------|-------------|------|------------|
-| L1 | Example Estate | 2024-01-15 | $150.00 |
+| L1 | Pete's Lot | 2025-12 | $100.00 |
 | L2 | Peter's Estate | 2024-11-20 | $771.09 |
+
+## Active Lot: L1-Pete's Lot
+
+| SKU | Item | Allocated Cost | List Price | Status |
+|-----|------|----------------|------------|--------|
+| RG-0011 | Settlement Cook Book 2nd Ed | TBD | $14.99 | Listed |
+
+*Note: Allocated cost TBD until full lot inventory complete.*
+
+## Direct Purchases (No Lot)
+
+| SKU | Item | Cost | List Price | Margin |
+|-----|------|------|------------|--------|
+| RG-0012 | Hallmark Lionel GG-1 Ornament | $1.00 | $19.99 | 1899% |
 
 ## Cost Allocation Methods
 

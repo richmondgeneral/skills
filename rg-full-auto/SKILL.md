@@ -50,19 +50,27 @@ mkdir -p ~/Workspace/items/RG-XXXX
 cp /path/to/uploaded/image.jpg ~/Workspace/items/RG-XXXX/original.jpg
 ```
 
-**Remove background (use gemini-chat skill):**
-```bash
-python3 ~/.claude/skills/gemini-chat/chat.py process \
-  ~/Workspace/items/RG-XXXX/original.jpg \
-  --output ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png \
-  --quality high
-```
-
-**Alternative via scripts:**
+**Remove background:**
 ```bash
 python3 ~/.claude/skills/rg-full-auto/scripts/remove_background.py \
   ~/Workspace/items/RG-XXXX/original.jpg \
   ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
+```
+
+**Alternative: Generate product image with AI:**
+```bash
+python3 ~/.claude/skills/image-generation-skill/scripts/generate_image.py \
+  --prompt "Professional product photography of ${ITEM_DESCRIPTION}, clean white background, soft lighting" \
+  --quality pro \
+  --output ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
+```
+
+**Enhance after background removal:**
+```bash
+python3 ~/.claude/skills/image-editing-skill/scripts/edit_image.py \
+  --input ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png \
+  --instruction "add soft drop shadow and professional lighting" \
+  --output ~/Workspace/items/RG-XXXX/RG-XXXX-final.png
 ```
 
 ## Phase 1: Appraisal, Lot Assignment & Research
@@ -107,8 +115,8 @@ See `references/pricing-guidelines.md` for category-specific margins.
 
 ### Image Upload
 
-**Via square-image-upload skill (REQUIRED - do NOT use direct API calls):**
-Use the `square-image-upload` skill via MCP:
+**Via square-image-upload skill (MCP - ONLY METHOD THAT WORKS):**
+Direct API image upload is not supported in current Square API. Use the `square-image-upload` MCP skill:
 ```
 Square:upload_image
   image_path: ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
@@ -119,9 +127,9 @@ Square:upload_image
 ```
 
 **⚠️ Important:**
-- Do NOT use direct API calls (403 authorization error)
-- Use the MCP-based square-image-upload skill instead
-- MCP handles proper authentication and token scopes
+- Do NOT use direct API calls - endpoint doesn't exist (404)
+- Use ONLY the MCP-based square-image-upload skill
+- MCP is the supported method for image uploads
 - WebP not supported - convert if needed:
 ```bash
 sips -s format jpeg RG-XXXX-hero.webp --out RG-XXXX-hero.jpeg
@@ -323,17 +331,17 @@ Next: Print label, place item on floor
 **Item shows "sold out":**
 - Missing inventory count (Phase 3 step 2)
 
-**Square 403 on image upload:**
-- Do NOT use direct API calls (e.g., raw requests library)
-- Use `square-image-upload` skill via MCP instead
-- MCP properly handles authentication and token scopes
-- Direct `SQUARE_ACCESS_TOKEN` lacks image upload permissions
+**Image upload to Square (404 error):**
+- Direct API image upload endpoint is not available (404 NOT_FOUND)
+- Use `square-image-upload` skill via MCP instead (the only supported method)
+- Token is valid and has required permissions - endpoint is the issue
+- MCP is the correct/supported method for image uploads
 
-**MCP vs Direct API authentication:**
-- MCP requests (via `call_mcp_tool`) use different auth mechanism than direct API calls
-- MCP server handles OAuth/scopes properly
-- Direct API calls need specific token permissions
-- Always use MCP-based skills for Square operations when available
+**Direct API vs MCP for Square:**
+- Direct API: Some endpoints unavailable (e.g., image upload returns 404)
+- MCP: Comprehensive support via Square integration
+- For image uploads: MCP ONLY - direct API not supported
+- Always use MCP-based skills for Square catalog operations
 
 **place_files.py fails to find repo:**
 - Default path: `~/Workspace/items`
@@ -345,18 +353,41 @@ Next: Print label, place item on floor
 - Check for leading/trailing whitespace
 - Ensure output PNG file has write permissions in destination directory
 
+## Automation Notes
+
+### Image Upload Automation (Phase 2)
+**Method:** Square MCP skill (ONLY supported method)
+- Direct API endpoint for image upload is not available (404)
+- Token has correct permissions; endpoint is the issue
+- Always use `square-image-upload` skill via MCP
+- No token regeneration needed
+
+### File Placement Automation (Phase 7)
+**Method:** place_files.py utility script
+- Handles binary file transfer from Claude container to user filesystem
+- Decodes base64-encoded QR codes
+- Places images in correct repo directory structure
+- Fully automated, no manual file handling required
+
+### Overall Workflow Automation
+- Phases 0, 1, 3, 5, 6: Fully automated
+- Phase 2: Automated via MCP
+- Phase 4: Manual Square Dashboard config (business requirement, not a blocker)
+- Phase 7: Fully automated with place_files.py + git operations
+- **Result:** End-to-end automation from appraisal to published listing
+
 ## Related Skills
 
-| Skill | Use For |
-|-------|---------|
-| `rg-item-update` | Quick edits to existing items |
-| `gemini-chat` | Background removal, image processing |
-| `square-image-upload` | Image upload via API |
-| `book-appraiser` | Antiquarian books, LOC cross-reference |
-| `carnival-glass-appraiser` | Pressed iridescent glass 1908-1930s |
-| `maker-mark-identifier` | Pottery, silver, furniture marks |
-| `product-labeler` | Label generation, Square descriptions |
-| `square-cache` | Fast catalog lookups |
+|| Skill | Use For |
+||-------|---------|
+|| `rg-item-update` | Quick edits to existing items |
+|| `gemini-chat` | Background removal via Gemini (Phase 0 alternative) |
+|| `square-image-upload` | Image upload to Square catalog (Phase 2, MCP) |
+|| `square-cache` | Fast SKU lookups (Phase 0, MCP) |
+|| `book-appraiser` | Antiquarian books, LOC cross-reference |
+|| `carnival-glass-appraiser` | Pressed iridescent glass 1908-1930s |
+|| `maker-mark-identifier` | Pottery, silver, furniture marks |
+|| `product-labeler` | Label generation, Square descriptions |
 
 ## References
 

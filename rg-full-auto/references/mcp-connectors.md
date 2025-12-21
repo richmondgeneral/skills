@@ -13,7 +13,8 @@ Last updated: 2024-12-20
 | `list_directory` | Check folder contents |
 | `create_directory` | Make new folders |
 
-**Paths:** `/Users/scottybe/...` or `~/.claude/skills/...`
+**Paths:** Absolute paths only: `/Users/scottybe/workspace/square/items/`
+**DO NOT USE:** `~` tilde expansion (unreliable across sessions)
 
 **Works:** HTML, CSV, MD, JSON, Python scripts
 **Fails:** Binary files from Claude's container

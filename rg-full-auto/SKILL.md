@@ -2,9 +2,9 @@
 name: rg-full-auto
 description: End-to-end 7-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, fulfillment, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "1.2"
+  version: "1.3"
   author: scottybe
-  updated: "2024-12-20"
+  updated: "2024-12-21"
 ---
 
 # Richmond General Full Auto
@@ -125,25 +125,22 @@ See `references/pricing-guidelines.md` for category-specific margins.
 
 **File naming:** `RG-XXXX-01.png`, `RG-XXXX-02.png`
 
-### Image Upload
+### Image Upload to Square
 
-**⚠️ KNOWN LIMITATION:** Direct API image upload returns 403 Forbidden. The MCP token lacks `ITEMS_WRITE` scope for multipart uploads.
+**✅ WORKING:** Use `square-image-upload` skill via osascript (verified 2024-12-21).
 
-**Workarounds (choose one):**
+**Important:** Create catalog item FIRST (Phase 3), then upload image with the returned ITEM_ID.
 
-1. **Manual upload (recommended):** Upload hero.png via Square Dashboard → Catalog → Item → Images
-2. **Skip Square image:** Flipcard on GitHub Pages shows the image; Square listing works without photo
-3. **Batch upload script:** User runs `upload_square_images.py` locally with full OAuth token
-
-**If API upload is ever fixed:**
-```bash
-python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
-  --image ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png \
+```applescript
+do shell script "source ~/.env && python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
+  --image /Users/scottybe/workspace/square/items/RG-XXXX/hero.png \
   --item-id CATALOG_ITEM_ID \
-  --name "RG-XXXX Hero" \
-  --caption "Front view" \
-  --primary
+  --name 'RG-XXXX Hero' \
+  --caption 'Front view' \
+  --primary"
 ```
+
+**Response includes:** Image ID and Square CDN URL.
 
 **⚠️ WebP not supported** - convert if needed:
 ```bash
@@ -350,10 +347,10 @@ Next: Print label, place item on floor
 
 ## Troubleshooting
 
-**Square 403 on image upload:**
-- MCP token lacks `ITEMS_WRITE` scope for multipart uploads
-- Workaround: Manual upload via Square Dashboard, or skip (flipcard shows image anyway)
-- Root cause: MCP uses different OAuth flow than direct API calls
+**Square image upload fails:**
+- Ensure catalog item exists FIRST (create in Phase 3 before uploading image)
+- 404 = wrong item ID; 401 = token issue
+- Use `square-image-upload` skill via osascript, NOT Square MCP (which is JSON-only)
 
 **Background removal fails:**
 - Check API keys on user's Mac: `source ~/.env && echo $REMOVEBG_API_KEY`

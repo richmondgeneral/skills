@@ -60,7 +60,7 @@ Manually add to your contacts reference file:
 
 ### Step 4: SKILL.md (documentation)
 
-Update the Richmond General Customers section in the imessage-assistant SKILL.md to reflect the change.
+Update the Richmond General Customers section in the contacts-manager SKILL.md to reflect the change.
 
 ---
 

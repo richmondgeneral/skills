@@ -127,7 +127,13 @@ When updating, you MUST include the current `version` and use `sparse_update: tr
 
 ### With Images
 
-Images must be uploaded separately via `catalog.createCatalogImage`:
+**⚠️ IMPORTANT - Use square-image-upload skill (MCP), not direct API calls**
+
+Direct API image uploads fail with 403 authentication error. The `SQUARE_ACCESS_TOKEN` lacks image upload permissions.
+
+**Correct approach:** Use the `square-image-upload` skill via MCP, which handles proper authentication and token scopes.
+
+For reference, images must be uploaded separately via `catalog.createCatalogImage` (MCP will handle this):
 
 ```json
 {

@@ -13,7 +13,7 @@
 
 | What | Where | How Often |
 |------|-------|-----------|
-| Check for changes in contacts.md | `~/.claude/skills/imessage-assistant/references/contacts.md` | Before syncing |
+| Check for changes in contacts.md | `~/.claude/skills/contacts-manager/references/contacts.md` | Before syncing |
 | Check for Square changes | [Square Dashboard](https://dashboard.squareup.com) → Customers | Before syncing |
 | Document conflicts | `~/.claude/skills/square-crm/working/conflict_review_YYYYMMDD.md` | As found |
 | Verify after sync | Both systems | After completing |
@@ -41,7 +41,7 @@
 
 ```bash
 # Open contacts.md
-open ~/.claude/skills/imessage-assistant/references/contacts.md
+open ~/.claude/skills/contacts-manager/references/contacts.md
 
 # Open Square Dashboard in browser
 open https://dashboard.squareup.com/login
@@ -465,7 +465,7 @@ These are the same! But formatting differs.
 cd ~/skills
 
 git add square-crm/working/sync_log_20251219.md
-git add imessage-assistant/references/contacts.md
+git add contacts-manager/references/contacts.md
 git commit -m "Manual sync: Dec 19 - 8 customers synced, 1 conflict resolved
 
 Co-Authored-By: Warp <agent@warp.dev>"
@@ -504,10 +504,10 @@ If something went wrong:
 
 ```bash
 # See what you changed
-git diff imessage-assistant/references/contacts.md
+git diff contacts-manager/references/contacts.md
 
 # Revert the contacts.md file
-git checkout imessage-assistant/references/contacts.md
+git checkout contacts-manager/references/contacts.md
 
 # Revert Square changes manually (Square doesn't have git)
 # Go to each customer in Square and revert notes to previous state
@@ -560,7 +560,7 @@ git show HEAD
 git revert HEAD
 
 # Or restore from before
-git checkout HEAD~1 -- imessage-assistant/references/contacts.md
+git checkout HEAD~1 -- contacts-manager/references/contacts.md
 ```
 
 Then:
@@ -666,7 +666,7 @@ cat ~/.claude/skills/square-crm/working/conflict_review_*.md
 
 - **Square Dashboard**: https://dashboard.squareup.com
 - **Square API Docs**: https://developer.squareup.com/reference/square/v2025-10-16
-- **contacts.md**: `~/.claude/skills/imessage-assistant/references/contacts.md`
+- **contacts.md**: `~/.claude/skills/contacts-manager/references/contacts.md`
 - **Sync working directory**: `~/.claude/skills/square-crm/working/`
 
 ---

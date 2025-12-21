@@ -31,10 +31,17 @@ Complete 7-phase workflow for onboarding new vintage/antique items from acquisit
 
 ## Phase 0: Image Processing
 
-**Get next SKU:**
+**Get next SKU (PRIMARY METHOD):**
+Use the `square-cache` skill to lookup highest existing SKU:
 ```bash
-# Check highest existing SKU in Square cache
-square_cache_search | grep -oE 'RG-[0-9]+' | sort -t'-' -k2 -n | tail -1
+# Via MCP (recommended)
+Use square-cache skill to query existing SKU numbers
+```
+
+**Fallback (local directory scan):**
+```bash
+# If offline, scan local directory
+ls ~/Workspace/items | grep -oE 'RG-[0-9]+' | sort -t'-' -k2 -n | tail -1
 ```
 
 **Copy uploaded image to working directory:**
@@ -100,17 +107,22 @@ See `references/pricing-guidelines.md` for category-specific margins.
 
 ### Image Upload
 
-**Via square-image-upload skill:**
-```bash
-python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
-  --image ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png \
-  --item-id CATALOG_ITEM_ID \
-  --name "RG-XXXX Hero" \
-  --caption "Front view" \
-  --primary
+**Via square-image-upload skill (REQUIRED - do NOT use direct API calls):**
+Use the `square-image-upload` skill via MCP:
+```
+Square:upload_image
+  image_path: ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
+  item_id: CATALOG_ITEM_ID
+  name: "RG-XXXX Hero"
+  caption: "Front view"
+  primary: true
 ```
 
-**⚠️ WebP not supported** - convert if needed:
+**⚠️ Important:**
+- Do NOT use direct API calls (403 authorization error)
+- Use the MCP-based square-image-upload skill instead
+- MCP handles proper authentication and token scopes
+- WebP not supported - convert if needed:
 ```bash
 sips -s format jpeg RG-XXXX-hero.webp --out RG-XXXX-hero.jpeg
 ```
@@ -238,9 +250,21 @@ See `references/label-format.md` for Print Master settings.
 
 **Site:** https://richmondgeneral.github.io/items/
 
+**Step 1: Place QR and images in repo**
+```bash
+python3 ~/.claude/skills/rg-full-auto/scripts/place_files.py \
+  --sku RG-XXXX \
+  --qr-base64 <base64_encoded_qr> \
+  --image ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
+```
+This creates `RG-XXXX/` folder in repo with QR code and hero image.
+
+**Step 2: Create info card**
 1. Copy `template/rg-item-card-template.html` → `RG-XXXX/index.html`
 2. Replace placeholders: `{{SKU}}`, `{{ITEM_TITLE}}`, `{{PRICE}}`, `{{STORY_TEXT}}`, etc.
 3. Generate QR for payment link (brand colors: Gold #C9A961, Cream #F5F1E8, Charcoal #2C2C2C)
+
+**Step 3: Publish**
 4. Add to gallery grid in `index.html`
 5. Commit and push to `main`
 
@@ -298,6 +322,28 @@ Next: Print label, place item on floor
 
 **Item shows "sold out":**
 - Missing inventory count (Phase 3 step 2)
+
+**Square 403 on image upload:**
+- Do NOT use direct API calls (e.g., raw requests library)
+- Use `square-image-upload` skill via MCP instead
+- MCP properly handles authentication and token scopes
+- Direct `SQUARE_ACCESS_TOKEN` lacks image upload permissions
+
+**MCP vs Direct API authentication:**
+- MCP requests (via `call_mcp_tool`) use different auth mechanism than direct API calls
+- MCP server handles OAuth/scopes properly
+- Direct API calls need specific token permissions
+- Always use MCP-based skills for Square operations when available
+
+**place_files.py fails to find repo:**
+- Default path: `~/Workspace/items`
+- Override with `--repo-path` argument
+- Ensure directory exists: `mkdir -p ~/Workspace/items`
+
+**QR code base64 decode fails:**
+- Verify base64 string is complete (no truncation)
+- Check for leading/trailing whitespace
+- Ensure output PNG file has write permissions in destination directory
 
 ## Related Skills
 

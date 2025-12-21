@@ -116,7 +116,7 @@ All systems stay in sync when discovering customer information.
   - Example workflow (Mike Giba)
   - All flags documented
 
-#### 2. imessage-assistant/SKILL.md
+#### 2. contacts-manager/SKILL.md
 - **Status:** ✅ Updated
 - **Changes:**
   - New "Sync with Square CRM & Contacts" section
@@ -169,7 +169,7 @@ Result: All 4 systems in sync ✓
 - ✅ sync-to-contacts-guide.md created
 - ✅ bidirectional-sync-design.md created
 - ✅ square-crm/SKILL.md updated
-- ✅ imessage-assistant/SKILL.md updated
+- ✅ contacts-manager/SKILL.md updated
 - ✅ Mike Giba confirmed in Apple Contacts
 - ✅ All changes committed to git
 - ✅ No syntax errors
@@ -256,7 +256,7 @@ python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py --json '{
 
 ### Skill Docs
 - `~/.claude/skills/square-crm/SKILL.md`
-- `~/.claude/skills/imessage-assistant/SKILL.md`
+- `~/.claude/skills/contacts-manager/SKILL.md`
 
 ---
 

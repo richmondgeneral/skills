@@ -59,7 +59,12 @@ class RGItemProcessor:
             raise ValueError("REMOVEBG_API_KEY environment variable required")
     
     def get_next_sku(self) -> str:
-        """Generate next available SKU number."""
+        """Generate next available SKU number.
+        
+        NOTE: This is a fallback local directory scan.
+        Preferred method: Use square-cache skill (MCP) to query existing SKUs.
+        See SKILL.md Phase 0 for details.
+        """
         max_num = 0
         for item in Path('.').glob('RG-*'):
             if item.is_dir():
@@ -114,7 +119,12 @@ class RGItemProcessor:
         return item_data
     
     def phase2_photography(self, input_path: str, sku: str) -> Dict:
-        """Phase 2: Photography & Background Removal."""
+        """Phase 2: Photography & Background Removal.
+        
+        NOTE: This only handles background removal via remove.bg API.
+        Image upload to Square must be done via the square-image-upload skill (MCP)
+        to avoid 403 authentication errors. See SKILL.md Phase 2 for details.
+        """
         print(f"\n=== PHASE 2: PHOTOGRAPHY ===")
         
         # Save original
@@ -143,6 +153,8 @@ class RGItemProcessor:
             out.write(response.content)
         
         print(f"✅ Background removed: {converted_path}")
+        print(f"\n⚠️  NEXT: Use square-image-upload skill to upload {converted_path}")
+        print(f"   Do NOT use direct API calls - use MCP-based square-image-upload skill")
         
         return {
             'original_path': str(original_path),
@@ -285,11 +297,14 @@ class RGItemProcessor:
         
         print("\n" + "=" * 60)
         print("PHASE 3 COMPLETE - Remaining phases require additional implementation:")
-        print("  Phase 2b: Upload image to Square (use square-image-upload)")
+        print("  Phase 2b: Upload image to Square (use square-image-upload skill)")
         print("  Phase 4: Fulfillment setup (Square Dashboard - manual)")
         print("  Phase 5: Payment link generation")
         print("  Phase 6: Label CSV")
         print("  Phase 7: GitHub Pages deployment")
+        print("\nFor Phase 7 file placement, use place_files.py:")
+        print("  python3 ~/.claude/skills/rg-full-auto/scripts/place_files.py \\")
+        print("    --sku RG-XXXX --qr-base64 <data> --image <path>")
         print("=" * 60)
 
 

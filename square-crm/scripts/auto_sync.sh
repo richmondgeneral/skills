@@ -11,7 +11,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(dirname "$SCRIPT_DIR")"
 LOG_FILE="$SKILL_DIR/logs/sync.log"
-CONTACTS_FILE="$HOME/skills/imessage-assistant/references/contacts.md"
+CONTACTS_FILE="$HOME/skills/contacts-manager/references/contacts.md"
 SQUARE_API="https://connect.squareup.com/v2"
 SQUARE_VERSION="2024-12-18"
 

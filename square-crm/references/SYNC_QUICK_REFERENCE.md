@@ -92,7 +92,7 @@ python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +141487575
   --last-name "Mitchell"
 
 # 2️⃣ Update contacts.md
-# Edit imessage-assistant/references/contacts.md:
+# Edit contacts-manager/references/contacts.md:
 # Change "414 Contact" section to:
 ### Bob Mitchell (Trades)
 - **Phone**: +14148757568
@@ -129,9 +129,9 @@ python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py --json '{
 
 | File | Purpose | When to Edit |
 |------|---------|--------------|
-| `~/.claude/skills/imessage-assistant/references/contacts.md` | Master contact reference | When discovering new customer info |
+| `~/.claude/skills/contacts-manager/references/contacts.md` | Master contact reference | When discovering new customer info |
 | `~/.claude/skills/square-crm/SKILL.md` | Square skill docs | When new groups/APIs are available |
-| `~/.claude/skills/imessage-assistant/SKILL.md` | iMessage skill docs | When adding new contact style notes |
+| `~/.claude/skills/contacts-manager/SKILL.md` | iMessage skill docs | When adding new contact style notes |
 
 ---
 
@@ -142,7 +142,7 @@ After syncing, verify all 4 systems match:
 ```bash
 # 1. Apple Contacts — open on iPhone, verify name + phones
 # 2. contacts.md — grep for the phone
-grep "+14148757568" ~/.claude/skills/imessage-assistant/references/contacts.md
+grep "+14148757568" ~/.claude/skills/contacts-manager/references/contacts.md
 
 # 3. Square CRM Dashboard — search by phone
 # 4. SKILL.md — check Quick Reference tables

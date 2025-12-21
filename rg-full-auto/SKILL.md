@@ -2,9 +2,29 @@
 name: rg-full-auto
 description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "1.9"
+  version: "2.2"
   author: scottybe
   updated: "2025-12-21"
+  changelog: |
+    v2.2 - Post RG-0014 improvements:
+    - Added Step 1.0: View image for appraisal using copy_file_user_to_claude
+    - Emphasized exact Square MCP method names (batchInsertObjects, batchChange)
+    - Gallery index update now uses osascript/sed exclusively (Filesystem:str_replace unreliable)
+    - Added reminder to check ~/Desktop for images
+    
+    v2.1 - Template enforcement:
+    - Created references/info-card-template.html with complete flip card template
+    - Phase 7.1 now REQUIRES flip card template with explicit checklist
+    - Added placeholder reference table for template variables
+    - Added explicit "DO NOT" list to prevent wrong template usage
+    
+    v2.0 - Post RG-0013 improvements:
+    - Added 20MB file size check before remove.bg (Phase 0.5)
+    - Strengthened book-appraiser routing for pre-1970 books (Phase 1)
+    - Added explicit inventory API example without catalog_object_type (Phase 3)
+    - Documented path case sensitivity issue with Filesystem tools (Phase 7)
+    - Added cleanup step for temp files (Phase 7.5)
+    - Added remove.bg credit monitoring
 ---
 
 # Richmond General Full Auto
@@ -18,6 +38,8 @@ Complete 8-phase workflow for onboarding new vintage/antique items from acquisit
 2. **User's Mac** - Where binary operations (image processing, QR generation) must run via osascript. Has `~/.env` with API keys, git repos, and full filesystem access.
 
 **Rule:** Text files (HTML, CSV, MD) → Filesystem tools. Binary files (PNG, JPEG) → osascript on user's Mac.
+
+**⚠️ Path Case Sensitivity:** Filesystem tools may return paths with wrong case (e.g., `/Users/scottybe/Workspace/` instead of `/workspace/`). For reliability, use osascript for all file operations on user's Mac.
 
 ## Quick Reference
 
@@ -74,7 +96,7 @@ Square:make_api_request
   request: {"text_filter": "RG-XXXX"}
 ```
 
-- If results empty → SKU is safe, proceed
+- If results empty (just `{"cursor":""}`) → SKU is safe, proceed
 - If results contain this SKU → increment and check again
 - Repeat until finding an unused SKU
 
@@ -86,24 +108,74 @@ do shell script "mkdir -p /Users/scottybe/workspace/square/items/RG-XXXX"
 
 ### Step 0.4: Locate user's image
 
-User uploads appear in `/mnt/user-data/uploads/` in Claude's container, but we need the file on user's Mac. Check common locations:
+User uploads appear in `/mnt/user-data/uploads/` in Claude's container, but we need the file on user's Mac. 
+
+**⚠️ CHECK BOTH LOCATIONS:** User often places images on Desktop, not just Downloads!
+
 ```applescript
-do shell script "ls ~/Downloads/*.jpg ~/Downloads/*.jpeg ~/Downloads/*.png ~/Desktop/*.jpg ~/Desktop/*.jpeg 2>/dev/null | head -10"
+do shell script "ls -lt ~/Desktop/*.jpg ~/Desktop/*.jpeg ~/Desktop/*.png ~/Desktop/*.heic ~/Downloads/*.jpg ~/Downloads/*.jpeg ~/Downloads/*.png 2>/dev/null | head -10"
 ```
 
-### Step 0.5: Remove background
+Or use `Filesystem:list_directory` on `/Users/scottybe/Desktop` to see all files.
+
+### Step 0.5: Check file size & compress if needed
+
+**⚠️ remove.bg has a 22MB limit.** Check file size first:
 
 ```applescript
-do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/rg-new-item/scripts/remove_background.py '/Users/scottybe/Downloads/IMAGE_NAME.jpg' '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png'"
+do shell script "stat -f%z '/Users/scottybe/Desktop/IMAGE_NAME.png'"
+```
+
+**If > 20MB (20000000 bytes):** Compress before background removal:
+```applescript
+do shell script "sips -Z 3000 '/Users/scottybe/Desktop/IMAGE_NAME.png' --out '/Users/scottybe/workspace/square/items/RG-XXXX/hero_temp.png'"
+```
+
+Then use `hero_temp.png` as input for background removal.
+
+**If ≤ 20MB:** Use original file directly.
+
+### Step 0.6: Remove background
+
+```applescript
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/rg-new-item/scripts/remove_background.py '/Users/scottybe/workspace/square/items/RG-XXXX/hero_temp.png' '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' 2>&1"
 ```
 
 **Prerequisites:** `~/.env` must have `REMOVEBG_API_KEY`. Note: Must `source ~/.env` to load API key.
 
-**If bg removal fails:** Fall back to original image, note in description that background removal is pending.
+**Monitor credits:** The script outputs remaining API credits. Alert user if credits ≤ 5.
+
+**If bg removal fails:** Fall back to original image (copy/rename to hero.png), note in description that background removal is pending.
 
 ---
 
 ## Phase 1: Appraisal & Research
+
+### Step 1.0: View image for appraisal
+
+To see what we're working with, transfer a compressed preview to Claude's environment:
+
+**1. Compress on user's Mac (if large):**
+```applescript
+do shell script "sips -Z 1500 '/path/to/original.png' --out '/tmp/preview.png'"
+```
+
+**2. Transfer to Claude's environment:**
+```
+Filesystem:copy_file_user_to_claude
+  path: /tmp/preview.png
+```
+(Returns path like `/mnt/user-data/uploads/preview.png`)
+
+**3. View with Claude's view tool:**
+```
+view
+  path: /mnt/user-data/uploads/preview.png
+```
+
+Now you can see the item and do proper research.
+
+---
 
 ### ⚠️ USER CHECKPOINTS (Do Not Assume)
 
@@ -144,12 +216,20 @@ Claude: [now has accurate info for pricing and description]
 - Record: lot ID, purchase date, total lot cost, item cost allocation
 - See `references/lot-tracking.md` for full lot management
 
+**Even if user says "unknown"** — prompt once more: "Do you want to assign this to a lot for tracking, or skip for now?"
+
 ### Step 1.2: Route to specialized appraiser if needed
 
-- Books pre-1970 → `book-appraiser`
-- Carnival glass → `carnival-glass-appraiser`
-- Maker's marks (pottery, silver, furniture) → `maker-mark-identifier`
-- General vintage → continue here
+**⚠️ MANDATORY ROUTING — Do not skip:**
+
+| Item Type | Trigger | Skill to Use |
+|-----------|---------|--------------|
+| Books dated 1970 or earlier | Publication year ≤ 1970 | `book-appraiser` — **MUST USE** |
+| Carnival glass | Iridescent pressed glass | `carnival-glass-appraiser` |
+| Maker's marks | Stamps, hallmarks, signatures | `maker-mark-identifier` |
+| General vintage | Everything else | Continue here |
+
+**For books:** If the book is from 1970 or earlier, you MUST read and follow the `book-appraiser` skill. This includes children's books, textbooks, and any printed material. The skill provides LOC cross-reference, edition identification, and specialized pricing.
 
 ### Step 1.3: Research
 
@@ -197,7 +277,7 @@ Claude: [now has accurate info for pricing and description]
 ```
 Square:make_api_request
   service: catalog
-  method: batchInsertObjects
+  method: batchInsertObjects   ← EXACT NAME (not batchUpsertCatalogObjects)
 ```
 
 **⚠️ CRITICAL:** Variation MUST have `present_at_all_locations: false` at the variation level, not just the item level.
@@ -246,9 +326,9 @@ Square:make_api_request
 }
 ```
 
-**Capture from response:** 
-- `id_mappings[0].object_id` → ITEM_ID
-- `id_mappings[1].object_id` → VARIATION_ID
+**Capture from response:**
+- `objects[0].id` → CATALOG_ITEM_ID (e.g., `6CYX5VOFKOK2QN3P7TYVXSEH`)
+- `objects[0].item_data.variations[0].id` → VARIATION_ID (e.g., `AR63H4MGON7VTBQ3TZB3KOHJ`)
 
 ---
 
@@ -258,8 +338,10 @@ Square:make_api_request
 ```
 Square:make_api_request
   service: inventory
-  method: batchChange
+  method: batchChange   ← EXACT NAME (not batchChangeInventory)
 ```
+
+**⚠️ CRITICAL:** Do NOT include `catalog_object_type` — Square rejects it as a write-only field.
 
 ```json
 {
@@ -267,25 +349,26 @@ Square:make_api_request
   "changes": [{
     "type": "PHYSICAL_COUNT",
     "physical_count": {
-      "catalog_object_id": "VARIATION_ID",
-      "state": "IN_STOCK",
+      "catalog_object_id": "VARIATION_ID_FROM_PHASE_2",
       "location_id": "B87BAEZ0NWV34",
       "quantity": "1",
-      "occurred_at": "ISO_TIMESTAMP"
+      "state": "IN_STOCK",
+      "occurred_at": "2025-12-21T19:32:00Z"
     }
   }]
 }
 ```
 
-Without this, items show "sold out" online.
+**Note:** `quantity` is a STRING, not integer. `occurred_at` must be ISO 8601 format.
 
 ---
 
-## Phase 4: Upload Image to Square
+## Phase 4: Image Upload
 
-**Execute on user's Mac via osascript:**
+**Use square-image-upload skill script on user's Mac:**
+
 ```applescript
-do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/square-image-upload/scripts/upload_image.py --image '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' --item-id 'CATALOG_ITEM_ID' --name 'RG-XXXX Hero' --caption 'Front view' --primary"
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/square-image-upload/scripts/upload_image.py --image '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' --item-id 'CATALOG_ITEM_ID' --name 'RG-XXXX Hero' --caption 'Front view' --primary 2>&1"
 ```
 
 **Capture:** Image ID from response.
@@ -358,8 +441,8 @@ Product Name,Attributes,Price,Condition,Condition Notes,SKU,QR Code URL
 "Item Title","Era • Type • Feature",55.00,Good,"Wear notes",RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/
 ```
 
-```bash
-echo '"Item Title","Era • Type • Feature",55.00,Good,"Wear notes",RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/' >> ~/workspace/square/items/rg-labels-batch.csv
+```applescript
+do shell script "echo '\"Item Title\",\"Era • Type • Feature\",55.00,Good,\"Wear notes\",RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/' >> ~/workspace/square/items/rg-labels-batch.csv"
 ```
 
 **Every item gets a QR code** on its label, linking to the info card. This is the customer experience—scan, read the story, buy.
@@ -373,12 +456,41 @@ See `references/label-format.md` for Print Master settings.
 **Site:** https://richmondgeneral.github.io/items/
 **Repo:** /Users/scottybe/workspace/square/items/
 
-### Step 7.1: Write index.html
+### Step 7.1: Write index.html (FLIP CARD TEMPLATE REQUIRED)
+
+**⚠️ MANDATORY:** Use the **flip card template** from `references/info-card-template.html`. Do NOT use detail-page layouts.
 
 Use `Filesystem:write_file` to write the populated template to:
 `/Users/scottybe/workspace/square/items/RG-XXXX/index.html`
 
-(Item folder already exists from Phase 0.2)
+(Item folder already exists from Phase 0.3)
+
+**Template requirements:**
+- MUST use `.flip-card`, `.card-front`, `.card-back` structure
+- MUST use `aspect-ratio: 5 / 7` for print optimization
+- MUST use CSS variables: `--rg-gold`, `--rg-cream`, `--rg-charcoal` (not shortened versions)
+- MUST include flip animation, keyboard accessibility, and ARIA attributes
+- MUST include mobile responsive breakpoints and print styles
+
+**Placeholders to replace:**
+| Placeholder | Replace With |
+|-------------|-------------|
+| `{{SKU}}` | RG-XXXX |
+| `{{ITEM_TITLE}}` | Item name |
+| `{{ERA_LINE}}` | Era • Type • Feature |
+| `{{PRICE}}` | XX.XX (no $ sign) |
+| `{{STORY_TEXT}}` | 2-3 paragraph story |
+| `{{DETAIL_N_LABEL}}` | Era, Maker, Origin, etc. |
+| `{{DETAIL_N_VALUE}}` | Corresponding value |
+| `{{CONDITION}}` | Good, Excellent, etc. |
+| `{{PAYMENT_LINK}}` | https://square.link/u/XXXXXXXX |
+| `{{SEO_DESCRIPTION}}` | Keyword-rich meta description |
+| `{{OG_DESCRIPTION}}` | Shorter OG description |
+
+**DO NOT:**
+- Use traditional multi-section layouts (header → hero → story → details → footer)
+- Use simplified CSS variables (`--gold` instead of `--rg-gold`)
+- Omit the flip animation or 5×7 aspect ratio
 
 ### Step 7.2: Generate QR code (payment link)
 
@@ -390,46 +502,58 @@ do shell script "source ~/.local/bin/env && cd /Users/scottybe/workspace/square/
 
 **⚠️ DON'T FORGET:** The item card won't appear on the main gallery page unless added to the index.
 
-Edit `/Users/scottybe/workspace/square/items/index.html` and add item card HTML before the "Coming Soon" placeholder:
+**⚠️ USE OSASCRIPT:** Filesystem tools may return wrong-case paths. Use sed via osascript for reliability:
 
-```html
-<!-- RG-XXXX: Item Title -->
-<a href="./RG-XXXX/" class="item-card" data-category="collectibles">
-    <div class="item-image">
-        <span class="item-badge">New</span>
-        <span class="item-sku">RG-XXXX</span>
-        <img src="./RG-XXXX/hero.png" alt="Item Title" style="max-width: 100%; max-height: 200px; object-fit: contain; border-radius: 4px;">
-    </div>
-    <div class="item-info">
-        <p class="item-category">Category</p>
-        <h3 class="item-title">Item Title</h3>
-        <p class="item-era">Era • Origin • Feature</p>
-        <div class="item-footer">
-            <span class="item-price">$XX.XX</span>
-            <span class="view-story">
-                View Story
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
-            </span>
-        </div>
-    </div>
-</a>
+```applescript
+do shell script "sed -i '' 's|<!-- Coming Soon Placeholder -->|<!-- RG-XXXX: Item Title -->\\
+            <a href=\"./RG-XXXX/\" class=\"item-card\" data-category=\"CATEGORY\">\\
+                <div class=\"item-image\">\\
+                    <span class=\"item-badge\">New</span>\\
+                    <span class=\"item-sku\">RG-XXXX</span>\\
+                    <img src=\"./RG-XXXX/hero.png\" alt=\"Item Title\" style=\"max-width: 100%; max-height: 200px; object-fit: contain; border-radius: 4px;\">\\
+                </div>\\
+                <div class=\"item-info\">\\
+                    <p class=\"item-category\">Category</p>\\
+                    <h3 class=\"item-title\">Item Title</h3>\\
+                    <p class=\"item-era\">Era • Origin • Feature</p>\\
+                    <div class=\"item-footer\">\\
+                        <span class=\"item-price\">$XX.XX</span>\\
+                        <span class=\"view-story\">\\
+                            View Story\\
+                            <svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">\\
+                                <path d=\"M5 12h14M12 5l7 7-7 7\"/>\\
+                            </svg>\\
+                        </span>\\
+                    </div>\\
+                </div>\\
+            </a>\\
+            \\
+            <!-- Coming Soon Placeholder -->|' /Users/scottybe/workspace/square/items/index.html"
 ```
 
 **Categories for filter:** `books`, `furniture`, `pottery`, `collectibles`
 
-Also update the item count in the hero stats section.
+### Step 7.4: Update item count
 
-### Step 7.4: Git commit and push
+```applescript
+do shell script "sed -i '' 's|<div class=\"stat-number\" id=\"item-count\">[0-9]*</div>|<div class=\"stat-number\" id=\"item-count\">NEW_COUNT</div>|' /Users/scottybe/workspace/square/items/index.html"
+```
+
+### Step 7.5: Cleanup temp files
+
+Remove any intermediate files created during processing:
+
+```applescript
+do shell script "rm -f /Users/scottybe/workspace/square/items/RG-XXXX/hero_temp.png 2>/dev/null; echo 'Cleanup complete'"
+```
+
+### Step 7.6: Git commit and push
 
 ```applescript
 do shell script "cd /Users/scottybe/workspace/square/items && git add RG-XXXX/ index.html && git commit -m 'Add RG-XXXX: Item Title' && git push origin main 2>&1"
 ```
 
 **Customer flow:** QR on label → Info card → Read story → Buy Now → Square checkout
-
-**Brand colors:** Gold #C9A961, Cream #F5F1E8, Charcoal #2C2C2C
 
 ---
 
@@ -481,6 +605,10 @@ Next: Print label, place item on floor
 
 ## Troubleshooting
 
+**Image too large for remove.bg:**
+- remove.bg limit is 22MB
+- Compress first: `sips -Z 3000 image.png --out hero_temp.png`
+
 **Image upload fails:**
 - Ensure catalog item created FIRST (need ITEM_ID for image upload)
 - Check token: `source ~/.env && echo $SQUARE_ACCESS_TOKEN`
@@ -489,6 +617,7 @@ Next: Print label, place item on floor
 **Background removal fails:**
 - Check API keys on user's Mac: `source ~/.env && echo $REMOVEBG_API_KEY`
 - Ensure image is accessible on user's Mac (not just in Claude's container)
+- Check remaining credits in script output
 
 **Binary file transfer fails:**
 - Binary files (PNG, JPEG) cannot transfer between Claude's container and user's Mac
@@ -497,11 +626,19 @@ Next: Print label, place item on floor
 **Square 401 Unauthorized:**
 - Token expired: Check `$SQUARE_ACCESS_TOKEN`
 
+**Inventory API rejects request:**
+- Do NOT include `catalog_object_type` in the request
+- Ensure `quantity` is a string, not integer
+
 **Image upload 413 Too Large:**
 - Compress: `sips -Z 2000 image.png`
 
 **Item shows "sold out":**
 - Missing inventory count (Phase 3)
+
+**Path case mismatch:**
+- Filesystem tools may return `/Workspace/` instead of `/workspace/`
+- Use osascript + sed for file edits on user's Mac
 
 ---
 
@@ -523,3 +660,4 @@ Next: Print label, place item on floor
 - `references/lot-tracking.md` - Lot management, cost allocation
 - `references/pricing-guidelines.md` - Margin targets by category
 - `references/label-format.md` - Print Master settings, style guide
+- `references/info-card-template.html` - HTML template for item pages

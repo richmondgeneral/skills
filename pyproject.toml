@@ -1,0 +1,19 @@
+[project]
+name = "rg-skills"
+version = "1.0.0"
+description = "Richmond General Claude skills - shared Python environment"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31.0",
+    "pymongo>=4.6.0",
+    "qrcode[pil]>=7.4.0",
+    "pillow>=10.0.0",
+    "google-generativeai>=0.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.1.0",
+]

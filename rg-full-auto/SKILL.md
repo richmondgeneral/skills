@@ -2,9 +2,9 @@
 name: rg-full-auto
 description: End-to-end 7-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, fulfillment, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "1.3"
+  version: "1.4"
   author: scottybe
-  updated: "2024-12-21"
+  updated: "2025-12-21"
 ---
 
 # Richmond General Full Auto
@@ -52,7 +52,7 @@ Complete 7-phase workflow for onboarding new vintage/antique items from acquisit
 | Merchant ID | 7MM9AFJAD0XHW |
 | SKU Prefix | RG-XXXX (sequential) |
 | GitHub Pages | https://richmondgeneral.github.io/items/ |
-| Working Directory | `/Users/scottybe/Workspace/items/` |
+| Working Directory | `/Users/scottybe/workspace/square/items/` |
 
 ### Category Assignment (choose ONE)
 
@@ -62,6 +62,17 @@ Complete 7-phase workflow for onboarding new vintage/antique items from acquisit
 | The New Finds | `P34KX3L7XRZJJ5RP6W35K4YO` | Regular new inventory arrivals |
 
 **Decision:** Is this genuinely rare/special → The Real Rarities. Standard new stock → The New Finds.
+
+## Python Environment
+
+All Python scripts use **uv** with a shared virtual environment at `~/.claude/skills/`.
+
+**Command pattern (works from any directory):**
+```bash
+uv run --project ~/.claude/skills python ~/.claude/skills/<skill>/scripts/<script>.py <args>
+```
+
+See `~/.claude/skills/PYTHON.md` for setup details.
 
 ## Phase 0: Image Processing
 
@@ -84,28 +95,7 @@ do shell script "ls ~/Downloads/*.jpg ~/Downloads/*.jpeg ~/Desktop/*.jpg ~/Deskt
 
 **Remove background via osascript (runs on user's Mac):**
 ```applescript
-do shell script "source ~/.env && python3 << 'EOF'
-import os
-import requests
-
-api_key = os.environ.get('REMOVEBG_API_KEY')
-input_path = '/Users/scottybe/Downloads/IMAGE_NAME.jpg'
-output_path = '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png'
-
-with open(input_path, 'rb') as f:
-    response = requests.post(
-        'https://api.remove.bg/v1.0/removebg',
-        files={'image_file': f},
-        data={'size': 'auto'},
-        headers={'X-Api-Key': api_key},
-    )
-response.raise_for_status()
-
-with open(output_path, 'wb') as out:
-    out.write(response.content)
-print(f'Background removed: {output_path}')
-EOF
-"
+do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills python ~/.claude/skills/rg-new-item/scripts/remove_background.py '/Users/scottybe/Downloads/IMAGE_NAME.jpg' '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png'"
 ```
 
 **Prerequisites:** User must have `~/.env` with `REMOVEBG_API_KEY` and image accessible on their Mac.
@@ -156,48 +146,7 @@ See `references/pricing-guidelines.md` for category-specific margins.
 
 **Upload via osascript (runs on user's Mac):**
 ```applescript
-do shell script "source ~/.env && python3 << 'EOF'
-import os
-import requests
-
-access_token = os.environ['SQUARE_ACCESS_TOKEN']
-image_path = '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png'
-item_id = 'CATALOG_ITEM_ID'  # From Phase 3 response
-
-url = 'https://connect.squareup.com/v2/catalog/images'
-headers = {
-    'Authorization': f'Bearer {access_token}',
-    'Square-Version': '2024-01-18',
-    'Accept': 'application/json'
-}
-
-import json
-request_data = {
-    'idempotency_key': f'rg-xxxx-img-{int(__import__(\"time\").time())}',
-    'image': {
-        'type': 'IMAGE',
-        'id': '#temp-image',
-        'image_data': {
-            'name': 'RG-XXXX Hero',
-            'caption': 'Front view'
-        }
-    },
-    'object_id': item_id,
-    'is_primary': True
-}
-
-with open(image_path, 'rb') as img_file:
-    files = {
-        'request': (None, json.dumps(request_data), 'application/json'),
-        'image_file': ('hero.png', img_file, 'image/png')
-    }
-    response = requests.post(url, headers=headers, files=files)
-
-response.raise_for_status()
-result = response.json()
-print(f\"Image uploaded: {result['image']['id']}\")
-EOF
-"
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/square-image-upload/scripts/upload_image.py --image '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' --item-id 'CATALOG_ITEM_ID' --name 'RG-XXXX Hero' --caption 'Front view' --primary"
 ```
 
 **⚠️ Workflow order matters:** Create catalog item FIRST (Phase 3), then upload image with the returned ITEM_ID.
@@ -321,7 +270,7 @@ Returns: `payment_link.url` → `https://square.link/u/XXXXXXXX`
 
 ## Phase 6: Labels & Batch CSV
 
-**Batch file:** `/Users/scottybe/Workspace/items/rg-labels-batch.csv`
+**Batch file:** `/Users/scottybe/workspace/square/items/rg-labels-batch.csv`
 
 ```csv
 Product Name,Attributes,Price,Condition,Condition Notes,SKU,QR Code URL
@@ -330,7 +279,7 @@ Product Name,Attributes,Price,Condition,Condition Notes,SKU,QR Code URL
 
 **Append row:**
 ```bash
-echo '"Item Title","Era • Type • Feature",55.00,Good,"Wear notes",RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/' >> ~/Workspace/items/rg-labels-batch.csv
+echo '"Item Title","Era • Type • Feature",55.00,Good,"Wear notes",RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/' >> ~/workspace/square/items/rg-labels-batch.csv
 ```
 
 **Include QR when:** Antiques (pre-1950), collectibles with story, items with info cards
@@ -355,15 +304,7 @@ Use `Filesystem:write_file` to write the populated template to:
 
 ### Step 3: Generate QR code (via osascript - binary file)
 ```applescript
-do shell script "cd /Users/scottybe/workspace/square/items/RG-XXXX && python3 -c \"
-import qrcode
-qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=2)
-qr.add_data('https://square.link/u/XXXXXXXX')
-qr.make(fit=True)
-img = qr.make_image(fill_color='#2C2C2C', back_color='white')
-img.save('qr-code.png')
-print('QR code saved')
-\""
+do shell script "source ~/.local/bin/env && cd /Users/scottybe/workspace/square/items/RG-XXXX && uv run --project ~/.claude/skills python -c \"import qrcode; qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=2); qr.add_data('https://square.link/u/XXXXXXXX'); qr.make(fit=True); img = qr.make_image(fill_color='#2C2C2C', back_color='white'); img.save('qr-code.png'); print('QR code saved')\""
 ```
 
 ### Step 4: Hero image (already placed in Phase 0)
@@ -402,7 +343,7 @@ After completing full workflow:
    Inventory: 1 in stock
 
 🖼️ Image
-   Hero: ~/workspace/square/items/RG-XXXX/hero.png
+   Hero: /Users/scottybe/workspace/square/items/RG-XXXX/hero.png
    Square Image ID: {IMAGE_ID}
 
 🔍 SEO

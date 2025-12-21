@@ -2,7 +2,7 @@
 name: rg-full-auto
 description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "1.5"
+  version: "1.6"
   author: scottybe
   updated: "2025-12-21"
 ---
@@ -55,28 +55,43 @@ See `~/.claude/skills/PYTHON.md` for setup details.
 
 **⚠️ CRITICAL:** Image processing runs on USER'S MAC via osascript, NOT in Claude's container. Binary files cannot transfer between environments.
 
-### Step 0.1: Get next SKU
+### Step 0.1: Get next SKU from cache
 
 Use square-cache for fast lookup:
-```bash
-square_cache_search with sku_pattern: "RG-"
 ```
-Find highest RG-XXXX and increment.
+square-cache:square_cache_search with sku_pattern: "RG-"
+```
+Find highest RG-XXXX and increment to get candidate SKU.
 
-### Step 0.2: Create item folder
+### Step 0.2: Verify SKU not taken (live API check)
+
+**Cache may be stale.** Before committing to the SKU, verify it doesn't exist:
+
+```
+Square:make_api_request
+  service: catalog
+  method: searchCatalogItems
+  request: {"text_filter": "RG-XXXX"}
+```
+
+- If results empty → SKU is safe, proceed
+- If results contain this SKU → increment and check again
+- Repeat until finding an unused SKU
+
+### Step 0.3: Create item folder
 
 ```applescript
 do shell script "mkdir -p /Users/scottybe/workspace/square/items/RG-XXXX"
 ```
 
-### Step 0.3: Locate user's image
+### Step 0.4: Locate user's image
 
 User uploads appear in `/mnt/user-data/uploads/` in Claude's container, but we need the file on user's Mac. Check common locations:
 ```applescript
 do shell script "ls ~/Downloads/*.jpg ~/Downloads/*.jpeg ~/Downloads/*.png ~/Desktop/*.jpg ~/Desktop/*.jpeg 2>/dev/null | head -10"
 ```
 
-### Step 0.4: Remove background
+### Step 0.5: Remove background
 
 ```applescript
 do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills python ~/.claude/skills/rg-new-item/scripts/remove_background.py '/Users/scottybe/Downloads/IMAGE_NAME.jpg' '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png'"

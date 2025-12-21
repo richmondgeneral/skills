@@ -2,7 +2,7 @@
 name: rg-full-auto
 description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "1.8"
+  version: "1.9"
   author: scottybe
   updated: "2025-12-21"
 ---
@@ -386,10 +386,45 @@ Use `Filesystem:write_file` to write the populated template to:
 do shell script "source ~/.local/bin/env && cd /Users/scottybe/workspace/square/items/RG-XXXX && uv run --project ~/.claude/skills python -c \"import qrcode; qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=2); qr.add_data('https://square.link/u/XXXXXXXX'); qr.make(fit=True); img = qr.make_image(fill_color='#2C2C2C', back_color='white'); img.save('qr-code.png'); print('QR code saved')\""
 ```
 
-### Step 7.3: Git commit and push
+### Step 7.3: Add to gallery index
+
+**⚠️ DON'T FORGET:** The item card won't appear on the main gallery page unless added to the index.
+
+Edit `/Users/scottybe/workspace/square/items/index.html` and add item card HTML before the "Coming Soon" placeholder:
+
+```html
+<!-- RG-XXXX: Item Title -->
+<a href="./RG-XXXX/" class="item-card" data-category="collectibles">
+    <div class="item-image">
+        <span class="item-badge">New</span>
+        <span class="item-sku">RG-XXXX</span>
+        <img src="./RG-XXXX/hero.png" alt="Item Title" style="max-width: 100%; max-height: 200px; object-fit: contain; border-radius: 4px;">
+    </div>
+    <div class="item-info">
+        <p class="item-category">Category</p>
+        <h3 class="item-title">Item Title</h3>
+        <p class="item-era">Era • Origin • Feature</p>
+        <div class="item-footer">
+            <span class="item-price">$XX.XX</span>
+            <span class="view-story">
+                View Story
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </span>
+        </div>
+    </div>
+</a>
+```
+
+**Categories for filter:** `books`, `furniture`, `pottery`, `collectibles`
+
+Also update the item count in the hero stats section.
+
+### Step 7.4: Git commit and push
 
 ```applescript
-do shell script "cd /Users/scottybe/workspace/square/items && git add RG-XXXX/ && git commit -m 'Add RG-XXXX: Item Title' && git push origin main 2>&1"
+do shell script "cd /Users/scottybe/workspace/square/items && git add RG-XXXX/ index.html && git commit -m 'Add RG-XXXX: Item Title' && git push origin main 2>&1"
 ```
 
 **Customer flow:** QR on label → Info card → Read story → Buy Now → Square checkout

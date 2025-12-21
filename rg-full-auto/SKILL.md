@@ -2,7 +2,7 @@
 name: rg-full-auto
 description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "1.7"
+  version: "1.8"
   author: scottybe
   updated: "2025-12-21"
 ---
@@ -104,6 +104,39 @@ do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/
 ---
 
 ## Phase 1: Appraisal & Research
+
+### ⚠️ USER CHECKPOINTS (Do Not Assume)
+
+**STOP and ask the user before proceeding.** These details fundamentally change pricing and description:
+
+| Question | Why It Matters | Example Impact |
+|----------|----------------|----------------|
+| **Quantity** — How many pieces? | Set of 9 vs single goblet = completely different listing | 9pc set @ $89 vs single @ $15 |
+| **Selling strategy** — Set or individual? | Changes title, description, pricing, inventory count | "Set of 9" vs "1 of 9 available" |
+| **Condition specifics** — Chips, cracks, wear, repairs? | Affects price and required disclosures | "Excellent" vs "Good - minor chip" |
+| **Original elements** — Stickers, labels, boxes, tags? | Adds provenance value, affects description | "with original Made in Germany sticker" |
+| **Lot assignment** — Track acquisition cost? | Optional but needed for margin analysis | L2-Peter's Estate @ $5 cost |
+
+**Do the research first**, then ask these questions with context. Example flow:
+
+```
+Claude: "These are Goebel Hummel figural wine goblets from West Germany, 
+        1960s-70s. Sets of 6 typically sell $50-150. 
+        
+        A few questions:
+        1. How many goblets in your set?
+        2. Selling as set or individually?
+        3. Any original 'Made in Western Germany' stickers?
+        4. Any chips, cracks, or gold wear?"
+
+User:  "we have 9, as a set, no stickers, no chips or cracks"
+
+Claude: [now has accurate info for pricing and description]
+```
+
+**Never assume** quantity=1, condition=excellent, or selling strategy. Ask.
+
+---
 
 ### Step 1.1: Assign lot & record acquisition cost
 

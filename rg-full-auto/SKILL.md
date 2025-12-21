@@ -2,7 +2,7 @@
 name: rg-full-auto
 description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "1.6"
+  version: "1.7"
   author: scottybe
   updated: "2025-12-21"
 ---
@@ -70,7 +70,7 @@ Find highest RG-XXXX and increment to get candidate SKU.
 ```
 Square:make_api_request
   service: catalog
-  method: searchCatalogItems
+  method: searchItems
   request: {"text_filter": "RG-XXXX"}
 ```
 
@@ -94,10 +94,10 @@ do shell script "ls ~/Downloads/*.jpg ~/Downloads/*.jpeg ~/Downloads/*.png ~/Des
 ### Step 0.5: Remove background
 
 ```applescript
-do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills python ~/.claude/skills/rg-new-item/scripts/remove_background.py '/Users/scottybe/Downloads/IMAGE_NAME.jpg' '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png'"
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/rg-new-item/scripts/remove_background.py '/Users/scottybe/Downloads/IMAGE_NAME.jpg' '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png'"
 ```
 
-**Prerequisites:** `~/.env` must have `REMOVEBG_API_KEY`.
+**Prerequisites:** `~/.env` must have `REMOVEBG_API_KEY`. Note: Must `source ~/.env` to load API key.
 
 **If bg removal fails:** Fall back to original image, note in description that background removal is pending.
 
@@ -164,8 +164,10 @@ do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills py
 ```
 Square:make_api_request
   service: catalog
-  method: batchUpsertCatalogObjects
+  method: batchInsertObjects
 ```
+
+**⚠️ CRITICAL:** Variation MUST have `present_at_all_locations: false` at the variation level, not just the item level.
 
 ```json
 {
@@ -192,6 +194,8 @@ Square:make_api_request
         "variations": [{
           "type": "ITEM_VARIATION",
           "id": "#RG-XXXX-var",
+          "present_at_all_locations": false,
+          "present_at_location_ids": ["B87BAEZ0NWV34"],
           "item_variation_data": {
             "item_id": "#RG-XXXX",
             "name": "Regular",
@@ -221,7 +225,7 @@ Square:make_api_request
 ```
 Square:make_api_request
   service: inventory
-  method: batchChangeInventory
+  method: batchChange
 ```
 
 ```json

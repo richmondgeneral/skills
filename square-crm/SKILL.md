@@ -7,7 +7,7 @@ metadata:
 
 # Square CRM Skill
 
-Bridges `iMessage-assistant` contacts with Square customer records. Enables bidirectional sync across all 4 systems:
+Bridges `contacts-manager` contacts with Square customer records. Enables bidirectional sync across all 4 systems:
 
 ```
 📱 Apple Contacts ↔ 📄 contacts.md ↔ 🟦 Square CRM ↔ 📚 SKILL.md

@@ -1,6 +1,10 @@
 ---
 name: image-editing
 description: Edit existing images using natural language instructions. Change colors, add/remove objects, modify styles, resize, combine multiple images, or add text overlays. Supports iterative refinement. Use when users want to modify, enhance, transform, or combine existing images.
+metadata:
+  version: "1.0"
+  author: scottybe
+  created: "2024-12-20"
 ---
 
 # Image Editing with Gemini Nano Banana

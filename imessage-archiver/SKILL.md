@@ -118,9 +118,9 @@ end tell
 | Large images fail | Size limit | Resize with `sips -Z 800` |
 | HEIC won't attach | Format issue | Convert: `sips -s format png` |
 
-## Integration with imessage-assistant
+## Integration with imessage-core
 
-This skill complements `imessage-assistant`. Use imessage-assistant for:
+This skill complements `imessage-core`. Use imessage-core for:
 - Reading/sending messages
 - Contact lookup
 - Service detection (RCS/iMessage/SMS)

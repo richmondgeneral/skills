@@ -11,7 +11,7 @@ Meta-skill for collaboratively developing and maintaining Claude skills with Sco
 
 ## Quick Reference
 
-**Skills Directory:** `/Users/scottybe/skills/`
+**Skills Directory:** `~/.claude/skills/`
 **Git Repo:** Yes (skills folder is version controlled)
 **Last synced:** 2025-12-19 (testing Save Skill button trigger)
 
@@ -32,7 +32,7 @@ Meta-skill for collaboratively developing and maintaining Claude skills with Sco
 ```
 
 **Key points:**
-- Claude CAN directly write to `/Users/scottybe/skills/` via Filesystem tools
+- Claude CAN directly write to `~/.claude/skills/` via Filesystem tools
 - Claude CANNOT write to `/mnt/skills/user/` (read-only on Claude's side)
 - User must click "Save Skill" in UI after Claude updates local files
 
@@ -47,7 +47,7 @@ Meta-skill for collaboratively developing and maintaining Claude skills with Sco
 | **product-labeler** | `~/.claude/skills/product-labeler/` | Thermal labels, Square descriptions | - |
 | **square-cache** | `~/.claude/skills/square-cache/` | MongoDB cache for Square catalog (100x faster) | 2025-12-19 |
 | **square-image-upload** | `~/.claude/skills/square-image-upload/` | Image upload via multipart form data | 2025-12-19 |
-| **imessage-assistant** | `~/.claude/skills/imessage-assistant/` | iMessage/RCS/SMS automation, CRM briefings | 2025-12-19 |
+| **imessage-core** | `~/.claude/skills/imessage-core/` | iMessage/RCS/SMS automation, CRM briefings | 2025-12-19 |
 | **square-crm** | `~/.claude/skills/square-crm/` | Square customer sync from contacts.md | 2025-12-19 |
 | **skill-manager** | `~/.claude/skills/skill-manager/` | This meta-skill | 2025-12-19 |
 

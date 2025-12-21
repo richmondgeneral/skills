@@ -1,6 +1,10 @@
 ---
 name: image-generation
 description: Generate images from text prompts, create artwork, visualize concepts, or produce variations of existing images. Automatically routes to Nano Banana (fast) or Nano Banana Pro (high-quality) based on complexity. Use when users want to create new images, generate logos, artwork, diagrams, or visualize ideas.
+metadata:
+  version: "1.0"
+  author: scottybe
+  created: "2024-12-20"
 ---
 
 # Image Generation with Gemini Nano Banana

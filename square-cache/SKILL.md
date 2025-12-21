@@ -66,27 +66,6 @@ See MCP server setup: `~/Workspace/square-tools/mcp-server/README.md`
 # Should show MongoDB running, items cached, last sync time
 ```
 
-## Access Methods
-
-**Two ways to use square-cache:**
-
-### 1. Bash Commands (Warp, Terminal, Scripts)
-```bash
-~/Workspace/square-tools/bin/square_cache.sh <command>
-```
-
-### 2. MCP Tools (Claude Desktop Only)
-If using Claude Desktop with MCP configured:
-- `square_cache_search` - Search by name or SKU
-- `square_cache_get_item` - Get item details
-- `square_cache_status` - Check cache health
-- `square_cache_changes` - View recent changes
-- `square_cache_sync` - Trigger sync
-
-MCP setup: See `~/Workspace/square-tools/mcp-server/README.md`
-
----
-
 ## Core Commands
 
 ### Sync Catalog

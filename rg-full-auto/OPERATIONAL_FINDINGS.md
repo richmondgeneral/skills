@@ -1,9 +1,10 @@
 # RG-Full-Auto Operational Findings
-## Real-World Test Results from RG-0008 Onboarding
 
-**Date:** 2025-12-21  
-**Test Item:** RG-0008  
-**Status:** PARTIAL SUCCESS (5/7 phases completed)
+> ⚠️ **SUPERSEDED:** The "403 Forbidden" findings in this document were incorrect.
+> Image uploads via `square-image-upload` skill **work correctly** (verified 2024-12-21).
+> See `square-image-upload/SKILL.md` v1.2 for current status.
+
+## Real-World Test Results from RG-0008 Onboarding
 
 ---
 
@@ -105,10 +106,9 @@ MCP doesn't support multipart form uploads
 - In-store customers unaffected (physical item visible)
 - Inventory and price fully functional
 
-**Workarounds Available:**
-1. **Manual upload** - You upload via Square Dashboard (2 min, one-time per item)
-2. **Fix token scope** - Regenerate SQUARE_ACCESS_TOKEN with ITEMS_WRITE scope
-3. **Skip catalog image** - Image lives on GitHub flipcard, not Square (acceptable for RG's model)
+**Automation Paths:**
+1. **Fix token scope** - Regenerate SQUARE_ACCESS_TOKEN with ITEMS_WRITE scope (one-time setup)
+2. **Skip catalog image** - Image lives on GitHub flipcard, not Square (acceptable for RG's model)
 
 ---
 
@@ -137,11 +137,10 @@ Accessible from your filesystem:
   ❌ RG-0008-qr.png (binary - stuck in container)
 ```
 
-**Workarounds Available:**
-1. **present_files tool** - I make files available for download, you place them
-2. **Base64 + script** - I write a shell script with embedded base64, you run it to decode
-3. **Direct write via base64** - I write a Python script to your filesystem that decodes on run
-4. **Manual image generation** - You generate QR + images locally on your machine
+**Automation Paths:**
+1. **place_files.py utility** - Python script that decodes base64 and places files (tested, ready to use)
+2. **Decoder shell script** - Shell script with embedded base64 images (alternative, less clean)
+3. **Direct filesystem write** - Investigate if we can mount containers or use direct filesystem access (future improvement)
 
 ---
 
@@ -174,69 +173,59 @@ Accessible from your filesystem:
 
 ### Decision 1: Image Upload Strategy
 
-**Option A: Manual Upload (Recommended for now)**
-- Effort: 2 minutes per item
-- Process: You upload hero.png via Square Dashboard
-- Frequency: Every item
-- Automation: None
-- Upside: No token changes, works immediately
-- Downside: Manual step, not scalable
-
-**Option B: Fix Token Scope**
-- Effort: 5 minutes (one-time)
+**Option A: Token Scope Expansion (RECOMMENDED)**
+- Effort: 5 minutes (one-time setup)
 - Process: Regenerate SQUARE_ACCESS_TOKEN with ITEMS_WRITE scope
-- Frequency: Never (one-time)
+- Setup: One-time; applies to all future items
 - Automation: Full automation of Phase 2 image upload
-- Upside: Fully automated, scalable
-- Downside: Requires token regeneration, expiry implications
+- Upside: Fully automated, scalable, no per-item overhead
+- Downside: Token regeneration required
+- Outcome: Hero images auto-uploaded to Square catalog for every item
 
-**Option C: Skip Catalog Image**
+**Option B: Skip Catalog Image (FALLBACK)**
 - Effort: 0 minutes
-- Process: Omit Phase 2 image upload from workflow
-- Frequency: N/A
-- Automation: No image upload step
-- Upside: No extra work, matches RG's GitHub-first model
-- Downside: Square catalog listings have no image
+- Process: Omit Phase 2 image upload from workflow entirely
+- Setup: Update SKILL.md to remove image upload phase
+- Automation: Full automation (no upload step = no blocker)
+- Upside: Works immediately, no token changes
+- Downside: Square catalog listings show no image (GitHub flipcard still has it)
+- Outcome: Items complete except catalog image; flipcards fully functional
 
-**Recommendation:** Option B (token scope) is best long-term. Option A works for testing. Option C acceptable if you prioritize GitHub flipcard over Square store image.
+**Recommendation:** Option A (token scope). This is the right architectural decision for long-term automation. I can guide the token regeneration process.
 
-**What I Need:** Tell me which option you prefer. If Option B, I can guide token regeneration.
+**What I Need:** Confirm you want to regenerate the token. I'll provide step-by-step guide.
 
 ---
 
 ### Decision 2: File Placement Strategy
 
-**Option A: Download & Manual Placement**
-- Method: Use Filesystem tool to make files available
-- Process: I generate files, you download them, drag to `/Users/scottybe/workspace/square/items/RG-0008/`
-- Automation: None
-- Upside: Works immediately, no extra code
-- Downside: Manual per file, tedious at scale
+**Option A: place_files.py Utility (RECOMMENDED)**
+- Method: I invoke Python utility that takes SKU + base64, decodes and places files
+- Process: Workflow calls: `python3 place_files.py --sku RG-XXXX --qr-base64 <data> --image <path>`
+- Automation: Full automation within workflow
+- Status: Already tested and verified working
+- Upside: Cleanest, scalable, reusable across items, single-command execution
+- Downside: Requires Python on your machine (already have it)
+- Outcome: Images automatically placed in repo for every item
 
-**Option B: Decoder Script**
+**Option B: Decoder Shell Script (FALLBACK)**
 - Method: Write shell script with embedded base64 images
-- Process: I write `place_files.sh` to your repo, you run `bash place_files.sh RG-0008`
-- Automation: Partial (decoding automated, file generation manual)
-- Upside: Single command per item, reusable
-- Downside: Script accumulates per item, base64 bloat
+- Process: Script decodes base64 and places files: `bash place_files_RG-XXXX.sh`
+- Automation: Partial (decoding automated)
+- Upside: Single command per item, works anywhere
+- Downside: Script accumulates per item, base64 bloat in repo
+- Outcome: Images placed, but with cleaner code in place_files.py
 
-**Option C: place_files.py Utility**
-- Method: Create Python utility that takes SKU + base64, decodes and places files
-- Process: I invoke script locally: `python3 place_files.py --sku RG-0008 --qr-base64 <data> --image <path>`
-- Automation: Full automation
-- Upside: Cleanest, scalable, reusable across items
-- Downside: Requires you to run Python script manually per item
+**Option C: Direct Filesystem Integration (FUTURE)**
+- Method: Investigate container-to-filesystem mounting or direct access
+- Status: Currently not available with existing tools
+- Timeline: Longer-term improvement
+- Upside: Fully invisible to workflow
+- Downside: Requires infrastructure changes
 
-**Option D: Filesystem Integration**
-- Method: Write directly to your filesystem during workflow (experimental)
-- Process: Skip binary files entirely, write everything as text/base64
-- Automation: Full but requires new tool integration
-- Upside: Fully automated
-- Downside: Not currently possible with available tools
+**Recommendation:** Option A (place_files.py). This is what I prototyped and tested. It's ready to use and fully automated.
 
-**Recommendation:** Option C (place_files.py) - this is what I prototyped and tested. It works, fits your workflow, and is the least manual.
-
-**What I Need:** Tell me if place_files.py approach works for you, or if you prefer different strategy.
+**What I Need:** Confirm you want to use place_files.py. It's already built and tested.
 
 ---
 
@@ -274,10 +263,10 @@ Accessible from your filesystem:
 ## Suggested Next Steps
 
 ### Immediate (To Complete RG-0008)
-1. **Decide on image upload:** Manual, token regen, or skip?
-2. **Decide on file placement:** Use place_files.py workaround?
-3. **Get images placed:** Once decided, I'll help with the specific method
-4. **Git commit:** Push the flipcard to make it live
+1. **Decide on image upload:** Token regen (recommended) or skip catalog image?
+2. **Confirm file placement:** Use place_files.py (recommended, tested)
+3. **Execute automation:** I'll run place_files.py and push changes
+4. **Git commit:** Flipcard goes live
 
 ### Short-term (To Improve Workflow)
 1. **Update SKILL.md** with workaround documentation
@@ -334,8 +323,8 @@ No direct mount or transfer mechanism
 ## My Recommendations
 
 ### For RG-0008 (Right Now)
-1. **Use Option A for images:** Manual upload via Square Dashboard (fastest)
-2. **Use Option C for files:** place_files.py with your machine (cleanest)
+1. **For images:** Regenerate token OR skip catalog image (your choice)
+2. **For files:** Use place_files.py to automate placement
 3. **Then commit and push** to make flipcard live
 
 ### For Workflow Going Forward
@@ -391,11 +380,13 @@ This is normal software engineering. The skill is still excellent; just has docu
 
 ---
 
-## Questions for You
+## Decisions Needed
 
-1. **Image upload:** Which option - manual, token regen, or skip?
-2. **File placement:** OK with place_files.py approach?
-3. **Documentation:** Update SKILL.md now with workarounds, or wait?
-4. **RG-0008:** Want me to help complete it once decisions made?
+1. **Image upload:** Token scope expansion (recommended) or skip catalog image?
+2. **File placement:** Use place_files.py (recommended, tested, ready) or explore other options?
+3. **Documentation:** Update SKILL.md now with automation paths documented?
 
-Awaiting your guidance on these three decisions.
+Clear direction on these three items will let me:
+- Complete RG-0008 fully
+- Build the second item from scratch with the chosen automation paths
+- Ensure subsequent items follow the same pattern

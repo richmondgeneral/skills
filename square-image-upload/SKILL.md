@@ -2,26 +2,25 @@
 name: square-image-upload
 description: Upload and manage images in Square Catalog via API. Use when the user needs to upload product photos, replace existing catalog images, or attach images to Square items/variations. Triggers on "upload image to Square", "add photo to item", "replace product image", "Square catalog image", or any request to programmatically manage Square product images. Required because Square's image endpoints use multipart form data which the standard MCP connector cannot handle.
 metadata:
-  version: "1.1"
-  updated: "2024-12-20"
+  version: "1.2"
+  updated: "2024-12-21"
 ---
 
 # Square Image Upload
 
 Upload images to Square Catalog using the CreateCatalogImage and UpdateCatalogImage API endpoints.
 
-## ⚠️ KNOWN LIMITATION
+## ✅ Status: WORKING
 
-**Current Status:** API uploads return 403 Forbidden when using `SQUARE_ACCESS_TOKEN` from `~/.env`.
+**Verified:** 2024-12-21 - Direct API upload via this skill's Python script works correctly.
 
-**Root Cause:** The token lacks `ITEMS_WRITE` scope for multipart/form-data uploads. The Square MCP connector uses a different OAuth flow with broader scopes.
+**Test Result:**
+```
+Image ID: JBV4V5HST6EAUXWB5ZPYP52G
+URL: https://items-images-production.s3.us-west-2.amazonaws.com/files/.../original.jpeg
+```
 
-**Workarounds:**
-1. **Manual upload** via Square Dashboard → Catalog → Item → Images (recommended)
-2. **Skip Square image** - GitHub Pages flipcard shows the image; Square listing works without photo
-3. **Full OAuth token** - regenerate token with explicit `ITEMS_WRITE` scope
-
-This skill remains documented for when the auth issue is resolved.
+**Note:** Square MCP connector cannot upload images (JSON-only). This skill handles multipart/form-data uploads directly.
 
 ## Why This Skill Exists
 
@@ -38,9 +37,9 @@ The Square MCP connector only supports JSON-based API calls. Image upload endpoi
 ### Upload New Image to Item
 
 ```bash
-python3 scripts/upload_image.py \
+python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
   --image /path/to/photo.jpg \
-  --item-id PA4Z5DLBA76TOLWUCC33764V \
+  --item-id CATALOG_ITEM_ID \
   --name "Product Photo" \
   --caption "Front view of product"
 ```
@@ -48,7 +47,7 @@ python3 scripts/upload_image.py \
 ### Replace Existing Image
 
 ```bash
-python3 scripts/upload_image.py \
+python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
   --image /path/to/new_photo.jpg \
   --image-id EXISTING_IMAGE_ID
 ```
@@ -56,9 +55,9 @@ python3 scripts/upload_image.py \
 ### Upload to Item Variation
 
 ```bash
-python3 scripts/upload_image.py \
+python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
   --image /path/to/photo.jpg \
-  --variation-id CKBTJ55TYKLGPUZJWB52YVJP
+  --variation-id VARIATION_ID
 ```
 
 ## Script Options
@@ -81,10 +80,26 @@ python3 scripts/upload_image.py \
 2. Run upload script with `--item-id` and `--primary` for main image
 3. Run upload script again for additional images
 
+**Important:** Item must exist before attaching image. Create catalog item first, then upload image.
+
 ## Workflow: Update Item Images
 
 1. Get item via Square MCP to find existing image IDs
 2. Run upload script with `--image-id` to replace specific image
+
+## Integration with rg-full-auto
+
+In Phase 2, after background removal:
+
+```bash
+# Via osascript (runs on Mac with env vars)
+do shell script "source ~/.env && python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
+  --image /Users/scottybe/workspace/square/items/RG-XXXX/hero.png \
+  --item-id CATALOG_ITEM_ID \
+  --name 'RG-XXXX Hero' \
+  --caption 'Primary product image' \
+  --primary"
+```
 
 ## Finding Item/Image IDs
 
@@ -109,11 +124,11 @@ JPEG, PNG, GIF, WebP, BMP, TIFF (max 15MB)
 
 ## Troubleshooting
 
-**403 Forbidden**: Token lacks `ITEMS_WRITE` scope for multipart uploads. See limitation note above.
+**403 Forbidden**: Usually means item doesn't exist yet, or wrong item ID. Create catalog item first.
 
 **401 Unauthorized**: Check access token is valid and has ITEMS_WRITE permission
 
-**404 Not Found**: Image ID doesn't exist (for updates)
+**404 Not Found**: Item or image ID doesn't exist
 
 **413 Too Large**: Image exceeds 15MB limit - compress before upload
 

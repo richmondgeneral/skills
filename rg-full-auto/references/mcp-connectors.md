@@ -1,6 +1,6 @@
 # MCP Connector Quick Reference
 
-Last updated: 2024-12-20
+Last updated: 2024-12-21
 
 ## Filesystem MCP (`Filesystem:*`)
 
@@ -23,7 +23,7 @@ Last updated: 2024-12-20
 
 ## osascript (`Control your Mac:osascript`)
 
-**Use for:** Binary operations, shell commands, git
+**Use for:** Binary operations, shell commands, git, API scripts
 
 ```applescript
 do shell script "source ~/.env && python3 ~/.claude/skills/[skill]/scripts/[script].py"
@@ -32,6 +32,7 @@ do shell script "source ~/.env && python3 ~/.claude/skills/[skill]/scripts/[scri
 | Operation | Example |
 |-----------|---------|
 | Background removal | `python3 scripts/remove_background.py input.jpg output.png` |
+| Image upload to Square | `python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py ...` |
 | QR generation | `python3 -c "import qrcode; ..."` |
 | Git operations | `cd ~/.claude/skills && git add . && git commit -m "msg" && git push` |
 | Open apps | `tell application "Preview" to open ...` |
@@ -51,15 +52,21 @@ do shell script "source ~/.env && python3 ~/.claude/skills/[skill]/scripts/[scri
 | `make_api_request` | Execute API calls |
 
 **Works:** Catalog CRUD, payment links, customers, inventory, orders
-**Fails:** Image uploads (requires multipart/form-data)
+**Cannot do:** Image uploads (requires multipart/form-data)
 
-### Image Upload Limitation
+### Image Upload Solution
 
-Square MCP **cannot upload images**. Options:
+Square MCP cannot upload images (JSON-only). Use `square-image-upload` skill instead:
 
-1. ✅ **Manual:** Square Dashboard → Catalog → Item → Images
-2. ⚠️ **Script:** `square-image-upload` skill (currently 403 - token scope issue)
-3. ✅ **Skip:** GitHub Pages flipcard shows image; Square listing works without
+```applescript
+do shell script "source ~/.env && python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
+  --image /path/to/hero.png \
+  --item-id CATALOG_ITEM_ID \
+  --name 'Product Hero' \
+  --primary"
+```
+
+✅ **Verified working** (2024-12-21) - Token has required scopes.
 
 ---
 
@@ -96,7 +103,7 @@ Need to...
 ├─ Read/write text file on Mac? → Filesystem MCP
 ├─ Process binary image? → osascript + Python script
 ├─ Call Square API (JSON)? → Square MCP
-├─ Upload image to Square? → Manual (Dashboard) or skip
+├─ Upload image to Square? → osascript + square-image-upload skill ✅
 ├─ Search catalog fast? → square-cache MCP
 ├─ Git commit/push? → osascript
 └─ Create Linear issue? → Linear MCP

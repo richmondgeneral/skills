@@ -2,12 +2,26 @@
 name: square-image-upload
 description: Upload and manage images in Square Catalog via API. Use when the user needs to upload product photos, replace existing catalog images, or attach images to Square items/variations. Triggers on "upload image to Square", "add photo to item", "replace product image", "Square catalog image", or any request to programmatically manage Square product images. Required because Square's image endpoints use multipart form data which the standard MCP connector cannot handle.
 metadata:
-  version: "1.0"
+  version: "1.1"
+  updated: "2024-12-20"
 ---
 
 # Square Image Upload
 
 Upload images to Square Catalog using the CreateCatalogImage and UpdateCatalogImage API endpoints.
+
+## ⚠️ KNOWN LIMITATION
+
+**Current Status:** API uploads return 403 Forbidden when using `SQUARE_ACCESS_TOKEN` from `~/.env`.
+
+**Root Cause:** The token lacks `ITEMS_WRITE` scope for multipart/form-data uploads. The Square MCP connector uses a different OAuth flow with broader scopes.
+
+**Workarounds:**
+1. **Manual upload** via Square Dashboard → Catalog → Item → Images (recommended)
+2. **Skip Square image** - GitHub Pages flipcard shows the image; Square listing works without photo
+3. **Full OAuth token** - regenerate token with explicit `ITEMS_WRITE` scope
+
+This skill remains documented for when the auth issue is resolved.
 
 ## Why This Skill Exists
 
@@ -94,6 +108,8 @@ See [references/api_reference.md](references/api_reference.md) for detailed endp
 JPEG, PNG, GIF, WebP, BMP, TIFF (max 15MB)
 
 ## Troubleshooting
+
+**403 Forbidden**: Token lacks `ITEMS_WRITE` scope for multipart uploads. See limitation note above.
 
 **401 Unauthorized**: Check access token is valid and has ITEMS_WRITE permission
 

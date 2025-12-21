@@ -2,13 +2,22 @@
 name: rg-full-auto
 description: End-to-end 7-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, fulfillment, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "1.1"
+  version: "1.2"
   author: scottybe
+  updated: "2024-12-20"
 ---
 
 # Richmond General Full Auto
 
 Complete 7-phase workflow for onboarding new vintage/antique items from acquisition to sale-ready.
+
+## Architecture Note
+
+**Two environments exist:**
+1. **Claude's container** - Linux environment where Claude runs. Has `/mnt/user-data/uploads/` for user uploads, `/mnt/skills/` for skills. Can write TEXT files to user's Mac via Filesystem tools.
+2. **User's Mac** - Where binary operations (image processing, QR generation) must run via osascript. Has `~/.env` with API keys, git repos, and full filesystem access.
+
+**Rule:** Text files (HTML, CSV, MD) → Filesystem tools. Binary files (PNG, JPEG) → osascript on user's Mac.
 
 ## Quick Reference
 
@@ -23,7 +32,7 @@ Complete 7-phase workflow for onboarding new vintage/antique items from acquisit
 ### Category Assignment (choose ONE)
 
 | Category | ID | Use For |
-|----------|----|---------|
+|----------|----|------------|
 | The Real Rarities | `FL4L42RRUE5UXMWFDLXOCNB5` | Rare, special, showcase-worthy pieces |
 | The New Finds | `P34KX3L7XRZJJ5RP6W35K4YO` | Regular new inventory arrivals |
 
@@ -31,47 +40,50 @@ Complete 7-phase workflow for onboarding new vintage/antique items from acquisit
 
 ## Phase 0: Image Processing
 
-**Get next SKU (PRIMARY METHOD):**
-Use the `square-cache` skill to lookup highest existing SKU:
-```bash
-# Via MCP (recommended)
-Use square-cache skill to query existing SKU numbers
+**⚠️ CRITICAL:** Image processing runs on USER'S MAC via osascript, NOT in Claude's container. Binary files cannot transfer between environments.
+
+**Get next SKU via Square MCP:**
+```
+Square:make_api_request
+  service: catalog
+  method: searchCatalogItems
+  request: {"product_types": ["REGULAR"], "limit": 100}
+```
+Then find highest RG-XXXX SKU from results.
+
+**Locate user's uploaded image:**
+User uploads appear in `/mnt/user-data/uploads/` in Claude's container, but we need the file on user's Mac. Check common locations:
+```applescript
+do shell script "ls ~/Downloads/*.jpg ~/Downloads/*.jpeg ~/Desktop/*.jpg ~/Desktop/*.jpeg 2>/dev/null | head -10"
 ```
 
-**Fallback (local directory scan):**
-```bash
-# If offline, scan local directory
-ls ~/Workspace/items | grep -oE 'RG-[0-9]+' | sort -t'-' -k2 -n | tail -1
+**Remove background via osascript (runs on user's Mac):**
+```applescript
+do shell script "source ~/.env && python3 << 'EOF'
+import os
+import requests
+
+api_key = os.environ.get('REMOVEBG_API_KEY')
+input_path = '/Users/scottybe/Downloads/IMAGE_NAME.jpg'
+output_path = '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png'
+
+with open(input_path, 'rb') as f:
+    response = requests.post(
+        'https://api.remove.bg/v1.0/removebg',
+        files={'image_file': f},
+        data={'size': 'auto'},
+        headers={'X-Api-Key': api_key},
+    )
+response.raise_for_status()
+
+with open(output_path, 'wb') as out:
+    out.write(response.content)
+print(f'Background removed: {output_path}')
+EOF
+"
 ```
 
-**Copy uploaded image to working directory:**
-```bash
-mkdir -p ~/Workspace/items/RG-XXXX
-cp /path/to/uploaded/image.jpg ~/Workspace/items/RG-XXXX/original.jpg
-```
-
-**Remove background:**
-```bash
-python3 ~/.claude/skills/rg-full-auto/scripts/remove_background.py \
-  ~/Workspace/items/RG-XXXX/original.jpg \
-  ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
-```
-
-**Alternative: Generate product image with AI:**
-```bash
-python3 ~/.claude/skills/image-generation-skill/scripts/generate_image.py \
-  --prompt "Professional product photography of ${ITEM_DESCRIPTION}, clean white background, soft lighting" \
-  --quality pro \
-  --output ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
-```
-
-**Enhance after background removal:**
-```bash
-python3 ~/.claude/skills/image-editing-skill/scripts/edit_image.py \
-  --input ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png \
-  --instruction "add soft drop shadow and professional lighting" \
-  --output ~/Workspace/items/RG-XXXX/RG-XXXX-final.png
-```
+**Prerequisites:** User must have `~/.env` with `REMOVEBG_API_KEY` and image accessible on their Mac.
 
 ## Phase 1: Appraisal, Lot Assignment & Research
 
@@ -115,22 +127,25 @@ See `references/pricing-guidelines.md` for category-specific margins.
 
 ### Image Upload
 
-**Via square-image-upload skill (MCP - ONLY METHOD THAT WORKS):**
-Direct API image upload is not supported in current Square API. Use the `square-image-upload` MCP skill:
-```
-Square:upload_image
-  image_path: ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
-  item_id: CATALOG_ITEM_ID
-  name: "RG-XXXX Hero"
-  caption: "Front view"
-  primary: true
+**⚠️ KNOWN LIMITATION:** Direct API image upload returns 403 Forbidden. The MCP token lacks `ITEMS_WRITE` scope for multipart uploads.
+
+**Workarounds (choose one):**
+
+1. **Manual upload (recommended):** Upload hero.png via Square Dashboard → Catalog → Item → Images
+2. **Skip Square image:** Flipcard on GitHub Pages shows the image; Square listing works without photo
+3. **Batch upload script:** User runs `upload_square_images.py` locally with full OAuth token
+
+**If API upload is ever fixed:**
+```bash
+python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
+  --image ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png \
+  --item-id CATALOG_ITEM_ID \
+  --name "RG-XXXX Hero" \
+  --caption "Front view" \
+  --primary
 ```
 
-**⚠️ Important:**
-- Do NOT use direct API calls - endpoint doesn't exist (404)
-- Use ONLY the MCP-based square-image-upload skill
-- MCP is the supported method for image uploads
-- WebP not supported - convert if needed:
+**⚠️ WebP not supported** - convert if needed:
 ```bash
 sips -s format jpeg RG-XXXX-hero.webp --out RG-XXXX-hero.jpeg
 ```
@@ -257,26 +272,43 @@ See `references/label-format.md` for Print Master settings.
 ## Phase 7: Info Card & Publishing
 
 **Site:** https://richmondgeneral.github.io/items/
+**Repo:** /Users/scottybe/workspace/square/items/
 
-**Step 1: Place QR and images in repo**
-```bash
-python3 ~/.claude/skills/rg-full-auto/scripts/place_files.py \
-  --sku RG-XXXX \
-  --qr-base64 <base64_encoded_qr> \
-  --image ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
+**⚠️ CRITICAL:** All file operations for Phase 7 run on USER'S MAC via osascript. Only index.html (text) can be written via Filesystem tools.
+
+### Step 1: Create item folder
+```applescript
+do shell script "mkdir -p /Users/scottybe/workspace/square/items/RG-XXXX"
 ```
-This creates `RG-XXXX/` folder in repo with QR code and hero image.
 
-**Step 2: Create info card**
-1. Copy `template/rg-item-card-template.html` → `RG-XXXX/index.html`
-2. Replace placeholders: `{{SKU}}`, `{{ITEM_TITLE}}`, `{{PRICE}}`, `{{STORY_TEXT}}`, etc.
-3. Generate QR for payment link (brand colors: Gold #C9A961, Cream #F5F1E8, Charcoal #2C2C2C)
+### Step 2: Write index.html (via Filesystem tools - text file OK)
+Use `Filesystem:write_file` to write the populated template to:
+`/Users/scottybe/workspace/square/items/RG-XXXX/index.html`
 
-**Step 3: Publish**
-4. Add to gallery grid in `index.html`
-5. Commit and push to `main`
+### Step 3: Generate QR code (via osascript - binary file)
+```applescript
+do shell script "cd /Users/scottybe/workspace/square/items/RG-XXXX && python3 -c \"
+import qrcode
+qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=2)
+qr.add_data('https://square.link/u/XXXXXXXX')
+qr.make(fit=True)
+img = qr.make_image(fill_color='#2C2C2C', back_color='white')
+img.save('qr-code.png')
+print('QR code saved')
+\""
+```
+
+### Step 4: Hero image (already placed in Phase 0)
+Background removal output goes directly to `/Users/scottybe/workspace/square/items/RG-XXXX/hero.png`
+
+### Step 5: Git commit and push
+```applescript
+do shell script "cd /Users/scottybe/workspace/square/items && git add RG-XXXX/ && git commit -m 'Add RG-XXXX: Item Title' && git push origin main 2>&1"
+```
 
 **Customer flow:** QR on label → Info card → Read story → Buy Now → Square checkout
+
+**Brand colors:** Gold #C9A961, Cream #F5F1E8, Charcoal #2C2C2C
 
 ## Quick Tasks (Single Phase)
 
@@ -318,12 +350,21 @@ Next: Print label, place item on floor
 
 ## Troubleshooting
 
+**Square 403 on image upload:**
+- MCP token lacks `ITEMS_WRITE` scope for multipart uploads
+- Workaround: Manual upload via Square Dashboard, or skip (flipcard shows image anyway)
+- Root cause: MCP uses different OAuth flow than direct API calls
+
 **Background removal fails:**
-- Check API keys: `echo $REMOVEBG_API_KEY` or `echo $GEMINI_API_KEY`
-- Try alternative model: `--model removebg` or `--model gemini25`
+- Check API keys on user's Mac: `source ~/.env && echo $REMOVEBG_API_KEY`
+- Ensure image is accessible on user's Mac (not just in Claude's container)
+
+**Binary file transfer fails:**
+- Binary files (PNG, JPEG) cannot transfer between Claude's container and user's Mac
+- Solution: Generate binaries via osascript on user's Mac directly
 
 **Square 401 Unauthorized:**
-- Token expired: `echo $SQUARE_ACCESS_TOKEN`
+- Token expired: Check `$SQUARE_ACCESS_TOKEN`
 
 **Image upload 413 Too Large:**
 - Compress: `sips -Z 2000 image.jpeg`
@@ -331,63 +372,18 @@ Next: Print label, place item on floor
 **Item shows "sold out":**
 - Missing inventory count (Phase 3 step 2)
 
-**Image upload to Square (404 error):**
-- Direct API image upload endpoint is not available (404 NOT_FOUND)
-- Use `square-image-upload` skill via MCP instead (the only supported method)
-- Token is valid and has required permissions - endpoint is the issue
-- MCP is the correct/supported method for image uploads
-
-**Direct API vs MCP for Square:**
-- Direct API: Some endpoints unavailable (e.g., image upload returns 404)
-- MCP: Comprehensive support via Square integration
-- For image uploads: MCP ONLY - direct API not supported
-- Always use MCP-based skills for Square catalog operations
-
-**place_files.py fails to find repo:**
-- Default path: `~/Workspace/items`
-- Override with `--repo-path` argument
-- Ensure directory exists: `mkdir -p ~/Workspace/items`
-
-**QR code base64 decode fails:**
-- Verify base64 string is complete (no truncation)
-- Check for leading/trailing whitespace
-- Ensure output PNG file has write permissions in destination directory
-
-## Automation Notes
-
-### Image Upload Automation (Phase 2)
-**Method:** Square MCP skill (ONLY supported method)
-- Direct API endpoint for image upload is not available (404)
-- Token has correct permissions; endpoint is the issue
-- Always use `square-image-upload` skill via MCP
-- No token regeneration needed
-
-### File Placement Automation (Phase 7)
-**Method:** place_files.py utility script
-- Handles binary file transfer from Claude container to user filesystem
-- Decodes base64-encoded QR codes
-- Places images in correct repo directory structure
-- Fully automated, no manual file handling required
-
-### Overall Workflow Automation
-- Phases 0, 1, 3, 5, 6: Fully automated
-- Phase 2: Automated via MCP
-- Phase 4: Manual Square Dashboard config (business requirement, not a blocker)
-- Phase 7: Fully automated with place_files.py + git operations
-- **Result:** End-to-end automation from appraisal to published listing
-
 ## Related Skills
 
-|| Skill | Use For |
-||-------|---------|
-|| `rg-item-update` | Quick edits to existing items |
-|| `gemini-chat` | Background removal via Gemini (Phase 0 alternative) |
-|| `square-image-upload` | Image upload to Square catalog (Phase 2, MCP) |
-|| `square-cache` | Fast SKU lookups (Phase 0, MCP) |
-|| `book-appraiser` | Antiquarian books, LOC cross-reference |
-|| `carnival-glass-appraiser` | Pressed iridescent glass 1908-1930s |
-|| `maker-mark-identifier` | Pottery, silver, furniture marks |
-|| `product-labeler` | Label generation, Square descriptions |
+| Skill | Use For |
+|-------|---------|
+| `rg-item-update` | Quick edits to existing items |
+| `gemini-chat` | Background removal, image processing |
+| `square-image-upload` | Image upload via API |
+| `book-appraiser` | Antiquarian books, LOC cross-reference |
+| `carnival-glass-appraiser` | Pressed iridescent glass 1908-1930s |
+| `maker-mark-identifier` | Pottery, silver, furniture marks |
+| `product-labeler` | Label generation, Square descriptions |
+| `square-cache` | Fast catalog lookups |
 
 ## References
 

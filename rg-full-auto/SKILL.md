@@ -19,6 +19,31 @@ Complete 7-phase workflow for onboarding new vintage/antique items from acquisit
 
 **Rule:** Text files (HTML, CSV, MD) → Filesystem tools. Binary files (PNG, JPEG) → osascript on user's Mac.
 
+## API vs Dashboard Capabilities
+
+**✅ Fully Automated via API:**
+| Feature | API Method | Notes |
+|---------|------------|-------|
+| Catalog creation | `catalog.batchUpsertCatalogObjects` | Items, variations, categories |
+| Image upload | `catalog.createCatalogImage` | Via osascript + multipart POST |
+| SEO configuration | `item_data.ecom_seo_data` | page_title, page_description, permalink |
+| Inventory counts | `inventory.batchChangeInventory` | Physical counts |
+| Payment links | `checkout.createPaymentLink` | Quick pay or order-based |
+| Visibility | `ecom_visibility: VISIBLE` | Online store visibility |
+
+**❌ Dashboard-Only (No API Support):**
+| Feature | Where in Dashboard | Square Staff Confirmed |
+|---------|-------------------|----------------------|
+| Fulfillment methods | Item → Square Online → Fulfillment | Oct 2023 - "not currently available" |
+| Shipping toggle | Item → enable "Shipping" checkbox | — |
+| Shipping weight | Item → Weight field | — |
+| Package dimensions | Item → Dimensions fields | — |
+| Shipping profiles | Settings → Fulfillment → Shipment | Account-level, not item-level |
+
+**Source:** https://developer.squareup.com/forums/t/how-to-set-the-fulfillment-methods-for-an-item-in-catalog-api/11135
+
+**Implication:** After API automation completes, items need manual Dashboard visit to enable shipping.
+
 ## Quick Reference
 
 | Key | Value |
@@ -32,7 +57,7 @@ Complete 7-phase workflow for onboarding new vintage/antique items from acquisit
 ### Category Assignment (choose ONE)
 
 | Category | ID | Use For |
-|----------|----|------------|
+|----------|----|---------|
 | The Real Rarities | `FL4L42RRUE5UXMWFDLXOCNB5` | Rare, special, showcase-worthy pieces |
 | The New Finds | `P34KX3L7XRZJJ5RP6W35K4YO` | Regular new inventory arrivals |
 
@@ -125,26 +150,61 @@ See `references/pricing-guidelines.md` for category-specific margins.
 
 **File naming:** `RG-XXXX-01.png`, `RG-XXXX-02.png`
 
-### Image Upload to Square
+### Image Upload
 
-**✅ WORKING:** Use `square-image-upload` skill via osascript (verified 2024-12-21).
+**✅ Status: WORKING** - Image upload via API confirmed functional (Dec 2024).
 
-**Important:** Create catalog item FIRST (Phase 3), then upload image with the returned ITEM_ID.
-
+**Upload via osascript (runs on user's Mac):**
 ```applescript
-do shell script "source ~/.env && python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
-  --image /Users/scottybe/workspace/square/items/RG-XXXX/hero.png \
-  --item-id CATALOG_ITEM_ID \
-  --name 'RG-XXXX Hero' \
-  --caption 'Front view' \
-  --primary"
+do shell script "source ~/.env && python3 << 'EOF'
+import os
+import requests
+
+access_token = os.environ['SQUARE_ACCESS_TOKEN']
+image_path = '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png'
+item_id = 'CATALOG_ITEM_ID'  # From Phase 3 response
+
+url = 'https://connect.squareup.com/v2/catalog/images'
+headers = {
+    'Authorization': f'Bearer {access_token}',
+    'Square-Version': '2024-01-18',
+    'Accept': 'application/json'
+}
+
+import json
+request_data = {
+    'idempotency_key': f'rg-xxxx-img-{int(__import__(\"time\").time())}',
+    'image': {
+        'type': 'IMAGE',
+        'id': '#temp-image',
+        'image_data': {
+            'name': 'RG-XXXX Hero',
+            'caption': 'Front view'
+        }
+    },
+    'object_id': item_id,
+    'is_primary': True
+}
+
+with open(image_path, 'rb') as img_file:
+    files = {
+        'request': (None, json.dumps(request_data), 'application/json'),
+        'image_file': ('hero.png', img_file, 'image/png')
+    }
+    response = requests.post(url, headers=headers, files=files)
+
+response.raise_for_status()
+result = response.json()
+print(f\"Image uploaded: {result['image']['id']}\")
+EOF
+"
 ```
 
-**Response includes:** Image ID and Square CDN URL.
+**⚠️ Workflow order matters:** Create catalog item FIRST (Phase 3), then upload image with the returned ITEM_ID.
 
 **⚠️ WebP not supported** - convert if needed:
 ```bash
-sips -s format jpeg RG-XXXX-hero.webp --out RG-XXXX-hero.jpeg
+sips -s format png image.webp --out hero.png
 ```
 
 ## Phase 3: Square Catalog Creation
@@ -220,7 +280,9 @@ Square:make_api_request
 
 Without this, items show "sold out" online.
 
-## Phase 4: Fulfillment Setup
+## Phase 4: Fulfillment Setup (Dashboard Required)
+
+**⚠️ NO API SUPPORT** - Square confirmed Oct 2023 that fulfillment assignment is not available via Catalog API.
 
 **Use judgment** - price is NOT a factor.
 
@@ -230,7 +292,16 @@ Without this, items show "sold out" online.
 
 **Flat rate reference:** Small $10.20 | Medium $17.10 | Large $21.90
 
-Configure in Square Dashboard: enable shipping, set weight/dimensions, assign profile.
+**Dashboard steps:**
+1. Go to Square Dashboard → Items & Orders → Catalog
+2. Search for item by SKU (RG-XXXX)
+3. Click item → scroll to "Square Online" section
+4. Enable "Shipping" toggle
+5. Enter weight (lbs) and dimensions (inches)
+6. Select shipping profile (Flat Rate recommended)
+7. Save
+
+**Batch strategy:** Complete all API phases for multiple items, then do one Dashboard session to configure fulfillment for all at once.
 
 ## Phase 5: Payment Link Generation
 
@@ -331,10 +402,15 @@ After completing full workflow:
    Inventory: 1 in stock
 
 🖼️ Image
-   Hero: ~/Workspace/items/RG-XXXX/RG-XXXX-hero.png
-   Square URL: {IMAGE_URL}
+   Hero: ~/workspace/square/items/RG-XXXX/hero.png
+   Square Image ID: {IMAGE_ID}
 
-🚚 Fulfillment: Shippable / Pickup only
+🔍 SEO
+   Title: {PAGE_TITLE}
+   Permalink: {PERMALINK}
+
+🚚 Fulfillment: ⏸️ REQUIRES DASHBOARD
+   → Enable shipping, set weight/dimensions
 
 💳 Payment Link: {PAYMENT_LINK_URL}
 
@@ -342,15 +418,19 @@ After completing full workflow:
 
 📄 Info Card: https://richmondgeneral.github.io/items/RG-XXXX/
 
-Next: Print label, place item on floor
+Next: Configure fulfillment in Dashboard, print label, place item on floor
 ```
 
 ## Troubleshooting
 
-**Square image upload fails:**
-- Ensure catalog item exists FIRST (create in Phase 3 before uploading image)
-- 404 = wrong item ID; 401 = token issue
-- Use `square-image-upload` skill via osascript, NOT Square MCP (which is JSON-only)
+**Fulfillment not showing online:**
+- Fulfillment methods require Dashboard configuration (no API support)
+- Go to item → Square Online → enable Shipping toggle
+
+**Image upload fails:**
+- Ensure catalog item created FIRST (need ITEM_ID for image upload)
+- Check token: `source ~/.env && echo $SQUARE_ACCESS_TOKEN`
+- Verify image is PNG or JPEG (WebP not supported)
 
 **Background removal fails:**
 - Check API keys on user's Mac: `source ~/.env && echo $REMOVEBG_API_KEY`
@@ -364,7 +444,7 @@ Next: Print label, place item on floor
 - Token expired: Check `$SQUARE_ACCESS_TOKEN`
 
 **Image upload 413 Too Large:**
-- Compress: `sips -Z 2000 image.jpeg`
+- Compress: `sips -Z 2000 image.png`
 
 **Item shows "sold out":**
 - Missing inventory count (Phase 3 step 2)

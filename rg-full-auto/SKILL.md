@@ -1,15 +1,15 @@
 ---
 name: rg-full-auto
-description: End-to-end 7-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, fulfillment, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
+description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "1.4"
+  version: "1.5"
   author: scottybe
   updated: "2025-12-21"
 ---
 
 # Richmond General Full Auto
 
-Complete 7-phase workflow for onboarding new vintage/antique items from acquisition to sale-ready.
+Complete 8-phase workflow for onboarding new vintage/antique items from acquisition to sale-ready.
 
 ## Architecture Note
 
@@ -18,31 +18,6 @@ Complete 7-phase workflow for onboarding new vintage/antique items from acquisit
 2. **User's Mac** - Where binary operations (image processing, QR generation) must run via osascript. Has `~/.env` with API keys, git repos, and full filesystem access.
 
 **Rule:** Text files (HTML, CSV, MD) → Filesystem tools. Binary files (PNG, JPEG) → osascript on user's Mac.
-
-## API vs Dashboard Capabilities
-
-**✅ Fully Automated via API:**
-| Feature | API Method | Notes |
-|---------|------------|-------|
-| Catalog creation | `catalog.batchUpsertCatalogObjects` | Items, variations, categories |
-| Image upload | `catalog.createCatalogImage` | Via osascript + multipart POST |
-| SEO configuration | `item_data.ecom_seo_data` | page_title, page_description, permalink |
-| Inventory counts | `inventory.batchChangeInventory` | Physical counts |
-| Payment links | `checkout.createPaymentLink` | Quick pay or order-based |
-| Visibility | `ecom_visibility: VISIBLE` | Online store visibility |
-
-**❌ Dashboard-Only (No API Support):**
-| Feature | Where in Dashboard | Square Staff Confirmed |
-|---------|-------------------|----------------------|
-| Fulfillment methods | Item → Square Online → Fulfillment | Oct 2023 - "not currently available" |
-| Shipping toggle | Item → enable "Shipping" checkbox | — |
-| Shipping weight | Item → Weight field | — |
-| Package dimensions | Item → Dimensions fields | — |
-| Shipping profiles | Settings → Fulfillment → Shipment | Account-level, not item-level |
-
-**Source:** https://developer.squareup.com/forums/t/how-to-set-the-fulfillment-methods-for-an-item-in-catalog-api/11135
-
-**Implication:** After API automation completes, items need manual Dashboard visit to enable shipping.
 
 ## Quick Reference
 
@@ -74,45 +49,62 @@ uv run --project ~/.claude/skills python ~/.claude/skills/<skill>/scripts/<scrip
 
 See `~/.claude/skills/PYTHON.md` for setup details.
 
+---
+
 ## Phase 0: Image Processing
 
 **⚠️ CRITICAL:** Image processing runs on USER'S MAC via osascript, NOT in Claude's container. Binary files cannot transfer between environments.
 
-**Get next SKU via Square MCP:**
-```
-Square:make_api_request
-  service: catalog
-  method: searchCatalogItems
-  request: {"product_types": ["REGULAR"], "limit": 100}
-```
-Then find highest RG-XXXX SKU from results.
+### Step 0.1: Get next SKU
 
-**Locate user's uploaded image:**
+Use square-cache for fast lookup:
+```bash
+square_cache_search with sku_pattern: "RG-"
+```
+Find highest RG-XXXX and increment.
+
+### Step 0.2: Create item folder
+
+```applescript
+do shell script "mkdir -p /Users/scottybe/workspace/square/items/RG-XXXX"
+```
+
+### Step 0.3: Locate user's image
+
 User uploads appear in `/mnt/user-data/uploads/` in Claude's container, but we need the file on user's Mac. Check common locations:
 ```applescript
-do shell script "ls ~/Downloads/*.jpg ~/Downloads/*.jpeg ~/Desktop/*.jpg ~/Desktop/*.jpeg 2>/dev/null | head -10"
+do shell script "ls ~/Downloads/*.jpg ~/Downloads/*.jpeg ~/Downloads/*.png ~/Desktop/*.jpg ~/Desktop/*.jpeg 2>/dev/null | head -10"
 ```
 
-**Remove background via osascript (runs on user's Mac):**
+### Step 0.4: Remove background
+
 ```applescript
 do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills python ~/.claude/skills/rg-new-item/scripts/remove_background.py '/Users/scottybe/Downloads/IMAGE_NAME.jpg' '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png'"
 ```
 
-**Prerequisites:** User must have `~/.env` with `REMOVEBG_API_KEY` and image accessible on their Mac.
+**Prerequisites:** `~/.env` must have `REMOVEBG_API_KEY`.
 
-## Phase 1: Appraisal, Lot Assignment & Research
+**If bg removal fails:** Fall back to original image, note in description that background removal is pending.
 
-**First: Assign to lot and record acquisition cost**
+---
+
+## Phase 1: Appraisal & Research
+
+### Step 1.1: Assign lot & record acquisition cost
+
 - Lot prefix format: `L##-` (e.g., L2 = Peter's Estate)
 - Record: lot ID, purchase date, total lot cost, item cost allocation
 - See `references/lot-tracking.md` for full lot management
 
-**Route to specialized skills if needed:**
+### Step 1.2: Route to specialized appraiser if needed
+
 - Books pre-1970 → `book-appraiser`
-- Maker's marks, pottery, carnival glass → `carnival-glass-appraiser`, `maker-mark-identifier`
+- Carnival glass → `carnival-glass-appraiser`
+- Maker's marks (pottery, silver, furniture) → `maker-mark-identifier`
 - General vintage → continue here
 
-**Research checklist:**
+### Step 1.3: Research
+
 1. Identify maker/manufacturer
 2. Date the piece (era, production dates)
 3. Assess condition
@@ -126,37 +118,32 @@ do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills py
 | Mid-range | $15-75 | 2.5-4x cost |
 | Showcase | $75+ | Research-based |
 
-See `references/pricing-guidelines.md` for category-specific margins.
+### Step 1.4: Determine shipping eligibility
 
-## Phase 2: Photography & Images
+**Ships easily:**
+- Books, paper goods, small collectibles
+- Sturdy items that fit in standard boxes
+- Most things you'd drop at the post office
 
-**Required shots:**
-1. Hero (front, clean background)
-2. Back/bottom (marks, labels)
-3. Details (condition issues, unique features)
-4. Scale reference if size matters
+**Pickup only:**
+- Furniture (size/weight impractical)
+- Large or awkward shapes
+- Extremely fragile items
+- Heavy items where shipping cost ≈ item value
 
-**Specs:** Min 1000px longest edge, transparent PNG preferred for hero
+**Flat rate reference:** Small $10.20 | Medium $17.10 | Large $21.90
 
-**File naming:** `RG-XXXX-01.png`, `RG-XXXX-02.png`
+**Output from Phase 1:**
+- Item title
+- Description (HTML with `<br>` tags)
+- Price in cents
+- Condition grade
+- SEO title and description
+- **Shippable: YES or NO**
 
-### Image Upload
+---
 
-**✅ Status: WORKING** - Image upload via API confirmed functional (Dec 2024).
-
-**Upload via osascript (runs on user's Mac):**
-```applescript
-do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/square-image-upload/scripts/upload_image.py --image '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' --item-id 'CATALOG_ITEM_ID' --name 'RG-XXXX Hero' --caption 'Front view' --primary"
-```
-
-**⚠️ Workflow order matters:** Create catalog item FIRST (Phase 3), then upload image with the returned ITEM_ID.
-
-**⚠️ WebP not supported** - convert if needed:
-```bash
-sips -s format png image.webp --out hero.png
-```
-
-## Phase 3: Square Catalog Creation
+## Phase 2: Square Catalog Creation
 
 **Use Square MCP:**
 ```
@@ -207,9 +194,20 @@ Square:make_api_request
 }
 ```
 
-**Capture from response:** `id_mappings[0].object_id` → ITEM_ID, `id_mappings[1].object_id` → VARIATION_ID
+**Capture from response:** 
+- `id_mappings[0].object_id` → ITEM_ID
+- `id_mappings[1].object_id` → VARIATION_ID
 
-### Set Inventory Count (Required)
+---
+
+## Phase 3: Set Inventory
+
+**Use Square MCP:**
+```
+Square:make_api_request
+  service: inventory
+  method: batchChangeInventory
+```
 
 ```json
 {
@@ -229,31 +227,41 @@ Square:make_api_request
 
 Without this, items show "sold out" online.
 
-## Phase 4: Fulfillment Setup (Dashboard Required)
+---
 
-**⚠️ NO API SUPPORT** - Square confirmed Oct 2023 that fulfillment assignment is not available via Catalog API.
+## Phase 4: Upload Image to Square
 
-**Use judgment** - price is NOT a factor.
+**Execute on user's Mac via osascript:**
+```applescript
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/square-image-upload/scripts/upload_image.py --image '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' --item-id 'CATALOG_ITEM_ID' --name 'RG-XXXX Hero' --caption 'Front view' --primary"
+```
 
-**Ships easily:** Books, paper goods, small collectibles, sturdy items
+**Capture:** Image ID from response.
 
-**Pickup only:** Furniture, large/awkward shapes, extremely fragile, heavy items where shipping ≈ item value
+**⚠️ WebP not supported** - convert if needed:
+```bash
+sips -s format png image.webp --out hero.png
+```
 
-**Flat rate reference:** Small $10.20 | Medium $17.10 | Large $21.90
+---
 
-**Dashboard steps:**
-1. Go to Square Dashboard → Items & Orders → Catalog
-2. Search for item by SKU (RG-XXXX)
-3. Click item → scroll to "Square Online" section
-4. Enable "Shipping" toggle
-5. Enter weight (lbs) and dimensions (inches)
-6. Select shipping profile (Flat Rate recommended)
-7. Save
+## Phase 5: Payment Link
 
-**Batch strategy:** Complete all API phases for multiple items, then do one Dashboard session to configure fulfillment for all at once.
+**Shipping decision from Phase 1 determines `ask_for_shipping_address`:**
 
-## Phase 5: Payment Link Generation
+| Shippable? | Setting | Customer Experience |
+|------------|---------|---------------------|
+| YES | `"ask_for_shipping_address": true` | Customer enters address → you ship |
+| NO | `"ask_for_shipping_address": false` | No address collected → pickup only |
 
+**Use Square MCP:**
+```
+Square:make_api_request
+  service: checkout
+  method: createPaymentLink
+```
+
+**For shippable items:**
 ```json
 {
   "idempotency_key": "rg-XXXX-pay-TIMESTAMP",
@@ -262,55 +270,72 @@ Without this, items show "sold out" online.
     "price_money": {"amount": 1999, "currency": "USD"},
     "location_id": "B87BAEZ0NWV34"
   },
-  "checkout_options": {"ask_for_shipping_address": true}
+  "checkout_options": {
+    "ask_for_shipping_address": true
+  }
 }
 ```
 
-Returns: `payment_link.url` → `https://square.link/u/XXXXXXXX`
+**For pickup-only items:**
+```json
+{
+  "idempotency_key": "rg-XXXX-pay-TIMESTAMP",
+  "quick_pay": {
+    "name": "Item Title",
+    "price_money": {"amount": 1999, "currency": "USD"},
+    "location_id": "B87BAEZ0NWV34"
+  },
+  "checkout_options": {
+    "ask_for_shipping_address": false
+  }
+}
+```
 
-## Phase 6: Labels & Batch CSV
+**Capture:** `payment_link.url` → `https://square.link/u/XXXXXXXX`
+
+---
+
+## Phase 6: Generate Label
+
+**Append row to batch CSV:**
 
 **Batch file:** `/Users/scottybe/workspace/square/items/rg-labels-batch.csv`
 
 ```csv
 Product Name,Attributes,Price,Condition,Condition Notes,SKU,QR Code URL
-"Item Title","Era • Type • Feature",55.00,Good,"Wear notes",RG-0003,https://richmondgeneral.github.io/items/RG-0003/
+"Item Title","Era • Type • Feature",55.00,Good,"Wear notes",RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/
 ```
 
-**Append row:**
 ```bash
 echo '"Item Title","Era • Type • Feature",55.00,Good,"Wear notes",RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/' >> ~/workspace/square/items/rg-labels-batch.csv
 ```
 
-**Include QR when:** Antiques (pre-1950), collectibles with story, items with info cards
+**Every item gets a QR code** on its label, linking to the info card. This is the customer experience—scan, read the story, buy.
 
 See `references/label-format.md` for Print Master settings.
+
+---
 
 ## Phase 7: Info Card & Publishing
 
 **Site:** https://richmondgeneral.github.io/items/
 **Repo:** /Users/scottybe/workspace/square/items/
 
-**⚠️ CRITICAL:** All file operations for Phase 7 run on USER'S MAC via osascript. Only index.html (text) can be written via Filesystem tools.
+### Step 7.1: Write index.html
 
-### Step 1: Create item folder
-```applescript
-do shell script "mkdir -p /Users/scottybe/workspace/square/items/RG-XXXX"
-```
-
-### Step 2: Write index.html (via Filesystem tools - text file OK)
 Use `Filesystem:write_file` to write the populated template to:
 `/Users/scottybe/workspace/square/items/RG-XXXX/index.html`
 
-### Step 3: Generate QR code (via osascript - binary file)
+(Item folder already exists from Phase 0.2)
+
+### Step 7.2: Generate QR code (payment link)
+
 ```applescript
 do shell script "source ~/.local/bin/env && cd /Users/scottybe/workspace/square/items/RG-XXXX && uv run --project ~/.claude/skills python -c \"import qrcode; qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=2); qr.add_data('https://square.link/u/XXXXXXXX'); qr.make(fit=True); img = qr.make_image(fill_color='#2C2C2C', back_color='white'); img.save('qr-code.png'); print('QR code saved')\""
 ```
 
-### Step 4: Hero image (already placed in Phase 0)
-Background removal output goes directly to `/Users/scottybe/workspace/square/items/RG-XXXX/hero.png`
+### Step 7.3: Git commit and push
 
-### Step 5: Git commit and push
 ```applescript
 do shell script "cd /Users/scottybe/workspace/square/items && git add RG-XXXX/ && git commit -m 'Add RG-XXXX: Item Title' && git push origin main 2>&1"
 ```
@@ -319,15 +344,19 @@ do shell script "cd /Users/scottybe/workspace/square/items && git add RG-XXXX/ &
 
 **Brand colors:** Gold #C9A961, Cream #F5F1E8, Charcoal #2C2C2C
 
+---
+
 ## Quick Tasks (Single Phase)
 
 | Request | Action |
 |---------|--------|
 | "make a label for..." | Phase 6 only |
 | "price this" / "what's this worth" | Phase 1 only |
-| "upload this image to Square" | Phase 2 image upload only |
+| "upload this image to Square" | Phase 4 only |
 | "create a payment link" | Phase 5 only |
 | "what's the SKU for..." | Cache lookup only |
+
+---
 
 ## Workflow Summary Output
 
@@ -350,8 +379,7 @@ After completing full workflow:
    Title: {PAGE_TITLE}
    Permalink: {PERMALINK}
 
-🚚 Fulfillment: ⏸️ REQUIRES DASHBOARD
-   → Enable shipping, set weight/dimensions
+🚚 Fulfillment: {SHIPPING / PICKUP ONLY}
 
 💳 Payment Link: {PAYMENT_LINK_URL}
 
@@ -359,14 +387,12 @@ After completing full workflow:
 
 📄 Info Card: https://richmondgeneral.github.io/items/RG-XXXX/
 
-Next: Configure fulfillment in Dashboard, print label, place item on floor
+Next: Print label, place item on floor
 ```
 
-## Troubleshooting
+---
 
-**Fulfillment not showing online:**
-- Fulfillment methods require Dashboard configuration (no API support)
-- Go to item → Square Online → enable Shipping toggle
+## Troubleshooting
 
 **Image upload fails:**
 - Ensure catalog item created FIRST (need ITEM_ID for image upload)
@@ -388,14 +414,15 @@ Next: Configure fulfillment in Dashboard, print label, place item on floor
 - Compress: `sips -Z 2000 image.png`
 
 **Item shows "sold out":**
-- Missing inventory count (Phase 3 step 2)
+- Missing inventory count (Phase 3)
+
+---
 
 ## Related Skills
 
 | Skill | Use For |
 |-------|---------|
 | `rg-item-update` | Quick edits to existing items |
-| `gemini-chat` | Background removal, image processing |
 | `square-image-upload` | Image upload via API |
 | `book-appraiser` | Antiquarian books, LOC cross-reference |
 | `carnival-glass-appraiser` | Pressed iridescent glass 1908-1930s |

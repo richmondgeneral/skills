@@ -25,16 +25,30 @@ uv run ruff check .
 
 | Directory | Purpose |
 |-----------|---------|
-| `rg-full-auto/` | 8-phase item onboarding workflow |
-| `rg-item-update/` | Quick edits to existing catalog items |
-| `book-appraiser/` | Antiquarian book appraisal |
+| **Richmond General Inventory** | |
+| `rg-full-auto/` | 8-phase item onboarding workflow (appraisal → Square → labels) |
+| `rg-item-update/` | Quick edits to existing catalog items (price, description, images) |
+| `catalog-classifier/` | Route items to correct Square category/brand/tier |
+| `product-labeler/` | Generate thermal printer labels (CSV for Print Master) |
+| **Appraisal & Identification** | |
+| `book-appraiser/` | Antiquarian book appraisal, editions, valuation |
 | `carnival-glass-appraiser/` | Carnival glass identification 1908-1930s |
-| `maker-mark-identifier/` | Pottery, silver, furniture marks |
-| `square-cache/` | MongoDB-cached Square catalog |
-| `square-image-upload/` | Image upload via multipart form |
+| `maker-mark-identifier/` | Pottery, silver, furniture, jewelry marks |
+| **Square Integration** | |
+| `square-cache/` | MongoDB-cached catalog with change tracking |
+| `square-image-upload/` | Image upload via multipart form API |
+| `square-crm/` | Sync contacts with Square customers |
+| **Apple Ecosystem** | |
 | `imessage-core/` | Read/send iMessage, RCS, SMS |
-| `contacts-manager/` | Contact lookup and profiles |
-| `skill-manager/` | Meta-skill for managing skills |
+| `imessage-archiver/` | Archive conversations to Apple Notes |
+| `contacts-manager/` | Contact lookup, profiles, spam filtering |
+| `daily-briefing/` | Morning briefing with CRM status to Notes |
+| **Image Processing** | |
+| `image-processor/` | Unified processing: bg removal, generation, editing, Photos.app access |
+| **Meta** | |
+| `skill-manager/` | Create/update skills, track versions |
+| `archive/` | Superseded skills (gemini-chat, image-*-skill, rg-new-item, rg-inventory) |
+| `docs/` | Build scripts, documentation |
 
 ## Skill Structure
 

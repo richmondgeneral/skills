@@ -12,7 +12,9 @@
       "Bash(done)",
       "Bash(find:*)",
       "Bash(xargs:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(uv run:*)",
+      "Bash(source ~/.zshrc)"
     ]
   }
 }

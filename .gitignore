@@ -26,8 +26,7 @@ __pycache__/
 *.tmp
 *.temp
 
-# Skill archives (generated, not committed)
-archive/
+# Skill build outputs (generated, not committed)
 *.zip
 *.skill
 

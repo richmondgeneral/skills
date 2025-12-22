@@ -2,10 +2,14 @@
 name: skill-manager
 description: Meta-skill for managing and updating Claude skills. Use when creating new skills, updating existing skills, or tracking skill versions. Triggers on "update skill", "create skill", "skill changelog", or references to skill management.
 metadata:
-  version: "1.2"
+  version: "1.3"
   author: scottybe
   updated: "2025-12-21"
   changelog: |
+    v1.3 - Skill consolidation:
+    - Archived rg-new-item and rg-inventory (superseded by rg-full-auto)
+    - Updated registry with archived skills section
+
     v1.2 - Anthropic skills update:
     - Updated all skills to Anthropic Agent Skills best practices
     - Added allowed-tools restrictions to read-only skills
@@ -62,8 +66,6 @@ Meta-skill for collaboratively developing and maintaining Claude skills with Sco
 |-------|---------|---------|--------------|
 | **rg-full-auto** | v2.3 | End-to-end item onboarding (8 phases) | 2025-12-21 |
 | **rg-item-update** | v1.1 | Quick edits to existing items | 2025-12-21 |
-| **rg-new-item** | - | Simplified new item flow (legacy) | 2025-12-20 |
-| **rg-inventory** | - | Inventory management (legacy) | 2025-12-20 |
 
 ### Appraisal & Identification
 
@@ -106,7 +108,12 @@ Meta-skill for collaboratively developing and maintaining Claude skills with Sco
 | **image-editing-skill** | Inactive | Image manipulation |
 | **image-generation-skill** | Inactive | AI image generation |
 
-**Archived:** `archive/` folder contains deprecated skills
+### Archived (`archive/` folder)
+
+| Skill | Reason | Superseded By |
+|-------|--------|---------------|
+| **rg-new-item** | Consolidated | rg-full-auto |
+| **rg-inventory** | Consolidated | rg-full-auto |
 
 ---
 

@@ -1,8 +1,14 @@
 ---
 name: imessage-core
-description: Read and send iMessage/RCS/SMS messages. Use when user asks to check messages, read texts, send a text, respond to someone, check delivery status, or list group chats. Queries chat.db directly for full sent+received history. Supports 1:1 conversations, group chats, and smart service detection (iMessage vs RCS vs SMS).
+description: Read and send iMessage/RCS/SMS messages. Use when user asks to check messages, read texts, send a text, text back, reply to someone, respond to a message, check delivery status, or list group chats. Queries chat.db directly for full sent+received history. Supports 1:1 conversations, group chats, and smart service detection (iMessage vs RCS vs SMS).
 metadata:
-  version: "1.0"
+  version: "1.1"
+  author: scottybe
+  updated: "2025-12-21"
+  changelog: |
+    v1.1 - Anthropic skills update:
+    - Enhanced triggers: "text back", "reply to", "respond to a message"
+    - Added author and updated fields
 ---
 
 # iMessage Core

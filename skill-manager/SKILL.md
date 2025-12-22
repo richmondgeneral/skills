@@ -2,9 +2,17 @@
 name: skill-manager
 description: Meta-skill for managing and updating Claude skills. Use when creating new skills, updating existing skills, or tracking skill versions. Triggers on "update skill", "create skill", "skill changelog", or references to skill management.
 metadata:
-  version: "1.1"
+  version: "1.2"
+  author: scottybe
   updated: "2025-12-21"
   changelog: |
+    v1.2 - Anthropic skills update:
+    - Updated all skills to Anthropic Agent Skills best practices
+    - Added allowed-tools restrictions to read-only skills
+    - Enhanced trigger keywords across all skills
+    - Updated registry with new versions
+    - Added author/updated fields to all skills
+
     v1.1 - Registry overhaul:
     - Added all RG workflow skills (rg-full-auto, rg-new-item, rg-item-update)
     - Added messaging skills (imessage-core, contacts-manager, daily-briefing)
@@ -52,41 +60,42 @@ Meta-skill for collaboratively developing and maintaining Claude skills with Sco
 
 | Skill | Version | Purpose | Last Updated |
 |-------|---------|---------|--------------|
-| **rg-full-auto** | v2.2 | End-to-end item onboarding (8 phases) | 2025-12-21 |
-| **rg-new-item** | - | Simplified new item flow | 2025-12-20 |
-| **rg-item-update** | - | Quick edits to existing items | 2025-12-20 |
+| **rg-full-auto** | v2.3 | End-to-end item onboarding (8 phases) | 2025-12-21 |
+| **rg-item-update** | v1.1 | Quick edits to existing items | 2025-12-21 |
+| **rg-new-item** | - | Simplified new item flow (legacy) | 2025-12-20 |
 | **rg-inventory** | - | Inventory management (legacy) | 2025-12-20 |
 
 ### Appraisal & Identification
 
 | Skill | Version | Purpose | Last Updated |
 |-------|---------|---------|--------------|
-| **book-appraiser** | - | Antiquarian books, LOC cross-reference | 2025-12-19 |
-| **carnival-glass-appraiser** | - | Pressed iridescent glass 1908-1930s | 2025-12-19 |
-| **maker-mark-identifier** | - | Pottery, silver, furniture marks | 2025-12-19 |
+| **book-appraiser** | v1.1 | Antiquarian books, LOC cross-reference | 2025-12-21 |
+| **carnival-glass-appraiser** | v1.1 | Pressed iridescent glass 1908-1930s | 2025-12-21 |
+| **maker-mark-identifier** | v1.1 | Pottery, silver, furniture marks | 2025-12-21 |
 
 ### Square Integration
 
 | Skill | Version | Purpose | Last Updated |
 |-------|---------|---------|--------------|
-| **square-cache** | - | MongoDB cache for catalog (100x faster) | 2025-12-19 |
-| **square-image-upload** | - | Image upload via multipart form data | 2025-12-19 |
-| **square-crm** | - | Square customer sync from contacts | 2025-12-19 |
-| **product-labeler** | - | Thermal labels, Square descriptions | 2025-12-19 |
+| **square-cache** | v1.1 | MongoDB cache for catalog (100x faster) | 2025-12-21 |
+| **square-image-upload** | v1.3 | Image upload via multipart form data | 2025-12-21 |
+| **square-crm** | v1.1 | Square customer sync from contacts | 2025-12-21 |
+| **product-labeler** | v1.1 | Thermal labels, Square descriptions | 2025-12-21 |
 
 ### Messaging & CRM
 
 | Skill | Version | Purpose | Last Updated |
 |-------|---------|---------|--------------|
-| **imessage-core** | - | Read/send iMessage, RCS, SMS | 2025-12-20 |
-| **contacts-manager** | - | Contact lookup, spam filtering, profiles | 2025-12-20 |
-| **daily-briefing** | - | Morning CRM briefing to Apple Notes | 2025-12-20 |
+| **imessage-core** | v1.1 | Read/send iMessage, RCS, SMS | 2025-12-21 |
+| **contacts-manager** | v1.1 | Contact lookup, spam filtering, profiles | 2025-12-21 |
+| **daily-briefing** | v1.1 | Morning CRM briefing to Apple Notes | 2025-12-21 |
+| **imessage-archiver** | v1.1 | Archive conversations to Apple Notes | 2025-12-21 |
 
 ### Meta / Utility
 
 | Skill | Version | Purpose | Last Updated |
 |-------|---------|---------|--------------|
-| **skill-manager** | v1.1 | This skill - registry & management | 2025-12-21 |
+| **skill-manager** | v1.2 | This skill - registry & management | 2025-12-21 |
 
 ### Experimental / Inactive
 
@@ -96,7 +105,6 @@ Meta-skill for collaboratively developing and maintaining Claude skills with Sco
 | **gemini-chat** | Experimental | Gemini API integration |
 | **image-editing-skill** | Inactive | Image manipulation |
 | **image-generation-skill** | Inactive | AI image generation |
-| **imessage-archiver** | Inactive | Message export/backup |
 
 **Archived:** `archive/` folder contains deprecated skills
 

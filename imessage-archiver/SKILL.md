@@ -2,7 +2,12 @@
 name: imessage-archiver
 description: Archive iMessage/RCS/SMS conversations to Apple Notes with inline images and attachments. Use when user wants to save, archive, or export text message conversations to Notes. Handles media embedding correctly using sequential attachment pattern. Supports date ranges, contact filtering, and automatic image resizing.
 metadata:
-  version: "1.0"
+  version: "1.1"
+  author: scottybe
+  updated: "2025-12-21"
+  changelog: |
+    v1.1 - Anthropic skills update:
+    - Added author and updated fields
 ---
 
 # iMessage Archiver

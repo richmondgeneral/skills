@@ -1,8 +1,14 @@
 ---
 name: rg-item-update
-description: Quick edits to existing Richmond General catalog items. Use for price changes, description updates, SEO tweaks, adding/replacing images, category changes, or fixing typos. Triggers on "update item", "change price", "edit description", "fix", "modify existing". NOT for new items—use rg-full-auto for complete onboarding workflow.
+description: Quick edits to existing Richmond General catalog items. Use for price changes, description updates, SEO tweaks, adding/replacing images, category changes, or fixing typos. Triggers on "update item", "change price", "edit description", "fix", "modify existing". Also handles BATCH operations like "move all food items" or "update category for multiple items". NOT for new items—use rg-full-auto for complete onboarding workflow.
 metadata:
-  version: "1.0"
+  version: "1.1"
+  author: scottybe
+  updated: "2025-12-21"
+  changelog: |
+    v1.1 - Anthropic skills update:
+    - Added batch operation triggers to description
+    - Added author and updated fields
 ---
 
 # Richmond General Item Update

@@ -2,8 +2,13 @@
 name: square-image-upload
 description: Upload and manage images in Square Catalog via API. Use when the user needs to upload product photos, replace existing catalog images, or attach images to Square items/variations. Triggers on "upload image to Square", "add photo to item", "replace product image", "Square catalog image", or any request to programmatically manage Square product images. Required because Square's image endpoints use multipart form data which the standard MCP connector cannot handle.
 metadata:
-  version: "1.2"
-  updated: "2024-12-21"
+  version: "1.3"
+  author: scottybe
+  updated: "2025-12-21"
+  changelog: |
+    v1.3 - Anthropic skills update:
+    - Added author field
+    - Updated date to 2025
 ---
 
 # Square Image Upload

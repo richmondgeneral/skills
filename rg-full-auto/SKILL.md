@@ -1,23 +1,27 @@
 ---
 name: rg-full-auto
-description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch or doing a complete item redo. Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
+description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "2.2"
+  version: "2.3"
   author: scottybe
   updated: "2025-12-21"
   changelog: |
+    v2.3 - Anthropic skills update:
+    - Enhanced triggers: "list item", "sell this"
+    - Aligned with Anthropic Agent Skills best practices
+
     v2.2 - Post RG-0014 improvements:
     - Added Step 1.0: View image for appraisal using copy_file_user_to_claude
     - Emphasized exact Square MCP method names (batchInsertObjects, batchChange)
     - Gallery index update now uses osascript/sed exclusively (Filesystem:str_replace unreliable)
     - Added reminder to check ~/Desktop for images
-    
+
     v2.1 - Template enforcement:
     - Created references/info-card-template.html with complete flip card template
     - Phase 7.1 now REQUIRES flip card template with explicit checklist
     - Added placeholder reference table for template variables
     - Added explicit "DO NOT" list to prevent wrong template usage
-    
+
     v2.0 - Post RG-0013 improvements:
     - Added 20MB file size check before remove.bg (Phase 0.5)
     - Strengthened book-appraiser routing for pre-1970 books (Phase 1)

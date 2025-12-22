@@ -1,8 +1,16 @@
 ---
 name: book-appraiser
-description: Antiquarian and antique book appraisal, identification, and valuation. Use when the user presents a book that appears to be from before 1970, asks about old/antique/vintage books, needs help identifying publisher/edition/printing, wants to research book value, or asks about Library of Congress holdings or public domain status.
+description: Antiquarian and antique book appraisal, identification, and valuation. Use when the user presents a book from before 1970, asks about old/antique/vintage books, rare books, first editions, signed copies, needs help identifying publisher/edition/printing, wants to research book value, or asks about Library of Congress holdings or public domain status.
+allowed-tools: Read, Grep, Glob, WebFetch, WebSearch
 metadata:
-  version: "1.0"
+  version: "1.1"
+  author: scottybe
+  updated: "2025-12-21"
+  changelog: |
+    v1.1 - Anthropic skills update:
+    - Added allowed-tools (read + web research)
+    - Enhanced triggers: "rare books", "first editions", "signed copies"
+    - Added author and updated fields
 ---
 
 # Book Appraiser: Antiquarian & Vintage Books

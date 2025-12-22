@@ -1,8 +1,16 @@
 ---
 name: contacts-manager
-description: Contact lookup, quick reference, and spam filtering. Use when user asks who a phone number belongs to, needs contact info, wants to lookup or add a contact, identify unknown numbers, or check if a number is spam. Contains detailed profiles with communication style notes for composing personalized replies.
+description: Contact lookup, quick reference, and spam filtering. Use when user asks who a phone number belongs to, needs contact info, wants to lookup or add a contact, identify unknown numbers, check if a number is spam, or asks "who is this" about a caller. Contains detailed profiles with communication style notes for composing personalized replies.
+allowed-tools: Read, Grep, Glob, Bash
 metadata:
-  version: "1.0"
+  version: "1.1"
+  author: scottybe
+  updated: "2025-12-21"
+  changelog: |
+    v1.1 - Anthropic skills update:
+    - Added allowed-tools restriction (read-only)
+    - Enhanced trigger keywords in description
+    - Added author and updated fields
 ---
 
 # Contacts Manager

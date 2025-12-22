@@ -1,8 +1,16 @@
 ---
 name: maker-mark-identifier
-description: Identify maker's marks on pottery, silver, furniture, and jewelry. Use when examining stamps, hallmarks, signatures, or labels to determine manufacturer, origin, and date range. Returns identification only—defers valuation to calling workflow.
+description: Identify maker's marks on pottery, silver, furniture, and jewelry. Use when examining stamps, hallmarks, signatures, labels, or asking "what is this mark" or "who made this" to determine manufacturer, origin, and date range. Returns identification only—defers valuation to calling workflow.
+allowed-tools: Read, Grep, Glob, WebFetch, WebSearch
 metadata:
-  version: "1.0"
+  version: "1.1"
+  author: scottybe
+  updated: "2025-12-21"
+  changelog: |
+    v1.1 - Anthropic skills update:
+    - Added allowed-tools (read + web research)
+    - Enhanced triggers: "what is this mark", "who made this"
+    - Added author and updated fields
 ---
 
 # Maker's Mark Identifier

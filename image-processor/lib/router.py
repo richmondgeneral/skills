@@ -1,7 +1,10 @@
 """Smart model routing logic for unified image processing."""
 from typing import List, Optional, Dict, Any
 
-from .models import BaseModel, TaskConfig, ProcessingResult, TaskType
+try:
+    from .models import BaseModel, TaskConfig, ProcessingResult, TaskType
+except ImportError:
+    from models import BaseModel, TaskConfig, ProcessingResult, TaskType
 
 
 class ModelRouter:
@@ -233,12 +236,20 @@ class ModelRouter:
 
 def create_default_router(prefer_free: bool = True) -> ModelRouter:
     """Create router with all available models."""
-    from .models import (
-        NanaBananaModel,
-        Gemini25FlashModel,
-        RemoveBgModel,
-        GeminiImageModel
-    )
+    try:
+        from .models import (
+            NanaBananaModel,
+            Gemini25FlashModel,
+            RemoveBgModel,
+            GeminiImageModel
+        )
+    except ImportError:
+        from models import (
+            NanaBananaModel,
+            Gemini25FlashModel,
+            RemoveBgModel,
+            GeminiImageModel
+        )
 
     models = [
         NanaBananaModel(),

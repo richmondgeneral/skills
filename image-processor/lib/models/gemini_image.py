@@ -6,7 +6,10 @@ import requests
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from .base import BaseModel, ProcessingResult, TaskConfig, TaskType
+try:
+    from .base import BaseModel, ProcessingResult, TaskConfig, TaskType
+except ImportError:
+    from base import BaseModel, ProcessingResult, TaskConfig, TaskType
 
 
 class GeminiAPIError(Exception):

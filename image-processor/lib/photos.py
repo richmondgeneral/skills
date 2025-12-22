@@ -1,12 +1,14 @@
 """
 Photos.app Library Access
 
-Accesses Photos library database to list images, albums, and retrieve file paths.
-Follows same SQLite pattern as imessage-core for database access.
+Two access methods:
+1. SQLite direct access (requires Full Disk Access for Terminal/Python)
+2. AppleScript via osascript (works with Claude Desktop's FDA)
 
-Requires: Full Disk Access permission in System Settings > Privacy & Security
+The module auto-detects which method works and uses it.
 """
 import sqlite3
+import subprocess
 import os
 import shutil
 from pathlib import Path
@@ -85,9 +87,21 @@ class PhotosLibrary:
     def _connect(self) -> sqlite3.Connection:
         """Create database connection."""
         # Read-only connection to avoid any issues
-        conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
-        conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
+            conn.row_factory = sqlite3.Row
+            return conn
+        except sqlite3.OperationalError as e:
+            if "unable to open database file" in str(e):
+                raise PermissionError(
+                    f"Cannot access Photos database: {self.db_path}\n\n"
+                    f"This requires Full Disk Access permission.\n"
+                    f"Go to: System Settings > Privacy & Security > Full Disk Access\n"
+                    f"And enable access for the application running this script.\n\n"
+                    f"Note: If running from Terminal or an IDE, you need to grant\n"
+                    f"Full Disk Access to that specific application."
+                ) from e
+            raise
 
     def _convert_timestamp(self, core_data_ts: float) -> Optional[datetime]:
         """Convert Core Data timestamp to datetime."""
@@ -527,3 +541,308 @@ class PhotosLibrary:
             }
         finally:
             conn.close()
+
+
+class PhotosLibraryAppleScript:
+    """
+    Access Photos.app via AppleScript/osascript.
+
+    This works with Claude Desktop's Full Disk Access since osascript
+    inherits permissions from the parent app.
+    """
+
+    def __init__(self):
+        """Initialize and verify Photos.app access."""
+        # Quick test that Photos.app is accessible
+        try:
+            result = subprocess.run(
+                ['osascript', '-e', 'tell application "Photos" to count of media items'],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode != 0:
+                raise RuntimeError(f"Cannot access Photos.app: {result.stderr}")
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Photos.app is not responding")
+
+    def _run_applescript(self, script: str) -> str:
+        """Run AppleScript and return output."""
+        result = subprocess.run(
+            ['osascript', '-e', script],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"AppleScript error: {result.stderr}")
+        return result.stdout.strip()
+
+    def get_library_stats(self) -> dict:
+        """Get library statistics."""
+        # Get total count (fast)
+        script1 = 'tell application "Photos" to count of media items'
+        total = int(self._run_applescript(script1))
+
+        # Get album count (fast)
+        script2 = 'tell application "Photos" to count of albums'
+        albums = int(self._run_applescript(script2))
+
+        return {
+            'total_photos': total,
+            'total_videos': 0,  # AppleScript can't easily distinguish
+            'favorites': 0,  # Too slow to count for large libraries
+            'albums': albums,
+            'library_path': PHOTOS_LIBRARY
+        }
+
+    def get_recent_photos(self, limit: int = 10) -> List[PhotoInfo]:
+        """Get most recent photos."""
+        script = f'''
+        tell application "Photos"
+            set recentItems to media items 1 thru {limit}
+            set output to ""
+            repeat with p in recentItems
+                try
+                    set pid to id of p
+                    set pname to filename of p
+                    set pwidth to width of p
+                    set pheight to height of p
+                    set pdate to date of p
+                    set pfav to favorite of p
+                    set output to output & pid & "|" & pname & "|" & pwidth & "|" & pheight & "|" & pdate & "|" & pfav & linefeed
+                end try
+            end repeat
+            return output
+        end tell
+        '''
+        output = self._run_applescript(script)
+        return self._parse_photo_list(output)
+
+    def get_favorites(self, limit: int = 25) -> List[PhotoInfo]:
+        """Get favorited photos."""
+        script = f'''
+        tell application "Photos"
+            set favItems to (media items whose favorite is true)
+            set maxItems to {limit}
+            if (count of favItems) < maxItems then set maxItems to count of favItems
+            set output to ""
+            repeat with i from 1 to maxItems
+                set p to item i of favItems
+                try
+                    set pid to id of p
+                    set pname to filename of p
+                    set pwidth to width of p
+                    set pheight to height of p
+                    set pdate to date of p
+                    set output to output & pid & "|" & pname & "|" & pwidth & "|" & pheight & "|" & pdate & "|true" & linefeed
+                end try
+            end repeat
+            return output
+        end tell
+        '''
+        output = self._run_applescript(script)
+        return self._parse_photo_list(output)
+
+    def list_albums(self, limit: int = 50) -> List[AlbumInfo]:
+        """List available albums."""
+        script = f'''
+        tell application "Photos"
+            set albumList to albums
+            set maxAlbums to {limit}
+            if (count of albumList) < maxAlbums then set maxAlbums to count of albumList
+            set output to ""
+            repeat with i from 1 to maxAlbums
+                set a to item i of albumList
+                set aname to name of a
+                set aid to id of a
+                set acount to count of media items of a
+                set output to output & aid & "|" & aname & "|" & acount & linefeed
+            end repeat
+            return output
+        end tell
+        '''
+        output = self._run_applescript(script)
+        albums = []
+        for line in output.strip().split('\n'):
+            if not line:
+                continue
+            parts = line.split('|')
+            if len(parts) >= 3:
+                albums.append(AlbumInfo(
+                    uuid=parts[0],
+                    title=parts[1],
+                    photo_count=int(parts[2]) if parts[2].isdigit() else 0,
+                    kind=2
+                ))
+        return albums
+
+    def search_by_filename(self, pattern: str, limit: int = 25) -> List[PhotoInfo]:
+        """Search photos by filename pattern."""
+        # Convert SQL LIKE pattern to AppleScript contains
+        search_term = pattern.replace('%', '').replace('*', '')
+        script = f'''
+        tell application "Photos"
+            set matchedItems to (media items whose filename contains "{search_term}")
+            set maxItems to {limit}
+            if (count of matchedItems) < maxItems then set maxItems to count of matchedItems
+            set output to ""
+            repeat with i from 1 to maxItems
+                set p to item i of matchedItems
+                try
+                    set pid to id of p
+                    set pname to filename of p
+                    set pwidth to width of p
+                    set pheight to height of p
+                    set pdate to date of p
+                    set pfav to favorite of p
+                    set output to output & pid & "|" & pname & "|" & pwidth & "|" & pheight & "|" & pdate & "|" & pfav & linefeed
+                end try
+            end repeat
+            return output
+        end tell
+        '''
+        output = self._run_applescript(script)
+        return self._parse_photo_list(output)
+
+    def get_photo_by_uuid(self, uuid: str) -> Optional[PhotoInfo]:
+        """Get single photo by UUID."""
+        script = f'''
+        tell application "Photos"
+            try
+                set p to media item id "{uuid}"
+                set pid to id of p
+                set pname to filename of p
+                set pwidth to width of p
+                set pheight to height of p
+                set pdate to date of p
+                set pfav to favorite of p
+                return pid & "|" & pname & "|" & pwidth & "|" & pheight & "|" & pdate & "|" & pfav
+            on error
+                return ""
+            end try
+        end tell
+        '''
+        output = self._run_applescript(script)
+        if not output:
+            return None
+        photos = self._parse_photo_list(output + '\n')
+        return photos[0] if photos else None
+
+    def export_photo(self, uuid: str, destination: str) -> str:
+        """
+        Export photo to destination using Photos.app.
+
+        Args:
+            uuid: Photo UUID/ID
+            destination: Destination folder path
+
+        Returns:
+            Path to exported file
+        """
+        dest_folder = os.path.dirname(destination)
+        dest_name = os.path.basename(destination)
+
+        # Ensure destination folder exists
+        Path(dest_folder).mkdir(parents=True, exist_ok=True)
+
+        script = f'''
+        tell application "Photos"
+            set p to media item id "{uuid}"
+            set destFolder to POSIX file "{dest_folder}" as alias
+            export {{p}} to destFolder
+        end tell
+        '''
+        self._run_applescript(script)
+
+        # Find the exported file (Photos exports with original filename)
+        photo = self.get_photo_by_uuid(uuid)
+        if photo:
+            exported_path = os.path.join(dest_folder, photo.filename)
+            if os.path.exists(exported_path):
+                # Rename to requested destination name if different
+                if exported_path != destination:
+                    shutil.move(exported_path, destination)
+                    return destination
+                return exported_path
+
+        raise FileNotFoundError(f"Export failed for photo {uuid}")
+
+    # Alias for compatibility
+    def copy_photo(self, uuid: str, destination: str) -> str:
+        """Copy/export photo to destination."""
+        return self.export_photo(uuid, destination)
+
+    def _parse_photo_list(self, output: str) -> List[PhotoInfo]:
+        """Parse AppleScript photo list output."""
+        photos = []
+        for line in output.strip().split('\n'):
+            if not line:
+                continue
+            parts = line.split('|')
+            if len(parts) >= 4:
+                # Parse date if available
+                date_created = None
+                if len(parts) > 4 and parts[4]:
+                    try:
+                        # AppleScript date format varies, try common formats
+                        date_str = parts[4]
+                        for fmt in ['%A, %B %d, %Y at %I:%M:%S %p',
+                                   '%Y-%m-%d %H:%M:%S',
+                                   '%m/%d/%Y %H:%M:%S']:
+                            try:
+                                date_created = datetime.strptime(date_str, fmt)
+                                break
+                            except ValueError:
+                                continue
+                    except Exception:
+                        pass
+
+                # Parse dimensions
+                try:
+                    width = int(parts[2]) if parts[2].isdigit() else 0
+                    height = int(parts[3]) if parts[3].isdigit() else 0
+                except (ValueError, IndexError):
+                    width, height = 0, 0
+
+                # Parse favorite
+                is_favorite = len(parts) > 5 and parts[5].lower() == 'true'
+
+                photos.append(PhotoInfo(
+                    uuid=parts[0],
+                    filename=parts[1],
+                    original_filename=parts[1],
+                    directory='',
+                    file_path='',  # Not available via AppleScript
+                    date_created=date_created,
+                    date_modified=None,
+                    width=width,
+                    height=height,
+                    file_size=0,
+                    kind='image',
+                    is_favorite=is_favorite,
+                    is_hidden=False,
+                    album_names=[]
+                ))
+        return photos
+
+
+def get_photos_library(prefer_applescript: bool = True) -> 'PhotosLibrary | PhotosLibraryAppleScript':
+    """
+    Get the best available Photos library accessor.
+
+    Args:
+        prefer_applescript: If True, try AppleScript first (works with Claude Desktop)
+
+    Returns:
+        PhotosLibrary or PhotosLibraryAppleScript instance
+    """
+    if prefer_applescript:
+        try:
+            return PhotosLibraryAppleScript()
+        except Exception:
+            pass
+
+    try:
+        return PhotosLibrary()
+    except (PermissionError, FileNotFoundError):
+        pass
+
+    # Last resort: try AppleScript
+    return PhotosLibraryAppleScript()

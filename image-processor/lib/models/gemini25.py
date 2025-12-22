@@ -8,7 +8,10 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 from typing import Dict, Any
 
-from .base import BaseModel, ProcessingResult, TaskConfig, TaskType
+try:
+    from .base import BaseModel, ProcessingResult, TaskConfig, TaskType
+except ImportError:
+    from base import BaseModel, ProcessingResult, TaskConfig, TaskType
 
 
 class Gemini25FlashModel(BaseModel):

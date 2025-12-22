@@ -19,7 +19,7 @@ from datetime import datetime
 # Add lib to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 
-from photos import PhotosLibrary, PhotoInfo
+from photos import get_photos_library, PhotoInfo
 
 
 def format_photo(photo: PhotoInfo, verbose: bool = False) -> str:
@@ -70,8 +70,8 @@ def main():
     args = parser.parse_args()
 
     try:
-        library = PhotosLibrary(args.library)
-    except FileNotFoundError as e:
+        library = get_photos_library(prefer_applescript=True)
+    except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 

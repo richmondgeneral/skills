@@ -85,9 +85,21 @@ class PhotosLibrary:
     def _connect(self) -> sqlite3.Connection:
         """Create database connection."""
         # Read-only connection to avoid any issues
-        conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
-        conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
+            conn.row_factory = sqlite3.Row
+            return conn
+        except sqlite3.OperationalError as e:
+            if "unable to open database file" in str(e):
+                raise PermissionError(
+                    f"Cannot access Photos database: {self.db_path}\n\n"
+                    f"This requires Full Disk Access permission.\n"
+                    f"Go to: System Settings > Privacy & Security > Full Disk Access\n"
+                    f"And enable access for the application running this script.\n\n"
+                    f"Note: If running from Terminal or an IDE, you need to grant\n"
+                    f"Full Disk Access to that specific application."
+                ) from e
+            raise
 
     def _convert_timestamp(self, core_data_ts: float) -> Optional[datetime]:
         """Convert Core Data timestamp to datetime."""

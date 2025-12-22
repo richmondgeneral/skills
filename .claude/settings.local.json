@@ -8,7 +8,11 @@
       "Bash(git merge:*)",
       "Bash(git push:*)",
       "Bash(git stash:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(done)",
+      "Bash(find:*)",
+      "Bash(xargs:*)",
+      "Bash(tree:*)"
     ]
   }
 }

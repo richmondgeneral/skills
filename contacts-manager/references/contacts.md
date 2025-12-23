@@ -106,7 +106,7 @@
 - **Service**: iMessage
 - **Relationship**: 20+ year friendship, like a brother
 - **Location**: Tennessee (moved from Chicago area)
-- **Current situation**: Going through hard times, doing DoorDash, uses casino free play
+- **Current situation**: Going through hard times, doing DoorDash, uses casino free play. Johnny (youngest son) living with him since Aug 2025 — not working out, Gary regrets it, hoping Johnny gets his act together.
 - **Style**: Casual, emotional, gets in his head when isolated. Sensitive about being ghosted.
 - **Call him**: "Brother"
 - **Shared interests**: Stocks/options, AI tools, real estate, casinos/gambling, collectibles (VHS, cards)

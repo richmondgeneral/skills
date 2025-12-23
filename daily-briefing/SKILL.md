@@ -1,13 +1,6 @@
 ---
 name: daily-briefing
 description: Generate morning briefing with CRM status, promises, and action items. Use when user asks for daily briefing, morning briefing, CRM status, what they owe people, or who they're waiting on. Outputs to Apple Notes with rich formatting. Reads contacts-manager for promise/waiting fields.
-metadata:
-  version: "1.1"
-  author: scottybe
-  updated: "2025-12-21"
-  changelog: |
-    v1.1 - Anthropic skills update:
-    - Added author and updated fields
 ---
 
 # Daily Briefing

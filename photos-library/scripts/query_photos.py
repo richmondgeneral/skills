@@ -82,7 +82,7 @@ def query_photos(db_path, days=7, min_width=0, favorites_only=False, limit=20, o
 
 def main():
     parser = argparse.ArgumentParser(description='Query macOS Photos Library')
-    parser.add_argument('--days', type=int, default=7, help='Photos from last N days')
+    parser.add_argument('--days', type=int, default=7, help='Photos from last N days (ignored if --favorites without --days)')
     parser.add_argument('--min-width', type=int, default=0, help='Minimum width in pixels')
     parser.add_argument('--favorites', action='store_true', help='Only favorited photos')
     parser.add_argument('--limit', type=int, default=20, help='Max results')
@@ -102,6 +102,12 @@ def main():
         print("Error: --days cannot be negative")
         return 1
 
+    # If --favorites is used without explicit --days, remove the day filter
+    # (check if --days was explicitly passed vs using default)
+    days_filter = args.days
+    if args.favorites and '--days' not in ' '.join(os.sys.argv):
+        days_filter = None  # No day restriction for favorites
+
     db_path = args.db or find_photos_db()
     if not db_path:
         print("Error: Could not find Photos Library database")
@@ -109,7 +115,7 @@ def main():
 
     photos = query_photos(
         db_path,
-        days=args.days,
+        days=days_filter,
         min_width=args.min_width,
         favorites_only=args.favorites,
         limit=args.limit
@@ -118,7 +124,9 @@ def main():
     if args.json:
         print(json.dumps(photos, indent=2))
     else:
-        print(f"Found {len(photos)} photos (last {args.days} days, min_width={args.min_width})\n")
+        days_str = f"last {days_filter} days" if days_filter else "all time"
+        fav_str = ", favorites only" if args.favorites else ""
+        print(f"Found {len(photos)} photos ({days_str}, min_width={args.min_width}{fav_str})\n")
         print(f"{'Filename':<35} {'Created':<20} {'Size':<12} {'Type'}")
         print("-" * 80)
         for p in photos:

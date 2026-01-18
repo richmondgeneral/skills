@@ -120,7 +120,7 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
 
 def main():
     parser = argparse.ArgumentParser(description='Extract photos from macOS Photos Library')
-    parser.add_argument('--days', type=int, default=7, help='Photos from last N days')
+    parser.add_argument('--days', type=int, default=7, help='Photos from last N days (ignored if --favorites without --days)')
     parser.add_argument('--min-width', type=int, default=0, help='Minimum width in pixels')
     parser.add_argument('--favorites', action='store_true', help='Only favorited photos')
     parser.add_argument('--limit', type=int, default=20, help='Max photos to extract')
@@ -151,6 +151,11 @@ def main():
             print("Error: --resize must be in format WxH (e.g., 800x800)")
             return 1
 
+    # If --favorites is used without explicit --days, remove the day filter
+    days_filter = args.days
+    if args.favorites and '--days' not in ' '.join(os.sys.argv):
+        days_filter = None  # No day restriction for favorites
+
     library_path = args.library or find_photos_library()
     if not library_path:
         print("Error: Could not find Photos Library")
@@ -162,7 +167,7 @@ def main():
     extracted = extract_photos(
         library_path,
         args.output,
-        days=args.days,
+        days=days_filter,
         min_width=args.min_width,
         favorites_only=args.favorites,
         limit=args.limit,

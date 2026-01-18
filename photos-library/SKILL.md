@@ -2,17 +2,22 @@
 name: photos-library
 description: Query and extract photos from macOS Photos Library. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, or pull images from Photos app for processing. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll".
 metadata:
-  version: "1.1"
+  version: "1.2"
   author: scottybe
   updated: "2026-01-18"
   changelog: |
+    v1.2 - Product photo clustering:
+    - Added find_product_clusters.py for auto-grouping photos by shoot
+    - Classifies clusters as: product, real_estate, screenshot, single, mixed
+    - Fixed --favorites ignoring day filter when used alone
+
     v1.1 - Security and robustness fixes:
     - Fixed SQL injection vulnerability (parameterized queries)
     - Added database connection context managers (prevents leaks)
     - Added input validation for all CLI parameters
     - Improved error handling (OSError, PermissionError)
     - Extracted magic numbers to named constants
-    
+
     v1.0 - Initial release: SQLite access to Photos.app library
 ---
 
@@ -65,6 +70,21 @@ Extract and convert photos. Options:
 - `--format jpeg|png` - Output format (default: jpeg)
 - `--quality N` - JPEG quality 1-100 (default: 90)
 - `--resize WxH` - Resize to max dimensions
+
+### `scripts/find_product_clusters.py`
+
+Auto-group photos by shooting session and classify them:
+- `--days N` - Search last N days (default: 14)
+- `--type TYPE` - Filter: all, product, real_estate, screenshot, single, mixed
+- `--gap N` - Max seconds between photos in cluster (default: 300)
+- `--json` - Output as JSON
+
+Classification heuristics:
+- **product**: Portrait orientation, 4:3 ratio, multiple shots in cluster
+- **real_estate**: Landscape, 5+ photos in cluster
+- **screenshot**: Wide aspect ratio (2.16+ = phone screenshots)
+- **single**: Isolated photo, not part of cluster
+- **mixed**: Unclear classification
 
 ## Database Schema
 
@@ -142,6 +162,7 @@ WHERE ZDATECREATED > (strftime('%s', 'now') - 978307200 - 7*24*60*60)
 
 ## Product Photo Workflow
 
+### Option A: Manual filtering
 1. Query recent photos with minimum resolution:
    ```bash
    python3 scripts/query_photos.py --days 3 --min-width 1000
@@ -154,8 +175,21 @@ WHERE ZDATECREATED > (strftime('%s', 'now') - 978307200 - 7*24*60*60)
 
 3. Review extracted JPEGs and identify product shots
 
-4. Create size variants using ImageMagick:
+### Option B: Auto-clustering (recommended)
+1. Find product photo clusters:
    ```bash
-   convert photo.jpeg -resize 800x800 photo_medium.jpeg
-   convert photo.jpeg -resize 400x400 photo_small.jpeg
+   python3 scripts/find_product_clusters.py --days 7 --type product
    ```
+
+2. Extract only the product clusters you need based on date/time
+
+3. The clustering algorithm identifies:
+   - Portrait-oriented photos (typical product shots)
+   - Grouped by shooting session (within 5 minutes)
+   - Filters out screenshots and real estate photos
+
+### Creating size variants
+```bash
+convert photo.jpeg -resize 800x800 photo_medium.jpeg
+convert photo.jpeg -resize 400x400 photo_small.jpeg
+```

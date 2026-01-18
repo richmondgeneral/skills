@@ -16,8 +16,8 @@ uv run --project ~/.claude/skills python ~/.claude/skills/square-image-upload/sc
   --image ~/path/to/image.jpg --item-id ITEM_ID --primary
 
 # Remove background
-uv run --project ~/.claude/skills python ~/.claude/skills/rg-new-item/scripts/remove_background.py \
-  input.jpg output.png
+uv run --project ~/.claude/skills python ~/.claude/skills/image-processor/scripts/process.py \
+  input.jpg --output output.png
 
 # Cache operations
 uv run --project ~/.claude/skills python ~/.claude/skills/square-cache/scripts/cache_wrapper.py
@@ -52,4 +52,4 @@ uv was installed to `~/.local/bin/`. The PATH is configured in `~/.zshrc`:
 source $HOME/.local/bin/env
 ```
 
-Python version: 3.13+ (managed by uv, not pyenv)
+Python version: 3.11+ (managed by uv, not pyenv)

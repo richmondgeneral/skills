@@ -142,7 +142,7 @@ Then use `hero_temp.png` as input for background removal.
 ### Step 0.6: Remove background
 
 ```applescript
-do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/rg-new-item/scripts/remove_background.py '/Users/scottybe/workspace/square/items/RG-XXXX/hero_temp.png' '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' 2>&1"
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/image-processor/scripts/process.py '/Users/scottybe/workspace/square/items/RG-XXXX/hero_temp.png' --output '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' 2>&1"
 ```
 
 **Prerequisites:** `~/.env` must have `REMOVEBG_API_KEY`. Note: Must `source ~/.env` to load API key.

@@ -19,40 +19,47 @@ def find_photos_db():
 
 def query_photos(db_path, days=7, min_width=0, favorites_only=False, limit=20, output_format='table'):
     """Query photos from the database."""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+    # Constants
+    COCOA_EPOCH_OFFSET = 978307200  # Seconds between Unix epoch (1970) and Cocoa epoch (2001)
+    SECONDS_PER_DAY = 86400
+    
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
 
-    conditions = ["a.ZTRASHEDSTATE = 0", "a.ZHIDDEN = 0", "a.ZKIND = 0"]
+        conditions = ["a.ZTRASHEDSTATE = 0", "a.ZHIDDEN = 0", "a.ZKIND = 0"]
+        params = []
 
-    if days:
-        conditions.append(f"a.ZDATECREATED > (strftime('%s', 'now') - 978307200 - {days}*24*60*60)")
-    if min_width:
-        conditions.append(f"a.ZWIDTH >= {min_width}")
-    if favorites_only:
-        conditions.append("a.ZFAVORITE = 1")
+        if days:
+            conditions.append(f"a.ZDATECREATED > (strftime('%s', 'now') - {COCOA_EPOCH_OFFSET} - ? * {SECONDS_PER_DAY})")
+            params.append(days)
+        if min_width:
+            conditions.append("a.ZWIDTH >= ?")
+            params.append(min_width)
+        if favorites_only:
+            conditions.append("a.ZFAVORITE = 1")
 
-    where_clause = " AND ".join(conditions)
+        where_clause = " AND ".join(conditions)
 
-    query = f"""
-    SELECT
-        a.ZUUID,
-        a.ZFILENAME,
-        datetime(a.ZDATECREATED + 978307200, 'unixepoch', 'localtime') as created,
-        a.ZWIDTH,
-        a.ZHEIGHT,
-        a.ZUNIFORMTYPEIDENTIFIER as file_type,
-        a.ZFAVORITE,
-        aa.ZORIGINALFILENAME
-    FROM ZASSET a
-    LEFT JOIN ZADDITIONALASSETATTRIBUTES aa ON a.ZADDITIONALATTRIBUTES = aa.Z_PK
-    WHERE {where_clause}
-    ORDER BY a.ZDATECREATED DESC
-    LIMIT {limit}
-    """
+        query = f"""
+        SELECT
+            a.ZUUID,
+            a.ZFILENAME,
+            datetime(a.ZDATECREATED + {COCOA_EPOCH_OFFSET}, 'unixepoch', 'localtime') as created,
+            a.ZWIDTH,
+            a.ZHEIGHT,
+            a.ZUNIFORMTYPEIDENTIFIER as file_type,
+            a.ZFAVORITE,
+            aa.ZORIGINALFILENAME
+        FROM ZASSET a
+        LEFT JOIN ZADDITIONALASSETATTRIBUTES aa ON a.ZADDITIONALATTRIBUTES = aa.Z_PK
+        WHERE {where_clause}
+        ORDER BY a.ZDATECREATED DESC
+        LIMIT ?
+        """
 
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    conn.close()
+        params.append(limit)
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
 
     photos = []
     for row in rows:
@@ -83,6 +90,17 @@ def main():
     parser.add_argument('--db', type=str, help='Path to Photos.sqlite (auto-detected if not specified)')
 
     args = parser.parse_args()
+
+    # Input validation
+    if args.limit < 1:
+        print("Error: --limit must be at least 1")
+        return 1
+    if args.min_width < 0:
+        print("Error: --min-width cannot be negative")
+        return 1
+    if args.days and args.days < 0:
+        print("Error: --days cannot be negative")
+        return 1
 
     db_path = args.db or find_photos_db()
     if not db_path:

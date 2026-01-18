@@ -20,6 +20,9 @@ def find_photos_library():
 def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only=False,
                    limit=20, output_format='jpeg', quality=90, resize=None):
     """Extract photos from library to output directory."""
+    # Constants
+    COCOA_EPOCH_OFFSET = 978307200  # Seconds between Unix epoch (1970) and Cocoa epoch (2001)
+    SECONDS_PER_DAY = 86400
 
     db_path = os.path.join(library_path, "database/Photos.sqlite")
     if not os.path.exists(db_path):
@@ -28,37 +31,41 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
 
     os.makedirs(output_dir, exist_ok=True)
 
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
 
-    conditions = ["a.ZTRASHEDSTATE = 0", "a.ZHIDDEN = 0", "a.ZKIND = 0"]
-    if days:
-        conditions.append(f"a.ZDATECREATED > (strftime('%s', 'now') - 978307200 - {days}*24*60*60)")
-    if min_width:
-        conditions.append(f"a.ZWIDTH >= {min_width}")
-    if favorites_only:
-        conditions.append("a.ZFAVORITE = 1")
+        conditions = ["a.ZTRASHEDSTATE = 0", "a.ZHIDDEN = 0", "a.ZKIND = 0"]
+        params = []
+        
+        if days:
+            conditions.append(f"a.ZDATECREATED > (strftime('%s', 'now') - {COCOA_EPOCH_OFFSET} - ? * {SECONDS_PER_DAY})")
+            params.append(days)
+        if min_width:
+            conditions.append("a.ZWIDTH >= ?")
+            params.append(min_width)
+        if favorites_only:
+            conditions.append("a.ZFAVORITE = 1")
 
-    where_clause = " AND ".join(conditions)
+        where_clause = " AND ".join(conditions)
 
-    query = f"""
-    SELECT
-        a.ZUUID,
-        a.ZUNIFORMTYPEIDENTIFIER as file_type,
-        aa.ZORIGINALFILENAME,
-        a.ZWIDTH,
-        a.ZHEIGHT,
-        datetime(a.ZDATECREATED + 978307200, 'unixepoch', 'localtime') as created
-    FROM ZASSET a
-    LEFT JOIN ZADDITIONALASSETATTRIBUTES aa ON a.ZADDITIONALATTRIBUTES = aa.Z_PK
-    WHERE {where_clause}
-    ORDER BY a.ZDATECREATED DESC
-    LIMIT {limit}
-    """
+        query = f"""
+        SELECT
+            a.ZUUID,
+            a.ZUNIFORMTYPEIDENTIFIER as file_type,
+            aa.ZORIGINALFILENAME,
+            a.ZWIDTH,
+            a.ZHEIGHT,
+            datetime(a.ZDATECREATED + {COCOA_EPOCH_OFFSET}, 'unixepoch', 'localtime') as created
+        FROM ZASSET a
+        LEFT JOIN ZADDITIONALASSETATTRIBUTES aa ON a.ZADDITIONALATTRIBUTES = aa.Z_PK
+        WHERE {where_clause}
+        ORDER BY a.ZDATECREATED DESC
+        LIMIT ?
+        """
 
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    conn.close()
+        params.append(limit)
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
 
     extracted = []
     for row in rows:
@@ -104,7 +111,10 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
             print(f"✗ Failed: {orig_name or uuid[:8]} - {e.stderr.decode()[:50] if e.stderr else 'unknown error'}")
         except FileNotFoundError:
             print("✗ ImageMagick 'convert' not found. Install with: brew install imagemagick")
-            break
+            return extracted  # Exit early, don't process remaining photos
+        except (OSError, PermissionError) as e:
+            print(f"✗ {orig_name or uuid[:8]}: {e}")
+            continue  # Skip this photo, try next
 
     return extracted
 
@@ -117,10 +127,30 @@ def main():
     parser.add_argument('--output', '-o', type=str, required=True, help='Output directory')
     parser.add_argument('--format', type=str, default='jpeg', choices=['jpeg', 'png'], help='Output format')
     parser.add_argument('--quality', type=int, default=90, help='JPEG quality (1-100)')
+    parser.add_argument('--min-width', type=int, default=0, help='Minimum width in pixels')
     parser.add_argument('--resize', type=str, help='Resize to max dimensions (e.g., 800x800)')
     parser.add_argument('--library', type=str, help='Path to Photos Library (auto-detected if not specified)')
 
     args = parser.parse_args()
+
+    # Input validation
+    if args.limit < 1:
+        print("Error: --limit must be at least 1")
+        return 1
+    if args.min_width < 0:
+        print("Error: --min-width cannot be negative")
+        return 1
+    if args.days and args.days < 0:
+        print("Error: --days cannot be negative")
+        return 1
+    if not 1 <= args.quality <= 100:
+        print("Error: --quality must be between 1 and 100")
+        return 1
+    if args.resize:
+        import re
+        if not re.match(r'^\d+x\d+$', args.resize):
+            print("Error: --resize must be in format WxH (e.g., 800x800)")
+            return 1
 
     library_path = args.library or find_photos_library()
     if not library_path:

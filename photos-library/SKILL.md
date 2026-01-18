@@ -2,10 +2,17 @@
 name: photos-library
 description: Query and extract photos from macOS Photos Library. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, or pull images from Photos app for processing. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll".
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: scottybe
-  updated: "2026-01-17"
+  updated: "2026-01-18"
   changelog: |
+    v1.1 - Security and robustness fixes:
+    - Fixed SQL injection vulnerability (parameterized queries)
+    - Added database connection context managers (prevents leaks)
+    - Added input validation for all CLI parameters
+    - Improved error handling (OSError, PermissionError)
+    - Extracted magic numbers to named constants
+    
     v1.0 - Initial release: SQLite access to Photos.app library
 ---
 

@@ -127,7 +127,6 @@ def main():
     parser.add_argument('--output', '-o', type=str, required=True, help='Output directory')
     parser.add_argument('--format', type=str, default='jpeg', choices=['jpeg', 'png'], help='Output format')
     parser.add_argument('--quality', type=int, default=90, help='JPEG quality (1-100)')
-    parser.add_argument('--min-width', type=int, default=0, help='Minimum width in pixels')
     parser.add_argument('--resize', type=str, help='Resize to max dimensions (e.g., 800x800)')
     parser.add_argument('--library', type=str, help='Path to Photos Library (auto-detected if not specified)')
 

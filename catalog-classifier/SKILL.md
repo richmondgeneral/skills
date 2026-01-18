@@ -3,6 +3,8 @@ name: catalog-classifier
 description: Determines Square category assignment based on item attributes. Use when onboarding items, bulk categorization, or when unsure which category an item belongs to. Routes items to correct brand (TVM/RG/TBDL/Snacks), premium tier (Real Rarities vs New Finds), and product type categories. Triggers on "what category", "classify", "which category", "categorize item".
 metadata:
   version: "1.0"
+  author: scottybe
+  updated: "2025-12-20"
 ---
 
 # Catalog Classifier

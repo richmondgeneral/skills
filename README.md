@@ -1,6 +1,6 @@
 # Richmond General Skills
 
-AI assistant skills for managing Richmond General's vintage and antique inventory system.
+A collection of 17 AI assistant skills for managing Richmond General's vintage and antique inventory system.
 
 ## Skills
 
@@ -59,10 +59,18 @@ skills/
 │   ├── SKILL.md
 │   ├── assets/
 │   └── references/
-├── imessage-assistant/     # iMessage integration
+├── imessage-core/          # iMessage read/send core
 │   ├── SKILL.md
-│   ├── scripts/
+│   └── scripts/
+├── imessage-archiver/     # Archive conversations to Notes
+│   ├── SKILL.md
+│   └── scripts/
+├── contacts-manager/      # Contact lookup & profiles
+│   ├── SKILL.md
 │   └── references/
+├── daily-briefing/        # Morning CRM briefing
+│   ├── SKILL.md
+│   └── scripts/
 ├── square-crm/             # Square customer management
 │   ├── SKILL.md
 │   ├── scripts/
@@ -76,8 +84,16 @@ skills/
 │   ├── SKILL.md
 │   ├── scripts/
 │   └── references/
-├── build-skill.sh          # Build script for generating ZIP archives
-└── archive/                # Generated ZIP files (not in git)
+├── image-processor/        # Unified image processing
+│   ├── SKILL.md
+│   ├── scripts/
+│   └── lib/
+├── photos-library/        # Photos.app SQLite access
+│   ├── SKILL.md
+│   └── scripts/
+├── docs/
+│   └── build-skill.sh     # Build script for generating ZIP archives
+└── archive/               # Superseded skills (not in git)
 ```
 
 ## Usage
@@ -90,13 +106,13 @@ Skills are packaged as ZIP files for distribution. Use the build script to gener
 
 ```bash
 # Build a single skill
-./build-skill.sh imessage-assistant
+./docs/build-skill.sh imessage-core
 
 # Build all skills
-./build-skill.sh --all
+./docs/build-skill.sh --all
 
 # List available skills
-./build-skill.sh
+./docs/build-skill.sh
 ```
 
 Generated ZIP files are placed in `archive/` and are excluded from version control.

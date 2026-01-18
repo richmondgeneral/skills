@@ -86,27 +86,31 @@ Meta-skill for collaboratively developing and maintaining Claude skills with Sco
 
 ### Messaging & CRM
 
-| Skill | Version | Purpose | Last Updated |
-|-------|---------|---------|--------------|
-| **imessage-core** | v1.1 | Read/send iMessage, RCS, SMS | 2025-12-21 |
-| **contacts-manager** | v1.1 | Contact lookup, spam filtering, profiles | 2025-12-21 |
-| **daily-briefing** | v1.1 | Morning CRM briefing to Apple Notes | 2025-12-21 |
-| **imessage-archiver** | v1.1 | Archive conversations to Apple Notes | 2025-12-21 |
+|| Skill | Version | Purpose | Last Updated |
+||-------|---------|---------|--------------|
+|| **imessage-core** | v1.1 | Read/send iMessage, RCS, SMS | 2025-12-21 |
+|| **contacts-manager** | v1.1 | Contact lookup, spam filtering, profiles | 2025-12-21 |
+|| **daily-briefing** | v2.0 | Morning CRM briefing to Apple Notes | 2025-12-22 |
+|| **imessage-archiver** | v1.1 | Archive conversations to Apple Notes | 2025-12-21 |
+
+### Image Processing
+
+|| Skill | Version | Purpose | Last Updated |
+||-------|---------|---------|--------------|
+|| **image-processor** | v1.0 | Unified image processing (bg removal, generation, editing, Photos.app) | 2025-12-21 |
+|| **photos-library** | v1.0 | Query Photos.app SQLite library | 2026-01-17 |
 
 ### Meta / Utility
 
-| Skill | Version | Purpose | Last Updated |
-|-------|---------|---------|--------------|
-| **skill-manager** | v1.2 | This skill - registry & management | 2025-12-21 |
+|| Skill | Version | Purpose | Last Updated |
+||-------|---------|---------|--------------|
+|| **skill-manager** | v1.4 | This skill - registry & management | 2026-01-18 |
 
-### Experimental / Inactive
+### Experimental
 
-| Skill | Status | Notes |
-|-------|--------|-------|
-| **catalog-classifier** | Experimental | Auto-categorization |
-| **gemini-chat** | Experimental | Gemini API integration |
-| **image-editing-skill** | Inactive | Image manipulation |
-| **image-generation-skill** | Inactive | AI image generation |
+|| Skill | Status | Notes |
+||-------|--------|-------|
+|| **catalog-classifier** | Experimental | Auto-categorization |
 
 ### Archived (`archive/` folder)
 

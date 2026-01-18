@@ -563,7 +563,7 @@ conflicts_resolved: 1
 ### Scheduled Sync (Phase 5)
 ```bash
 # Add to launchd (runs daily at 6 AM)
-/usr/local/bin/python3 /Users/scottybe/skills/square-crm/scripts/sync_bidirectional.py
+/usr/local/bin/python3 /Users/scottybe/.claude/skills/square-crm/scripts/sync_bidirectional.py
 ```
 
 ### Smart Conflict Resolution (Phase 3b+)

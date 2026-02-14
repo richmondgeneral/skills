@@ -2,16 +2,10 @@
 name: rg-full-auto
 description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "2.4"
+  version: "2.3"
   author: scottybe
-  updated: "2026-02-14"
+  updated: "2025-12-21"
   changelog: |
-    v2.4 - Review & consistency fixes:
-    - Fixed SKU verification: replaced broken searchItems text_filter with cache-based exact match
-    - Updated occurred_at guidance to use dynamic ISO timestamp (not hardcoded)
-    - Fixed phase count references (8-phase, not 7)
-    - Cross-file path consistency fixes
-
     v2.3 - Anthropic skills update:
     - Enhanced triggers: "list item", "sell this"
     - Aligned with Anthropic Agent Skills best practices
@@ -95,21 +89,20 @@ square-cache:square_cache_search with sku_pattern: "RG-"
 ```
 Find highest RG-XXXX and increment to get candidate SKU.
 
-### Step 0.2: Verify SKU not taken
+### Step 0.2: Verify SKU not taken (live API check)
 
-**Cache may be stale.** Before committing to the SKU, verify via cache with exact match:
+**Cache may be stale.** Before committing to the SKU, verify it doesn't exist:
 
 ```
-square-cache:square_cache_search with sku_pattern: "RG-XXXX"
+Square:make_api_request
+  service: catalog
+  method: searchItems
+  request: {"text_filter": "RG-XXXX"}
 ```
 
-Check the results for an **exact SKU match** (not substring). The cache search returns partial matches, so verify the specific SKU string appears in results.
-
-- If no exact match → SKU is safe, proceed
-- If exact match found → increment and check again
+- If results empty (just `{"cursor":""}`) → SKU is safe, proceed
+- If results contain this SKU → increment and check again
 - Repeat until finding an unused SKU
-
-**⚠️ Do NOT use `searchItems` with `text_filter`** — it does broad text matching across all fields and returns the entire catalog instead of filtering by exact SKU.
 
 ### Step 0.3: Create item folder
 
@@ -364,13 +357,13 @@ Square:make_api_request
       "location_id": "B87BAEZ0NWV34",
       "quantity": "1",
       "state": "IN_STOCK",
-      "occurred_at": "CURRENT_ISO_TIMESTAMP"
+      "occurred_at": "2025-12-21T19:32:00Z"
     }
   }]
 }
 ```
 
-**Note:** `quantity` is a STRING, not integer. `occurred_at` must be a **current** ISO 8601 timestamp (within 24 hours). Generate dynamically — do NOT hardcode a date.
+**Note:** `quantity` is a STRING, not integer. `occurred_at` must be ISO 8601 format.
 
 ---
 

@@ -1,7 +1,7 @@
 # rg-full-auto Architecture Audit
 ## Comparison Against Claude Agent Skills Official Docs
 
-**Date:** 2025-12-21 (updated 2026-02-14)
+**Date:** 2025-12-21  
 **Reference:** https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview
 
 ---
@@ -15,9 +15,9 @@
 ```yaml
 ---
 name: rg-full-auto
-description: End-to-end 8-phase workflow...
+description: End-to-end 7-phase workflow...
 metadata:
-  version: "2.4"
+  version: "1.1"
   author: scottybe
 ---
 ```
@@ -95,8 +95,7 @@ rg-full-auto/
     ├── lot-tracking.md (reference material)
     ├── pricing-guidelines.md (reference material)
     ├── label-format.md (reference material)
-    ├── square-catalog.md (reference material)
-    └── info-card-template.html (HTML template)
+    └── square-catalog.md (reference material)
 ```
 
 **Status:** ✅ COMPLIANT
@@ -160,7 +159,7 @@ python3 ~/.claude/skills/rg-full-auto/scripts/place_files.py \
 **Recommendation:** Add explicit triggers section to YAML:
 ```yaml
 metadata:
-  version: "2.4"
+  version: "1.1"
   author: scottybe
   triggers:
     - "new item"
@@ -304,7 +303,7 @@ This skill composes with:
    - MCP integration seamless (square-cache, square-image-upload)
    - Fallback mechanisms (local SKU scan if cache unavailable)
 
-3. **Workflow Structure:** 8-phase approach maps well to Agent Skills architecture
+3. **Workflow Structure:** 7-phase approach maps well to Agent Skills architecture
    - Each phase is a distinct context load
    - Instructions reference specific resources
    - Scripts execute deterministically

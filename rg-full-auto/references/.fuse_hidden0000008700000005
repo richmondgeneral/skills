@@ -56,8 +56,6 @@ Query all categories with: `catalog.searchObjects` with `object_types: ["CATEGOR
         "variations": [{
           "type": "ITEM_VARIATION",
           "id": "#temp-var-id",
-          "present_at_all_locations": false,
-          "present_at_location_ids": ["B87BAEZ0NWV34"],
           "item_variation_data": {
             "item_id": "#temp-id",
             "name": "Regular",
@@ -92,7 +90,7 @@ Query all categories with: `catalog.searchObjects` with `object_types: ["CATEGOR
       "state": "IN_STOCK",
       "location_id": "B87BAEZ0NWV34",
       "quantity": "1",
-      "occurred_at": "CURRENT_ISO_TIMESTAMP"
+      "occurred_at": "2025-01-01T12:00:00Z"
     }
   }]
 }

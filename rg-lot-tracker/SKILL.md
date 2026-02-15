@@ -137,7 +137,7 @@ User specifies exact cost. Use for direct purchases or standout pieces.
 Add a row to the Items table:
 
 ```
-| RG-0015 | Vintage milk glass vase | $8.20 | $24.99 | — | Listed |
+| RG-0015 | Vintage milk glass vase | $8.20 | $25.00 | — | Listed |
 ```
 
 Fields: SKU | Description | Allocated Cost | List Price | Sale Price | Status
@@ -167,27 +167,28 @@ Always show the math — the owner wants to see the numbers:
 
 ```
 Allocated cost:     $8.20
-Proposed price:     $34.99
-Gross margin:       $26.79 (326%)
+Proposed price:     $35.00
+Gross margin:       $26.80 (327%)
 Multiplier:         4.3×
-Square fees (est):  $1.31  (2.9% + $0.30)
+Square fees (est):  $1.32  (2.9% + $0.30)
 Net after fees:     $25.48
-Net margin:         310%
+Net margin:         311%
 
 ✅ GOOD — exceeds 3–4× target for mid-range vintage
 ```
 
 ### Price formatting rules
 
-- Under $20 → $X.99 endings
-- $20+ → $X.95 or round numbers
-- Never $X.00
+- Under $20 → price in `.50` increments (e.g., `$8.50`, `$13.50`, `$19.50`)
+- $20+ → whole-dollar prices (`$35.00`, `$85.00`, `$125.00`)
+- Do not use `.99` endings
+- Keep stored values numeric with two decimals for platform compatibility
 
 ### Below-target warnings
 
 If margin is below target, flag it clearly but don't block:
 ```
-⚠️ $12.99 on $8.20 cost = 1.6× (target: 3–4×). Suggest $24.99+.
+⚠️ $13.50 on $8.20 cost = 1.6× (target: 3–4×). Suggest $25.00+.
 ```
 
 The owner might have reasons (quick flip, shelf space, bundling) — just make
@@ -212,14 +213,14 @@ See `references/roi-formulas.md` for the complete fee schedule and formulas.
 
 Change the item's row:
 ```
-| RG-0015 | Vintage milk glass vase | $8.20 | $24.99 | $24.99 | Sold 2026-02-14 |
+| RG-0015 | Vintage milk glass vase | $8.20 | $25.00 | $25.00 | Sold 2026-02-14 |
 ```
 
 Recalculate the Running Totals section:
 ```
 ## Running Totals
-- **Total Listed Value:** $104.98
-- **Total Sold:** $24.99
+- **Total Listed Value:** $105.00
+- **Total Sold:** $25.00
 - **Total Fees:** $1.02
 - **Net P/L:** -$176.03
 - **ROI:** -88%
@@ -241,14 +242,14 @@ Read the lot file, present:
 Acquired: Nov 19, 2025 | Source: Peter's estate, visit 2 | Cost: $200.00
 
 Items:  4 identified, 2 listed, 0 sold
-List Value: $69.98 | Revenue: $0.00 | Fees: $0.00
+List Value: $70.00 | Revenue: $0.00 | Fees: $0.00
 Net P/L: -$200.00 | ROI: -100%
 Break-even: Need $200.00 in net sales
 
 | SKU | Item | Cost | Price | Status |
 |-----|------|------|-------|--------|
-| RG-0001 | Little Orphan Annie Comic | $5.00 | $19.99 | Listed |
-| RG-0006 | Walt Disney Comics Cover | $5.00 | $49.99 | Listed |
+| RG-0001 | Little Orphan Annie Comic | $5.00 | $19.50 | Listed |
+| RG-0006 | Walt Disney Comics Cover | $5.00 | $50.00 | Listed |
 | — | 2 items unprocessed | — | — | Pending |
 ```
 
@@ -261,12 +262,12 @@ Read all files in `{ops_root}/lot-tracking/`, aggregate:
 
 | Lot | Cost | Listed | Sold | Net P/L | ROI |
 |-----|------|--------|------|---------|-----|
-| PETER-002 | $200 | $69.98 | $0 | -$200 | -100% |
-| IOWA-0925 | $771 | $104.98 | $0 | -$771 | -100% |
+| PETER-002 | $200 | $70.00 | $0 | -$200 | -100% |
+| IOWA-0925 | $771 | $105.00 | $0 | -$771 | -100% |
 | FREE-JERRY | $0 | $55.00 | $0 | $0 | — |
-| **Total** | **$971** | **$229.96** | **$0** | **-$971** | **-100%** |
+| **Total** | **$971** | **$230.00** | **$0** | **-$971** | **-100%** |
 
-Pipeline: $229.96 in listed inventory across 4 items
+Pipeline: $230.00 in listed inventory across 4 items
 Unprocessed: ~96 items across active lots
 Break-even: Need $971 in net sales
 ```
@@ -282,13 +283,13 @@ rg-full-auto calls this skill at two points:
 **Phase 1 (Appraisal):** "Assign this item to a lot and give me the allocated cost."
 → Run Phase 0 (if new lot) + Phase 1. Return lot_id and allocated_cost.
 
-**Phase 3 (Pricing):** "Validate $34.99 against $8.20 cost for mid-range vintage."
+**Phase 3 (Pricing):** "Validate $35.00 against $8.20 cost for mid-range vintage."
 → Run Phase 2. Return margin analysis and recommendation.
 
 ### Square
 
 This skill doesn't touch Square directly. Prices go into Square via rg-full-auto
-or rg-item-update. Sale data comes from user input ("RG-0015 sold for $24.99").
+or rg-item-update. Sale data comes from user input ("RG-0015 sold for $25.00").
 
 ### What this skill does NOT do
 

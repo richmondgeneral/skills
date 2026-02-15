@@ -14,10 +14,11 @@
 ## Pricing Psychology
 
 ### Price Point Formatting
-- Under $20: use $X.99 (e.g., $14.99, $19.99)
-- $20–99: use $X.95 or round to nearest $5 (e.g., $24.95, $35.00)
-- $100+: round numbers OK (e.g., $125, $150)
-- Never use $X.00 for items under $100 — it looks lazy
+- Under $20: use `.50` increments (e.g., $8.50, $13.50, $19.50)
+- $20–99: use whole-dollar pricing (e.g., $25.00, $35.00, $85.00)
+- $100+: whole-dollar pricing only (e.g., $125.00, $150.00)
+- Avoid `.99` and `.95` endings; use clean, intentional price points
+- Keep two-decimal numeric values in Square/Whatnot payloads for API/platform compatibility
 
 ### Anchoring
 - Group similar items at different price points

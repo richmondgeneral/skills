@@ -1,11 +1,19 @@
 ---
 name: rg-full-auto
-description: End-to-end 9-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, info card publishing, and Whatnot CSV listing. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
+description: End-to-end 10-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, info card publishing, Whatnot CSV listing, and Photos library cleanup. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this", "add to whatnot". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "2.9"
+  version: "3.0"
   author: scottybe
   updated: "2026-02-15"
   changelog: |
+    v3.0 - Photos library cleanup phase + sold-state flow:
+    - Added Phase 9: Photos Library Archive — organizes source photos into
+      per-item albums under "Richmond General Archive" folder in Photos.app
+    - Two archive modes: direct UUID (from cluster discovery) and reverse-lookup
+      (filename-to-UUID for Desktop/Downloads imports)
+    - New scripts: archive_photos.py (Python wrapper), archive_to_album.scpt (AppleScript)
+    - Now a 10-phase workflow (Phases 0–9)
+
     v2.9 - Whatnot workflow metadata alignment:
     - Updated skill description to reflect 9-phase workflow
     - Added Whatnot CSV listing to top-level capability summary
@@ -63,7 +71,7 @@ metadata:
 
 # Richmond General Full Auto
 
-Complete 9-phase workflow for onboarding new vintage/antique items from acquisition to sale-ready.
+Complete 10-phase workflow for onboarding new vintage/antique items from acquisition to sale-ready.
 
 ## Architecture Note
 
@@ -758,6 +766,53 @@ do shell script "echo '\"Rare & Vintage Books\",,\"Item Title\",\"Plain text des
 
 ---
 
+## Phase 9: Photos Library Archive (Cleanup)
+
+**Purpose:** Organize source photos into per-item albums so the Photos library stays clean.
+
+**Structure in Photos.app:**
+```
+Richmond General Archive/     (folder)
+  RG-0001/                    (album — originals for item 1)
+  RG-0002/                    (album — originals for item 2)
+  ...
+```
+
+**⚠️ PREREQUISITE:** Git push (Step 7.6) must have completed successfully — the item folder in git is the archive of record. Photos.app albums are for convenient browsing, not backup.
+
+### Step 9.1: Archive photos to per-item album
+
+**Mode A — Direct UUID (when Step 0.4 cluster discovery was used):**
+
+If you have the UUIDs from the cluster discovery step, pass them directly:
+
+```applescript
+do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills python ~/.claude/skills/photos-library/scripts/archive_photos.py --item-id RG-XXXX --uuids UUID1 UUID2 UUID3 --json 2>&1"
+```
+
+**Mode B — Reverse filename lookup (when Step 0.5 manual fallback was used):**
+
+When photos came from Desktop/Downloads (no UUIDs captured), reverse-lookup the original filenames against the Photos database:
+
+```applescript
+do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills python ~/.claude/skills/photos-library/scripts/archive_photos.py --item-id RG-XXXX --reverse --include 'IMG_*' --json 2>&1"
+```
+
+This searches the Photos SQLite DB for assets matching filenames in the item directory and archives any matches. Use comma-separated globs for stricter matching when needed, for example: `--include 'IMG_*.jpg,IMG_*.jpeg,IMG_*.HEIC'`.
+
+**Dry run (preview without touching Photos):**
+```applescript
+do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills python ~/.claude/skills/photos-library/scripts/archive_photos.py --item-id RG-XXXX --reverse --include 'IMG_*' --dry-run --json 2>&1"
+```
+
+### Step 9.2: Verify archive
+
+Confirm the output JSON shows `archived > 0`. If `skipped > 0`, some UUIDs weren't found (photos may have already been deleted from the library).
+
+**⚠️ This step does NOT delete photos.** It only adds them to an album. The user can periodically review and bulk-delete from the "Richmond General Archive" folder in Photos when satisfied that git has everything.
+
+---
+
 ## Quick Tasks (Single Phase)
 
 | Request | Action |
@@ -768,6 +823,7 @@ do shell script "echo '\"Rare & Vintage Books\",,\"Item Title\",\"Plain text des
 | "create a payment link" | Phase 5 only |
 | "what's the SKU for..." | Cache lookup only |
 | "add to whatnot" / "list on whatnot" | Phase 8 only |
+| "archive photos" / "clean up photos" | Phase 9 only |
 
 ---
 
@@ -799,6 +855,8 @@ After completing full workflow:
 🏷️ Label: Added to rg-labels-batch.csv
 
 📄 Info Card: https://richmondgeneral.github.io/items/RG-XXXX/
+
+📸 Photos Archive: Richmond General Archive / RG-XXXX ({N} photos archived)
 
 Next: Print label, place item on floor
 ```

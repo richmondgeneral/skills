@@ -40,7 +40,7 @@ This skill supports **two access methods** depending on your environment:
 
 ### MCP Tools (Claude Desktop / Agent Mode)
 
-**Available MCP tools when `RGSquareItemCache` MCP server is configured:**
+**Available MCP tools when `square_cache_mcp` MCP server is configured:**
 - `square_cache_search` - Search by name or SKU
 - `square_cache_get_item` - Get full item details
 - `square_cache_status` - Check cache health

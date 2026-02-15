@@ -96,7 +96,7 @@ do shell script "source ~/.env && python3 ~/.claude/skills/square-image-upload/s
 
 ---
 
-## Square Cache MCP (`RGSquareItemCache:*`)
+## Square Cache MCP (`square_cache_mcp:*`)
 
 **Use for:** Fast catalog lookups (100x faster than API)
 
@@ -130,7 +130,7 @@ Need to...
 ├─ Process binary image? → osascript + Python script
 ├─ Call Square API (JSON)? → mcp_square_api
 ├─ Upload image to Square? → osascript + square-image-upload skill ✅
-├─ Search catalog fast? → RGSquareItemCache
+├─ Search catalog fast? → square_cache_mcp
 ├─ Git commit/push? → osascript
 └─ Create Linear issue? → Linear MCP
 ```

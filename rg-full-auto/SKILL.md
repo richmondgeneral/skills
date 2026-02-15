@@ -2,10 +2,17 @@
 name: rg-full-auto
 description: End-to-end 10-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, info card publishing, Whatnot CSV listing, and Photos library cleanup. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this", "add to whatnot". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "3.1"
+  version: "3.2"
   author: scottybe
   updated: "2026-02-15"
   changelog: |
+    v3.2 - Fix Square description HTML formatting:
+    - BREAKING: Switched from deprecated `description` field to `description_html`
+    - Use `<p>` tags for paragraphs instead of `<br>` tags in plain text
+    - Use Unicode characters (©, –, —) instead of HTML entities (&copy;, &ndash;, &mdash;)
+    - Added "Description Formatting Rules" reference table in Phase 2
+    - Prevents double-escaping that rendered raw `<br>` and `&amp;` on richmondgeneral.com
+
     v3.1 - square-cache reconciliation after writes:
     - Added Step 4.1 to sync square-cache after Phase 2/3/4 write operations
     - Added post-sync verification for exact SKU + cached image linkage
@@ -128,7 +135,7 @@ See `~/.claude/skills/PYTHON.md` for setup details.
 
 Use square-cache for fast lookup:
 ```
-RGSquareItemCache:square_cache_search with sku_pattern: "RG-"
+square_cache_mcp:square_cache_search with sku_pattern: "RG-"
 ```
 Find highest RG-XXXX and increment to get candidate SKU.
 
@@ -137,7 +144,7 @@ Find highest RG-XXXX and increment to get candidate SKU.
 **Cache may be stale.** Before committing to the SKU, verify via cache with exact match:
 
 ```
-RGSquareItemCache:square_cache_search with sku_pattern: "RG-XXXX"
+square_cache_mcp:square_cache_search with sku_pattern: "RG-XXXX"
 ```
 
 Check the results for an **exact SKU match** (not substring). The cache search returns partial matches, so verify the specific SKU string appears in results.
@@ -352,7 +359,7 @@ If lot tracking was skipped and no `allocated_cost` is available, skip this step
 
 **Output from Phase 1:**
 - Item title
-- Description (HTML with `<br>` tags)
+- Description (HTML paragraphs for `description_html` — see Phase 2 formatting rules)
 - Price in cents
 - Condition grade
 - SEO title and description
@@ -371,6 +378,42 @@ If lot tracking was skipped and no `allocated_cost` is available, skip this step
 - Do NOT move `idempotency_key` inside `batches`.
 - Variation MUST have `present_at_all_locations: false` at the variation level.
 
+### Description Formatting Rules (MANDATORY)
+
+**⚠️ Square's `description` field is DEPRECATED.** Always use `description_html` instead.
+
+**Supported HTML tags:** `<p>`, `<br>`, `<b>`, `<strong>`, `<i>`, `<em>`, `<u>`, `<ul>`, `<ol>`, `<li>`, `<h1>`–`<h6>`, `<a>`, `<div>`, `<code>`.
+**NOT supported:** Inline styles, `<style>` tags, CSS classes. No `style="..."` attributes.
+
+| Rule | Correct | WRONG |
+|------|---------|-------|
+| Paragraph spacing | `</p><p>&nbsp;</p><p>` (spacer paragraph) | `<p>` alone (no visible gap on Square) |
+| Paragraph breaks | `<p>Paragraph one.</p><p>&nbsp;</p><p>Paragraph two.</p>` | `<br><br>` in `description` field |
+| Bold labels | `<b>Condition:</b> Good` | Plain text (no visual hierarchy) |
+| Ampersand | `&amp;` (only entity needed) | `&amp;amp;` (double-escaped) |
+| Copyright © | Unicode `©` directly | `&copy;` entity |
+| Em dash — | Unicode `—` directly | `&mdash;` entity |
+| En dash – | Unicode `–` directly | `&ndash;` entity |
+
+**Why `<p>&nbsp;</p>` spacers:** Square Online CSS strips `<p>` margins to zero, so back-to-back `<p>` tags render as line breaks with no visual gap. A `<p>&nbsp;</p>` spacer paragraph forces a visible blank line between sections.
+
+**Template pattern:**
+```html
+<p>Opening paragraph — what this item is.</p>
+<p>&nbsp;</p>
+<p>History/provenance paragraph.</p>
+<p>&nbsp;</p>
+<p>Additional context paragraph.</p>
+<p>&nbsp;</p>
+<p>Production/technical details. Copyright © Year Holder.</p>
+<p>&nbsp;</p>
+<p><b>Condition:</b> Grade. Specific notes. Shipping info.</p>
+```
+
+**Why not `description`:** When you put `<br>` tags or HTML entities into the plain `description` field, Square wraps everything in `<p>` tags and escapes the HTML, so `<br>` becomes visible as literal text on the website.
+
+**Correct approach:** Use `description_html` with `<p>` tags + `<p>&nbsp;</p>` spacers + Unicode characters. Square auto-generates `description` and `description_plaintext` from `description_html`.
+
 **Payload A: `batchInsertObjects`**
 ```json
 {
@@ -383,7 +426,7 @@ If lot tracking was skipped and no `allocated_cost` is available, skip this step
       "present_at_location_ids": ["B87BAEZ0NWV34"],
       "item_data": {
         "name": "Item Title",
-        "description": "HTML description with <br> tags",
+        "description_html": "<p>First paragraph.</p><p>&nbsp;</p><p>Second paragraph.</p><p>&nbsp;</p><p><b>Condition:</b> Good. Notes here.</p>",
         "categories": [{"id": "CHOSEN_CATEGORY_ID"}],
         "reporting_category": {"id": "CHOSEN_CATEGORY_ID"},
         "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
@@ -427,7 +470,7 @@ If lot tracking was skipped and no `allocated_cost` is available, skip this step
     "present_at_location_ids": ["B87BAEZ0NWV34"],
     "item_data": {
       "name": "Item Title",
-      "description": "HTML description with <br> tags",
+      "description_html": "<p>First paragraph.</p><p>&nbsp;</p><p>Second paragraph.</p><p>&nbsp;</p><p><b>Condition:</b> Grade. Notes.</p>",
       "categories": [{"id": "CHOSEN_CATEGORY_ID"}],
       "reporting_category": {"id": "CHOSEN_CATEGORY_ID"},
       "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
@@ -522,7 +565,7 @@ After catalog create (Phase 2), inventory write (Phase 3), and image upload (Pha
 
 **Primary (MCP):**
 ```
-RGSquareItemCache:square_cache_sync
+square_cache_mcp:square_cache_sync
 ```
 
 **Fallback (local script):**
@@ -534,13 +577,13 @@ Then verify:
 
 1. Exact SKU exists in cache
 ```
-RGSquareItemCache:square_cache_search with sku_pattern: "RG-XXXX"
+square_cache_mcp:square_cache_search with sku_pattern: "RG-XXXX"
 ```
 Confirm exact `RG-XXXX` match (not substring only).
 
 2. Cached item includes uploaded image
 ```
-RGSquareItemCache:square_cache_get_item with item_id: "CATALOG_ITEM_ID"
+square_cache_mcp:square_cache_get_item with item_id: "CATALOG_ITEM_ID"
 ```
 Confirm `item_data.image_ids` contains the image ID from Phase 4. If not, run sync once more and re-check.
 

@@ -2,10 +2,15 @@
 name: rg-item-update
 description: Quick edits to existing Richmond General catalog items. Use for price changes, description updates, SEO tweaks, adding/replacing images, category changes, or fixing typos. Triggers on "update item", "change price", "edit description", "fix", "modify existing". Also handles BATCH operations like "move all food items" or "update category for multiple items". NOT for new items—use rg-full-auto for complete onboarding workflow.
 metadata:
-  version: "1.2"
+  version: "1.3"
   author: scottybe
   updated: "2026-02-15"
   changelog: |
+    v1.3 - description_html + connector naming:
+    - Switched item description guidance/template from `description` to `description_html`
+    - Added paragraph/Unicode formatting note for Square rendering
+    - Renamed Square cache connector examples to `square_cache_mcp:*`
+
     v1.2 - cache reconciliation update:
     - Added required post-write square-cache sync/verification step
     - Updated related skills table to current rg-full-auto phase count
@@ -24,14 +29,14 @@ Lightweight operations for modifying existing catalog items.
 | Key | Value |
 |-----|-------|
 | Square Location | B87BAEZ0NWV34 |
-| Search cache | `RGSquareItemCache:square_cache_search` (fast) |
+| Search cache | `square_cache_mcp:square_cache_search` (fast) |
 | Direct API | `catalog.searchItems` |
 
 ## Find the Item First
 
 **Option 1: Cache search (fastest)**
 ```
-RGSquareItemCache:square_cache_search with name_pattern or sku_pattern
+square_cache_mcp:square_cache_search with name_pattern or sku_pattern
 ```
 
 **Option 2: API search**
@@ -63,6 +68,8 @@ Returns `item_id` and `variation_id` needed for updates.
 
 ### Description / SEO Update
 
+**⚠️ Use `description_html` (NOT `description`).** Wrap paragraphs in `<p>` tags. Use Unicode characters (©, –, —) not HTML entities. See rg-full-auto Phase 2 for full formatting rules.
+
 ```json
 {
   "idempotency_key": "uuid",
@@ -70,7 +77,7 @@ Returns `item_id` and `variation_id` needed for updates.
     "type": "ITEM",
     "id": "ITEM_ID",
     "item_data": {
-      "description": "New HTML description",
+      "description_html": "<p>First paragraph.</p><p>Second paragraph.</p>",
       "ecom_seo_data": {
         "page_title": "Updated Title | Richmond General",
         "page_description": "Updated meta description. Richmond, IL.",
@@ -155,7 +162,7 @@ After any write to Square (price, description, category, image, inventory), sync
 
 **Primary (MCP):**
 ```
-RGSquareItemCache:square_cache_sync
+square_cache_mcp:square_cache_sync
 ```
 
 **Fallback (local script):**
@@ -164,7 +171,7 @@ uv run --project ~/.claude/skills python ~/.claude/skills/square-cache/scripts/c
 ```
 
 Verification:
-- Query the changed SKU/item via `RGSquareItemCache:square_cache_search` or `RGSquareItemCache:square_cache_get_item`
+- Query the changed SKU/item via `square_cache_mcp:square_cache_search` or `square_cache_mcp:square_cache_get_item`
 - For image updates, confirm `item_data.image_ids` includes the new image
 - For batch updates, run one sync at the end, then spot-check at least 3 updated items
 

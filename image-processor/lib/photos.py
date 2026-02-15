@@ -677,6 +677,9 @@ class PhotosLibraryAppleScript:
         """Search photos by filename pattern."""
         # Convert SQL LIKE pattern to AppleScript contains
         search_term = pattern.replace('%', '').replace('*', '')
+        # Sanitize for AppleScript string
+        search_term = search_term.replace('\\', '\\\\').replace('"', '\\"')
+        
         script = f'''
         tell application "Photos"
             set matchedItems to (media items whose filename contains "{search_term}")

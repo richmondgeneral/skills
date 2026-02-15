@@ -2,15 +2,20 @@
 """Get historical bars for a symbol from Alpaca."""
 
 import sys
+import os
 import json
 import requests
 from datetime import datetime
 import argparse
 
 # API Configuration
-API_KEY = "AKABFLWKAFS42D6ALODECTBJZS"
-SECRET_KEY = "4TdUYawjmKigmou7sy9hpcQPTJyhH1rzk8NGPg4FrdMV"
+API_KEY = os.environ.get("ALPACA_API_KEY")
+SECRET_KEY = os.environ.get("ALPACA_SECRET_KEY")
 BASE_URL = "https://data.alpaca.markets"
+
+if not API_KEY or not SECRET_KEY:
+    print("Error: ALPACA_API_KEY and ALPACA_SECRET_KEY environment variables must be set.", file=sys.stderr)
+    sys.exit(1)
 
 def get_bars(symbol: str, timeframe: str = "1Day", start: str = None, end: str = None, limit: int = 100) -> dict:
     """Get historical bars for a symbol."""

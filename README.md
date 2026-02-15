@@ -1,136 +1,77 @@
 # Richmond General Skills
 
-A collection of 17 AI assistant skills for managing Richmond General's vintage and antique inventory system.
+A comprehensive collection of AI assistant skills for managing Richmond General's vintage and antique inventory system. These skills integrate with Square Catalog, Apple ecosystem (iMessage, Contacts, Notes), and external identification databases to streamline operations.
 
-## Skills
+**Repository:** `richmondgeneral/skills`
+**Current Version:** v2026.02.14
 
-### rg-full-auto
-Claude-supervised workflow for processing new items from a single photo to live listing. Complete 7-phase automation with user approval at key steps.
+## Overview
 
-**Use when:** User provides a product photo, says "new item", "add to inventory", or "create listing". Handles appraisal, background removal, Square catalog, payment links, and GitHub Pages publishing.
+This repository houses specialized workflows ("Skills") that autonomous agents (like Claude) use to perform complex tasks. Instead of prompting for every step, you can trigger these skills with simple natural language.
 
-### rg-full-auto
-Main orchestrator skill for the complete inventory workflow from appraisal through GitHub Pages publishing.
+## Skills Catalog
 
-**Use when:** Processing items, creating Square catalog entries, pricing vintage/antique items, generating labels, or tracking purchase lots.
+### 📦 Inventory Management
+| Skill | Trigger | Purpose |
+|-------|---------|---------|
+| **rg-full-auto** | "new item", "sell this", "onboard" | **Main Workflow.** Complete 8-phase process: Image → Appraisal → Catalog → Labels → Web. |
+| **rg-item-update** | "update item", "change price" | Quick edits to existing items (price, description, images). |
+| **catalog-classifier** | "what category?", "classify" | *(Experimental)* Automatically routes items to the correct Square category. |
 
-### book-appraiser
-Specialized skill for antiquarian and antique book appraisal, edition identification, and valuation.
+### 🔍 Appraisal & Identification
+| Skill | Trigger | Purpose |
+|-------|---------|---------|
+| **book-appraiser** | "old book", "1950 book" | specialized appraisal for pre-1970 books with Library of Congress lookup. |
+| **carnival-glass-appraiser** | "carnival glass", "iridescent bowl" | Identification and valuation of pressed glass (1908-1930s). |
+| **maker-mark-identifier** | "identify mark", "who made this" | Identifies pottery stamps, silver hallmarks, and furniture labels. |
 
-**Use when:** Appraising pre-1970 books, identifying first editions, researching book value, checking Library of Congress holdings, or determining public domain status.
+### 💳 Square Integration
+| Skill | Trigger | Purpose |
+|-------|---------|---------|
+| **square-cache** | "search cache", "catalog changes" | High-speed local cache of the Square catalog. 100x faster than API. |
+| **square-crm** | "add customer", "sync contacts" | Syncs Apple Contacts with Square Customer directory. |
+| **square-image-upload** | "upload image" | Handles complex multipart image uploads to Square API. |
+| **product-labeler** | "make label", "print tag" | Generates thermal printer CSVs and HTML descriptions. |
 
-### carnival-glass-appraiser
-Complete appraisal workflow for carnival glass (pressed iridescent glass from 1908-1930s).
+### 💬 Messaging & CRM
+| Skill | Trigger | Purpose |
+|-------|---------|---------|
+| **imessage-core** | "read texts", "reply to" | Reads and sends iMessage/SMS/RCS directly. |
+| **contacts-manager** | "who is this", "lookup number" | Contact profiles, spam filtering, and context. |
+| **daily-briefing** | "morning briefing", "status" | Generates a CRM status report in Apple Notes. |
+| **imessage-archiver** | "archive chat", "save thread" | Saves text conversations to Notes with inline images. |
 
-**Use when:** Identifying carnival glass patterns, authenticating pieces, attributing makers (Northwood, Fenton, Imperial), or valuing bowls, plates, water sets.
-
-### maker-mark-identifier
-Focused identification skill for pottery, silver, furniture, and jewelry marks.
-
-**Use when:** Examining stamps, hallmarks, signatures, or labels to determine manufacturer and date range. Returns ID only—defers valuation to rg-full-auto.
-
-### product-labeler
-Generate product labels for Richmond General Square inventory and thermal printing.
-
-**Use when:** Creating thermal printer labels (CSV for Print Master), Square catalog descriptions, or price tags.
-
-
-## Structure
-
-```
-skills/
-├── rg-full-auto/            # Claude-supervised new item workflow
-│   ├── SKILL.md
-│   ├── scripts/
-│   └── references/
-├── rg-full-auto/           # Main orchestrator
-│   ├── SKILL.md
-│   └── references/
-├── book-appraiser/         # Full appraisal: books
-│   ├── SKILL.md
-│   └── references/
-├── carnival-glass-appraiser/  # Full appraisal: carnival glass
-│   ├── SKILL.md
-│   └── references/
-├── maker-mark-identifier/  # ID only: marks on pottery, silver, furniture
-│   ├── SKILL.md
-│   └── references/
-├── product-labeler/        # Labels & Square descriptions
-│   ├── SKILL.md
-│   ├── assets/
-│   └── references/
-├── imessage-core/          # iMessage read/send core
-│   ├── SKILL.md
-│   └── scripts/
-├── imessage-archiver/     # Archive conversations to Notes
-│   ├── SKILL.md
-│   └── scripts/
-├── contacts-manager/      # Contact lookup & profiles
-│   ├── SKILL.md
-│   └── references/
-├── daily-briefing/        # Morning CRM briefing
-│   ├── SKILL.md
-│   └── scripts/
-├── square-crm/             # Square customer management
-│   ├── SKILL.md
-│   ├── scripts/
-│   └── references/
-├── skill-manager/          # Meta-skill for skill updates
-│   └── SKILL.md
-├── square-cache/           # MongoDB cache for Square catalog
-│   ├── SKILL.md
-│   └── scripts/
-├── square-image-upload/    # Image upload for Square Catalog API
-│   ├── SKILL.md
-│   ├── scripts/
-│   └── references/
-├── image-processor/        # Unified image processing
-│   ├── SKILL.md
-│   ├── scripts/
-│   └── lib/
-├── photos-library/        # Photos.app SQLite access
-│   ├── SKILL.md
-│   └── scripts/
-├── docs/
-│   └── build-skill.sh     # Build script for generating ZIP archives
-└── archive/               # Superseded skills (not in git)
-```
+### 🖼️ Media & Utility
+| Skill | Trigger | Purpose |
+|-------|---------|---------|
+| **image-processor** | "remove bg", "edit photo" | Unified tool for background removal, generation, and editing. |
+| **photos-library** | "recent photos", "find product shots" | Queries the local macOS Photos.app library. |
+| **alpaca-market-data** | "stock price", "market data" | Real-time financial market data. |
+| **skill-manager** | "update skill", "create skill" | Meta-skill for maintaining this repository. |
 
 ## Usage
 
-These skills are designed to be loaded by AI assistants (Claude, Warp, etc.) to provide specialized knowledge and workflows for Richmond General inventory management.
+Skills are **model-invoked**. You do not need to run scripts manually. Simply ask the agent:
 
-## Building Skills
+> "Process this new photo of a carnival glass bowl."
+> "Who is texting me from 847-555-0199?"
+> "Update the price of the 'Vintage Radio' to $45."
 
-Skills are packaged as ZIP files for distribution. Use the build script to generate archives:
+The agent will automatically select the correct skill and execute the workflow.
+
+## Installation
+
+Skills reside in `~/.claude/skills/`. To update or install:
 
 ```bash
-# Build a single skill
-./docs/build-skill.sh imessage-core
-
-# Build all skills
-./docs/build-skill.sh --all
-
-# List available skills
-./docs/build-skill.sh
+cd ~/.claude/skills
+git pull
 ```
-
-Generated ZIP files are placed in `archive/` and are excluded from version control.
 
 ## Related Repositories
 
-- **Items Site**: [richmondgeneral/items](https://github.com/richmondgeneral/items) - GitHub Pages site with item cards
-- **Main Site**: richmondgeneral.com - Square-hosted ecommerce
+- **Items Site**: [richmondgeneral.github.io/items](https://richmondgeneral.github.io/items/) - Public gallery
+- **Main Site**: [richmondgeneral.com](https://richmondgeneral.com) - Square-hosted store
 
-## Integration
-
-Skills integrate with:
-- Square Catalog API
-- Square Checkout API (payment links)
-- GitHub Pages (richmondgeneral.github.io/items)
-- Library of Congress catalog
-- Print Master (label printing)
-
-## License
-
-© 2024-2025 Richmond General. All rights reserved.
+---
+© 2024-2026 Richmond General. All rights reserved.

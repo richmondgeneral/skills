@@ -5,13 +5,14 @@ Richmond General - New Item Processing Workflow
 Claude-supervised, agent-run workflow for processing items from photo to live listing.
 
 This script orchestrates the 8-phase workflow:
+0. Image Processing (background removal, file prep)
 1. Appraisal & Research (visual analysis)
-2. Photography (background removal)
-3. Square Catalog Creation
+2. Square Catalog Creation
+3. Inventory Setup
 4. Image Upload to Square
-5. Fulfillment Setup (manual step)
-6. Payment Link Generation
-7. Label CSV & GitHub Pages
+5. Payment Link Generation
+6. Label Generation
+7. Info Card & Publishing (GitHub Pages)
 
 Usage:
     # Interactive mode (Claude supervises each step)

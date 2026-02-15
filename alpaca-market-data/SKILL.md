@@ -1,3 +1,13 @@
+---
+name: alpaca-market-data
+description: Real-time and historical market data for stocks/crypto via Alpaca API. Triggers on "stock price", "market data", "get quote".
+allowed-tools: Read, Grep, Glob, Bash
+metadata:
+  version: "1.0"
+  author: scottybe
+  updated: "2026-02-14"
+---
+
 # Alpaca Market Data Skill
 
 Real-time and historical market data from Alpaca Markets API.

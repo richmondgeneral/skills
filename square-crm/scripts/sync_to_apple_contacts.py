@@ -166,7 +166,7 @@ def update_note(phone, note):
 def add_company(phone, company):
     """Set contact's company/organization."""
     normalized = format_phone(phone)
-    safe_company = company.replace('"', '\\"')
+    safe_company = company.replace('\\', '\\\\').replace('"', '\\"')
     script = f'''
     tell application "Contacts"
         set matchingPeople to (every person whose value of phones contains "{normalized}")

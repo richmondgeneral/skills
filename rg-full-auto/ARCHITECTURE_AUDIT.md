@@ -1,7 +1,7 @@
 # rg-full-auto Architecture Audit
 ## Comparison Against Claude Agent Skills Official Docs
 
-**Date:** 2025-12-21 (updated 2026-02-14)
+**Date:** 2025-12-21 (updated 2026-02-15)
 **Reference:** https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview
 
 ---
@@ -17,7 +17,7 @@
 name: rg-full-auto
 description: End-to-end 8-phase workflow...
 metadata:
-  version: "2.4"
+  version: "2.5"
   author: scottybe
 ---
 ```
@@ -37,17 +37,18 @@ metadata:
 
 #### Level 1: Instructions (SKILL.md)
 - ✅ Main guidance document (primary instructions)
-- ✅ Phase-by-phase workflow (7 phases)
+- ✅ Phase-by-phase workflow (8 phases)
 - ✅ Quick reference tables (locations, SKUs, categories)
 - ✅ Troubleshooting section
 - ✅ Under 5k tokens as per spec
 - **Token Cost:** Under 5k tokens (on-demand trigger)
 
 #### Level 2: Additional Instructions
-- ✅ `references/lot-tracking.md` - Cost allocation guidance
-- ✅ `references/pricing-guidelines.md` - Category-specific margins
 - ✅ `references/label-format.md` - Print Master CSV format
 - ✅ `references/square-catalog.md` - API reference details
+- ✅ `references/info-card-template.html` - Item page template
+- ✅ `references/system-paths.md` - Canonical absolute paths
+- ✅ Lot/pricing references delegated to `rg-lot-tracker` skill
 - **Loading:** Referenced in SKILL.md, loaded on-demand
 - **Token Cost:** "Effectively unlimited" (as-needed loading)
 
@@ -92,8 +93,9 @@ rg-full-auto/
 │   ├── remove_background.py (executable code)
 │   └── place_files.py (executable code - NEW)
 └── references/
-    ├── lot-tracking.md (reference material)
-    ├── pricing-guidelines.md (reference material)
+    ├── mcp-connectors.md (reference material)
+    ├── system-paths.md (reference material)
+    ├── marketplace-templates.md (reference material)
     ├── label-format.md (reference material)
     ├── square-catalog.md (reference material)
     └── info-card-template.html (HTML template)
@@ -160,7 +162,7 @@ python3 ~/.claude/skills/rg-full-auto/scripts/place_files.py \
 **Recommendation:** Add explicit triggers section to YAML:
 ```yaml
 metadata:
-  version: "2.4"
+  version: "2.5"
   author: scottybe
   triggers:
     - "new item"
@@ -178,42 +180,25 @@ metadata:
 ---
 
 ### 2. Resource Documentation
-**Current:** References exist but lack formal "resources" section
+**Current:** References are documented under a `## References` section in SKILL.md.
 
 **Current Pattern:**
 ```markdown
-See `references/pricing-guidelines.md` for category-specific margins.
+**Pricing tiers:** See `rg-lot-tracker` for full margin targets by category.
 ```
 
-**Recommendation:** Add formal resources section to SKILL.md:
-```markdown
-## Resources
+**Recommendation:** Keep `rg-full-auto` references focused on catalog, labels, and template concerns; keep lot/pricing docs in `rg-lot-tracker`.
 
-**Reference Materials:**
-- `references/lot-tracking.md` - Complete lot management system
-- `references/pricing-guidelines.md` - Margin targets by category
-- `references/label-format.md` - Print Master CSV format
-- `references/square-catalog.md` - Square API details
+**Why:** Maintains clean separation of responsibilities across skills.
 
-Claude accesses these only when referenced, consuming zero tokens if unused.
-```
-
-**Why:** Makes resource structure explicit per docs architecture.
-
-**Impact:** Improves clarity and aligns with official documentation.
+**Impact:** Improves maintainability and avoids duplicated guidance.
 
 ---
 
 ### 3. Explicit Skill Dependencies Documentation
-**Current:** Routing documented informally
+**Current:** Skill dependencies are documented in the `## Related Skills` section.
 
-**Current Pattern:**
-```markdown
-**Route to specialized skills if needed:**
-- Books pre-1970 → `book-appraiser`
-```
-
-**Recommendation:** Add "Skill Dependencies" section:
+**Recommendation:** Keep the dependency table current and include short integration contracts for delegated skills (inputs/outputs expected).
 ```markdown
 ## Related Skills (Skill Composition)
 
@@ -222,17 +207,18 @@ This skill composes with:
 | Skill | When Used | Integration |
 |-------|-----------|-------------|
 | square-cache | Phase 0 (SKU lookup) | MCP-based query |
-| square-image-upload | Phase 2 (image upload) | MCP-based image operations |
+| square-image-upload | Phase 4 (image upload) | MCP-based image operations |
 | book-appraiser | Phase 1 (pre-1970 books) | Routing for specialized appraisal |
 | carnival-glass-appraiser | Phase 1 (carnival glass) | Routing for maker identification |
 | maker-mark-identifier | Phase 1 (pottery, silver) | Routing for mark research |
 | product-labeler | Phase 6 (labels) | Skill reference |
 | rg-item-update | Related task | For non-full-workflow edits |
+| rg-lot-tracker | Step 1.1 + Step 1.5 | Lot/cost/margin delegation |
 ```
 
-**Why:** Explicit dependency mapping helps agents compose skills effectively.
+**Why:** Explicit contracts reduce integration drift and handoff ambiguity.
 
-**Impact:** Improves skill orchestration and clarity.
+**Impact:** Improves skill orchestration and debugging speed.
 
 ---
 

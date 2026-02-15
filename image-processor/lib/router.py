@@ -45,18 +45,18 @@ class ModelRouter:
         if task_type in (TaskType.GENERATE, TaskType.EDIT):
             return self._select_generation_model(capable, task_config)
 
-        # Filter by cost if prefer_free is set
-        if task_config.prefer_free:
-            free_models = [m for m in capable
-                          if m.get_capabilities()['cost'] == 'free']
-            if free_models:
-                capable = free_models
-
         # Filter by health check
         healthy = [m for m in capable if m.health_check()]
 
         if not healthy:
             return None
+
+        # Filter by cost if prefer_free is set
+        if task_config.prefer_free:
+            free_models = [m for m in healthy
+                          if m.get_capabilities()['cost'] == 'free']
+            if free_models:
+                healthy = free_models
 
         # Score and select best
         return self._score_and_select(healthy, task_config)

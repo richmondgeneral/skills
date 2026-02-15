@@ -15,6 +15,11 @@ class QueryHelper:
     """Helper class for building MongoDB queries"""
     
     @staticmethod
+    def _sanitize(value: str) -> str:
+        """Escape single quotes for JS strings"""
+        return value.replace("'", "\\'") if value else ""
+    
+    @staticmethod
     def items_with_images() -> str:
         """Get all items that have images attached"""
         return """mongosh square_cache --eval "db.catalog_items.find({'item_data.image_ids': {\$exists: true, \$ne: []}}).pretty()" """
@@ -32,17 +37,21 @@ class QueryHelper:
     @staticmethod
     def items_by_category(category_id: str) -> str:
         """Get items in a specific category"""
-        return f"""mongosh square_cache --eval "db.catalog_items.find({{'item_data.categories': {{\\$elemMatch: {{id: '{category_id}'}}}}}}).pretty()" """
+        safe_id = QueryHelper._sanitize(category_id)
+        return f"""mongosh square_cache --eval "db.catalog_items.find({{'item_data.categories': {{\\$elemMatch: {{id: '{safe_id}'}}}}}}).pretty()" """
     
     @staticmethod
     def changes_by_date_range(start_date: str, end_date: str) -> str:
         """Get changes between two dates (YYYY-MM-DD format)"""
-        return f"""mongosh square_cache --eval "db.change_snapshots.find({{timestamp: {{\$gte: new Date('{start_date}'), \$lte: new Date('{end_date}')}}}}).sort({{timestamp: -1}}).pretty()" """
+        s = QueryHelper._sanitize(start_date)
+        e = QueryHelper._sanitize(end_date)
+        return f"""mongosh square_cache --eval "db.change_snapshots.find({{timestamp: {{\$gte: new Date('{s}'), \$lte: new Date('{e}')}}}}).sort({{timestamp: -1}}).pretty()" """
     
     @staticmethod
     def changes_by_item(item_id: str) -> str:
         """Get all changes for a specific item"""
-        return f"""mongosh square_cache --eval "db.change_snapshots.find({{item_id: '{item_id}'}}).sort({{timestamp: -1}}).pretty()" """
+        safe_id = QueryHelper._sanitize(item_id)
+        return f"""mongosh square_cache --eval "db.change_snapshots.find({{item_id: '{safe_id}'}}).sort({{timestamp: -1}}).pretty()" """
     
     @staticmethod
     def recent_changes(limit: int = 50) -> str:
@@ -77,12 +86,14 @@ class QueryHelper:
     @staticmethod
     def search_by_name(pattern: str) -> str:
         """Search items by name pattern (case-insensitive)"""
-        return f"""mongosh square_cache --eval "db.catalog_items.find({{'item_data.name': {{\$regex: '{pattern}', \$options: 'i'}}}}).pretty()" """
+        safe_pat = QueryHelper._sanitize(pattern)
+        return f"""mongosh square_cache --eval "db.catalog_items.find({{'item_data.name': {{\$regex: '{safe_pat}', \$options: 'i'}}}}).pretty()" """
     
     @staticmethod
     def get_item(item_id: str) -> str:
         """Get specific item by ID"""
-        return f"""mongosh square_cache --eval "db.catalog_items.findOne({{id: '{item_id}'}})" """
+        safe_id = QueryHelper._sanitize(item_id)
+        return f"""mongosh square_cache --eval "db.catalog_items.findOne({{id: '{safe_id}'}})" """
     
     @staticmethod
     def items_with_variations() -> str:

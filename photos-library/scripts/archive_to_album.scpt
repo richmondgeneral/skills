@@ -17,16 +17,24 @@ on run argv
 
     tell application "Photos"
         -- 1. Ensure root folder exists
-        if not (exists folder rootFolderName) then
+        if not (exists folder named rootFolderName) then
             make new folder named rootFolderName
         end if
-        set rootFolder to folder rootFolderName
+        set matchingFolders to (every folder whose name is rootFolderName)
+        if (count of matchingFolders) is 0 then
+            error "Unable to create or locate Photos folder '" & rootFolderName & "'. Ensure Photos scripting has library read-write access."
+        end if
+        set rootFolder to item 1 of matchingFolders
 
         -- 2. Ensure item album exists inside root folder
-        if not (exists album itemId of rootFolder) then
+        if not (exists album named itemId of rootFolder) then
             make new album named itemId at rootFolder
         end if
-        set targetAlbum to album itemId of rootFolder
+        set matchingAlbums to (every album of rootFolder whose name is itemId)
+        if (count of matchingAlbums) is 0 then
+            error "Unable to create or locate album '" & itemId & "' in Photos folder '" & rootFolderName & "'."
+        end if
+        set targetAlbum to item 1 of matchingAlbums
 
         -- 3. Collect media items by UUID
         set itemsToArchive to {}

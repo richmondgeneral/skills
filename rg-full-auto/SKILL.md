@@ -2,10 +2,15 @@
 name: rg-full-auto
 description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "2.4"
+  version: "2.5"
   author: scottybe
-  updated: "2026-02-14"
+  updated: "2026-02-15"
   changelog: |
+    v2.5 - Lot tracking delegation refinement:
+    - Moved margin validation before catalog write (Step 1.5)
+    - Delegated lot assignment/cost allocation to rg-lot-tracker
+    - Removed lot/pricing references moved to rg-lot-tracker
+
     v2.4 - Review & consistency fixes:
     - Fixed SKU verification: replaced broken searchItems text_filter with cache-based exact match
     - Updated occurred_at guidance to use dynamic ISO timestamp (not hardcoded)
@@ -198,7 +203,7 @@ Now you can see the item and do proper research.
 | **Selling strategy** — Set or individual? | Changes title, description, pricing, inventory count | "Set of 9" vs "1 of 9 available" |
 | **Condition specifics** — Chips, cracks, wear, repairs? | Affects price and required disclosures | "Excellent" vs "Good - minor chip" |
 | **Original elements** — Stickers, labels, boxes, tags? | Adds provenance value, affects description | "with original Made in Germany sticker" |
-| **Lot assignment** — Track acquisition cost? | Optional but needed for margin analysis | L2-Peter's Estate @ $5 cost |
+| **Lot assignment** — Track acquisition cost? | Optional but needed for margin analysis (via `rg-lot-tracker`) | L2-Peter's Estate @ $5 cost |
 
 **Do the research first**, then ask these questions with context. Example flow:
 
@@ -223,11 +228,17 @@ Claude: [now has accurate info for pricing and description]
 
 ### Step 1.1: Assign lot & record acquisition cost
 
-- Lot prefix format: `L##-` (e.g., L2 = Peter's Estate)
-- Record: lot ID, purchase date, total lot cost, item cost allocation
-- See `references/lot-tracking.md` for full lot management
+→ **Delegate to `rg-lot-tracker` skill** (Phase 0 + Phase 1)
+
+If the user provides lot info (source, cost, date), pass it to `rg-lot-tracker`:
+- Phase 0 creates or selects the lot
+- Phase 1 allocates cost to this item
+- Returns: `lot_id` and `allocated_cost`
+
+Store the `allocated_cost` for pricing validation before Phase 2.
 
 **Even if user says "unknown"** — prompt once more: "Do you want to assign this to a lot for tracking, or skip for now?"
+If they skip, continue without cost data and skip margin validation in Step 1.5.
 
 ### Step 1.2: Route to specialized appraiser if needed
 
@@ -250,12 +261,8 @@ Claude: [now has accurate info for pricing and description]
 4. Research comps (eBay sold, auction records)
 5. Determine price point
 
-**Pricing tiers:**
-| Tier | Range | Margin Target |
-|------|-------|---------------|
-| Quick flip | $1-15 | 2-3x cost |
-| Mid-range | $15-75 | 2.5-4x cost |
-| Showcase | $75+ | Research-based |
+**Pricing tiers:** See `rg-lot-tracker` for full margin targets by category.
+Quick reference: quick flip 2.5-3x, mid-range 3-4x, showcase research-based.
 
 ### Step 1.4: Determine shipping eligibility
 
@@ -271,6 +278,20 @@ Claude: [now has accurate info for pricing and description]
 - Heavy items where shipping cost ≈ item value
 
 **Flat rate reference:** Small $10.20 | Medium $17.10 | Large $21.90
+
+### Step 1.5: Validate pricing against cost basis
+
+If `allocated_cost` is available from Step 1.1:
+
+→ **Delegate to `rg-lot-tracker` skill** (Phase 2)
+
+Pass: item SKU, proposed list price, allocated cost, and item category.
+Receive: margin analysis with go/no-go recommendation.
+
+If margin is below target, present the analysis and ask whether to adjust price
+or proceed anyway. Do not block; user decides.
+
+If lot tracking was skipped and no `allocated_cost` is available, skip this step.
 
 **Output from Phase 1:**
 - Item title
@@ -664,11 +685,10 @@ Next: Print label, place item on floor
 | `maker-mark-identifier` | Pottery, silver, furniture marks |
 | `product-labeler` | Label generation, Square descriptions |
 | `square-cache` | Fast catalog lookups |
+| `rg-lot-tracker` | Lot tracking, cost allocation, margin validation |
 
 ## References
 
 - `references/square-catalog.md` - API details, category IDs
-- `references/lot-tracking.md` - Lot management, cost allocation
-- `references/pricing-guidelines.md` - Margin targets by category
 - `references/label-format.md` - Print Master settings, style guide
 - `references/info-card-template.html` - HTML template for item pages

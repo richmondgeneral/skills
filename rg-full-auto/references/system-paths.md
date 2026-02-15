@@ -1,7 +1,7 @@
 ---
 title: System Paths Reference
 description: Canonical absolute paths for agent consistency across sessions
-updated: 2024-12-20
+updated: 2026-02-15
 ---
 
 # System Paths Reference
@@ -44,13 +44,24 @@ updated: 2024-12-20
 ├── references/
 │   ├── mcp-connectors.md
 │   ├── system-paths.md
-│   ├── pricing-guidelines.md
-│   └── square-catalog.md
+│   ├── square-catalog.md
+│   ├── label-format.md
+│   └── info-card-template.html
 └── scripts/
     ├── remove_background.py
     ├── process_new_item.py
     └── place_files.py
 ```
+
+---
+
+## Delegated Lot Tracking Skill
+
+```
+/Users/scottybe/.claude/skills/rg-lot-tracker/
+```
+
+**Purpose:** Lot creation, cost allocation, margin validation, and ROI tracking.
 
 ---
 

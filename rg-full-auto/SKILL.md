@@ -344,19 +344,9 @@ If lot tracking was skipped and no `allocated_cost` is available, skip this step
 
 ## Phase 2: Square Catalog Creation
 
-**Primary method (if available in connector):**
-```
-Square:make_api_request
-  service: catalog
-  method: batchInsertObjects
-```
-
-**Fallback method (if connector rejects `batchInsertObjects`):**
-```
-Square:make_api_request
-  service: catalog
-  method: upsertCatalogObject
-```
+**Method Selection:**
+1. **Primary:** Attempt `catalog.batchInsertObjects` first.
+2. **Fallback:** If rejected (e.g., due to schema/body issues), switch to `catalog.upsertCatalogObject`.
 
 **⚠️ CRITICAL:**
 - `idempotency_key` stays at the **top level** for both payload styles.
@@ -408,7 +398,7 @@ Square:make_api_request
 }
 ```
 
-**Payload B: `upsertCatalogObject`**
+**Payload B: `upsertCatalogObject` (Fallback)**
 ```json
 {
   "idempotency_key": "rg-XXXX-create-TIMESTAMP",

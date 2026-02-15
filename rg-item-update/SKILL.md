@@ -10,6 +10,7 @@ metadata:
     - Switched item description guidance/template from `description` to `description_html`
     - Added paragraph/Unicode formatting note for Square rendering
     - Renamed Square cache connector examples to `square_cache_mcp:*`
+    - Updated category update template to type + tier categories with `reporting_category`
 
     v1.2 - cache reconciliation update:
     - Added required post-write square-cache sync/verification step
@@ -91,9 +92,11 @@ Returns `item_id` and `variation_id` needed for updates.
 
 ### Category Change
 
-**Categories (choose ONE):**
-- The Real Rarities: `FL4L42RRUE5UXMWFDLXOCNB5` (rare/special)
-- The New Finds: `P34KX3L7XRZJJ5RP6W35K4YO` (regular new stock)
+**Type categories (primary + reporting):** Books & Paper `CLZCJ62H4TTHDQ3ZBYMZQASQ`, Furniture `W3EYAJJPTNC46WSLNYI4WH7V`, Pottery & Ceramics `APSTFSN4UXQI44HBFSDTSEX7`, Collectibles `YQWBSOJDENMXDGUUQ3TGI3HF`, Art & Craft Kits `F4JQYK4Z5MEBV5VFCDYHIAWT`, Wellness & Apothecary `I5PMPWGTVR7IDBL4RUJWN3A4`, The Apothecary Cabinet `6E7UZYZFNZBGFRJFH272RVBE`, Home & Gifts `AR3ZTA45KU4BH23AJ7LOLLRA`, Analog `N35REXL33FZWJNJV24IUQGPN`
+
+**Tier categories (secondary):** The New Finds `P34KX3L7XRZJJ5RP6W35K4YO` (default), The Real Rarities `FL4L42RRUE5UXMWFDLXOCNB5` (rare only)
+
+See `rg-full-auto/references/square-catalog.md` for full list including snack and TVM categories.
 
 ```json
 {
@@ -103,8 +106,10 @@ Returns `item_id` and `variation_id` needed for updates.
     "id": "ITEM_ID",
     "item_data": {
       "categories": [
-        {"id": "CHOSEN_CATEGORY_ID"}
-      ]
+        {"id": "TYPE_CATEGORY_ID"},
+        {"id": "TIER_CATEGORY_ID"}
+      ],
+      "reporting_category": {"id": "TYPE_CATEGORY_ID"}
     }
   }],
   "sparse_update": true

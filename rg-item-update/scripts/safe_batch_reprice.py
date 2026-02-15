@@ -109,9 +109,12 @@ def safe_batch_update(client: Square, updates: dict, dry_run: bool = False):
     fetched = result.objects or []
     print(f"✅ Retrieved {len(fetched)} objects")
 
-    if len(fetched) != len(variation_ids):
-        missing = set(variation_ids) - {obj.id for obj in fetched}
-        print(f"⚠️  Missing IDs: {missing}")
+    fetched_ids = {obj.id for obj in fetched}
+    missing = set(variation_ids) - fetched_ids
+    if missing:
+        print(f"❌ Missing IDs: {sorted(missing)}")
+        print("❌ Aborting to avoid partial repricing.")
+        return False
 
     # ── PATCH ─────────────────────────────────────────────────────────
     patched = []
@@ -128,6 +131,10 @@ def safe_batch_update(client: Square, updates: dict, dry_run: bool = False):
             }
             patched.append(d)
             print(f"   {sku}: ${old_price/100:.2f} → ${new_price/100:.2f}")
+
+    if len(patched) != len(variation_ids):
+        print("❌ Patch set does not match requested update count. Aborting.")
+        return False
 
     if dry_run:
         print(f"\n🏁 Dry run complete. {len(patched)} objects patched (not sent).")
@@ -201,7 +208,9 @@ def main():
     ok = safe_batch_update(client, updates, dry_run=args.dry_run)
 
     if ok and not args.dry_run and not args.no_cache_sync:
-        sync_square_cache(token)
+        sync_ok = sync_square_cache(token)
+        if not sync_ok:
+            ok = False
 
     sys.exit(0 if ok else 1)
 

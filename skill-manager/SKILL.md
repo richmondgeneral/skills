@@ -82,9 +82,9 @@ rg -n "^name:|^description:|^metadata:|version:|author:|updated:" ~/.claude/skil
 
 | Skill | Version | Updated |
 |-------|---------|---------|
-| `rg-full-auto` | 3.1 | 2026-02-15 |
-| `rg-item-update` | 1.2 | 2026-02-15 |
-| `rg-lot-tracker` | in progress | in progress |
+| `rg-full-auto` | 3.2 | 2026-02-15 |
+| `rg-item-update` | 1.3 | 2026-02-15 |
+| `rg-lot-tracker` | 1.0 | 2026-02-15 |
 
 ### Square Integration
 

@@ -10,6 +10,13 @@ description: >
   "new lot", "create lot", "record purchase", "bought for $X", "allocate costs",
   "ROI report", "profit report", "how's the lot doing", "price check against cost",
   "lot status", "lot summary", "record sale", "sold for $X", "break even", "margin check".
+metadata:
+  version: "1.0"
+  author: scottybe
+  updated: "2026-02-15"
+  changelog: |
+    v1.0 - Metadata normalization:
+    - Added required metadata fields for repository consistency checks
 ---
 
 # Richmond General Lot Tracker

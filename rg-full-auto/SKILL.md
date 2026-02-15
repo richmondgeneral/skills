@@ -11,6 +11,8 @@ metadata:
     - Use `<p>` tags for paragraphs instead of `<br>` tags in plain text
     - Use Unicode characters (©, –, —) instead of HTML entities (&copy;, &ndash;, &mdash;)
     - Added "Description Formatting Rules" reference table in Phase 2
+    - Updated Square category model to type + tier assignments with `reporting_category` guidance
+    - Added per-phase channel classification rules (Square IDs vs GitHub slugs vs Whatnot labels)
     - Prevents double-escaping that rendered raw `<br>` and `&amp;` on richmondgeneral.com
 
     v3.1 - square-cache reconciliation after writes:
@@ -105,14 +107,37 @@ Complete 10-phase workflow for onboarding new vintage/antique items from acquisi
 | GitHub Pages | https://richmondgeneral.github.io/items/ |
 | Working Directory | `/Users/scottybe/workspace/square/items/` |
 
-### Category Assignment (choose ONE)
+### Category Assignment (pick type + tier)
+
+**Type Categories (primary — determines reporting):**
 
 | Category | ID | Use For |
 |----------|----|---------|
-| The Real Rarities | `FL4L42RRUE5UXMWFDLXOCNB5` | Rare, special, showcase-worthy pieces |
-| The New Finds | `P34KX3L7XRZJJ5RP6W35K4YO` | Regular new inventory arrivals |
+| Books & Paper | `CLZCJ62H4TTHDQ3ZBYMZQASQ` | Books, magazines, paper ephemera |
+| Furniture | `W3EYAJJPTNC46WSLNYI4WH7V` | Stools, trunks, tables, chairs |
+| Pottery & Ceramics | `APSTFSN4UXQI44HBFSDTSEX7` | Mugs, vases, plaques, figurines |
+| Collectibles | `YQWBSOJDENMXDGUUQ3TGI3HF` | Games, toys, dolls, vintage misc |
+| Art & Craft Kits | `F4JQYK4Z5MEBV5VFCDYHIAWT` | Watercolor kits, craft supplies |
+| Wellness & Apothecary | `I5PMPWGTVR7IDBL4RUJWN3A4` | Teas, serums, natural products |
+| The Apothecary Cabinet | `6E7UZYZFNZBGFRJFH272RVBE` | Sage, ritual items, candles |
+| Home & Gifts | `AR3ZTA45KU4BH23AJ7LOLLRA` | Home decor, giftable items |
+| Analog | `N35REXL33FZWJNJV24IUQGPN` | Vinyl, pinball, analog tech |
 
-**Decision:** Is this genuinely rare/special → The Real Rarities. Standard new stock → The New Finds.
+**Tier Categories (secondary):**
+
+| Category | ID | Use For |
+|----------|----|---------|
+| The New Finds | `P34KX3L7XRZJJ5RP6W35K4YO` | Default intake — most new items get this |
+| The Real Rarities | `FL4L42RRUE5UXMWFDLXOCNB5` | Truly rare/showcase pieces only |
+
+**Assignment:** Pick type category → set as primary + `reporting_category`. Add The New Finds as secondary (or The Real Rarities if genuinely special). See `references/square-catalog.md` for full list including snack and TVM categories.
+
+### Channel Classification By Phase
+
+- **Phase 2 (Square):** Use Square category IDs (`categories` + `reporting_category`) from the tables above.
+- **Phase 7 (GitHub Pages):** Use website filter slugs in `data-category` (not Square IDs).
+- **Phase 8 (Whatnot):** Use Whatnot CSV category labels (not Square IDs, not website slugs).
+- **Channel gating:** Not every item must be published to every channel. Only run phases requested by the user/workflow.
 
 ## Python Environment
 
@@ -427,8 +452,11 @@ If lot tracking was skipped and no `allocated_cost` is available, skip this step
       "item_data": {
         "name": "Item Title",
         "description_html": "<p>First paragraph.</p><p>&nbsp;</p><p>Second paragraph.</p><p>&nbsp;</p><p><b>Condition:</b> Good. Notes here.</p>",
-        "categories": [{"id": "CHOSEN_CATEGORY_ID"}],
-        "reporting_category": {"id": "CHOSEN_CATEGORY_ID"},
+        "categories": [
+          {"id": "TYPE_CATEGORY_ID"},
+          {"id": "TIER_CATEGORY_ID"}
+        ],
+        "reporting_category": {"id": "TYPE_CATEGORY_ID"},
         "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
         "is_taxable": true,
         "ecom_visibility": "VISIBLE",
@@ -471,8 +499,11 @@ If lot tracking was skipped and no `allocated_cost` is available, skip this step
     "item_data": {
       "name": "Item Title",
       "description_html": "<p>First paragraph.</p><p>&nbsp;</p><p>Second paragraph.</p><p>&nbsp;</p><p><b>Condition:</b> Grade. Notes.</p>",
-      "categories": [{"id": "CHOSEN_CATEGORY_ID"}],
-      "reporting_category": {"id": "CHOSEN_CATEGORY_ID"},
+      "categories": [
+        {"id": "TYPE_CATEGORY_ID"},
+        {"id": "TIER_CATEGORY_ID"}
+      ],
+      "reporting_category": {"id": "TYPE_CATEGORY_ID"},
       "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
       "is_taxable": true,
       "ecom_visibility": "VISIBLE",
@@ -662,6 +693,8 @@ See `references/label-format.md` for Print Master settings.
 
 ## Phase 7: Info Card & Publishing
 
+Run this phase only if the item should be published to GitHub Pages.
+
 **Site:** https://richmondgeneral.github.io/items/
 **Repo:** /Users/scottybe/workspace/square/items/
 
@@ -740,7 +773,11 @@ do shell script "sed -i '' 's|<!-- Coming Soon Placeholder -->|<!-- RG-XXXX: Ite
             <!-- Coming Soon Placeholder -->|' /Users/scottybe/workspace/square/items/index.html"
 ```
 
-**Categories for filter:** `books`, `furniture`, `pottery`, `collectibles`
+**Categories for filter (`data-category` on index card):**
+- `books` → Square type `Books & Paper`
+- `furniture` → Square type `Furniture`
+- `pottery` → Square type `Pottery & Ceramics`
+- `collectibles` → Square types `Collectibles`, `Art & Craft Kits`, `Wellness & Apothecary`, `The Apothecary Cabinet`, `Home & Gifts`, `Analog`
 
 ### Step 7.4: Update item count
 
@@ -767,6 +804,8 @@ do shell script "cd /Users/scottybe/workspace/square/items && git add RG-XXXX/ i
 ---
 
 ## Phase 8: Whatnot Item Library Listing
+
+Run this phase only if the item should be listed on Whatnot.
 
 **Method:** CSV bulk import (no API/MCP connector exists for Whatnot)
 **Image hosting:** GitHub Pages — `https://richmondgeneral.github.io/items/RG-XXXX/hero.png`

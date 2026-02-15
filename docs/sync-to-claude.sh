@@ -77,6 +77,11 @@ if [[ ! -d "$SOURCE_DIR" ]]; then
     exit 1
 fi
 
+if ! command -v rsync >/dev/null 2>&1; then
+    echo "rsync is required but not found in PATH." >&2
+    exit 1
+fi
+
 mkdir -p "$TARGET_DIR"
 
 SOURCE_REAL="$(cd "$SOURCE_DIR" && pwd -P)"
@@ -129,19 +134,30 @@ echo "Sync target: $TARGET_REAL"
 echo "Skills: ${SKILLS[*]}"
 echo
 
+SYNCED_COUNT=0
+SKIPPED_COUNT=0
+
 for skill_name in "${SKILLS[@]}"; do
     src="$SOURCE_DIR/$skill_name"
     dst="$TARGET_DIR/$skill_name"
 
     if [[ ! -f "$src/SKILL.md" ]]; then
         echo "Skipping '$skill_name' (no SKILL.md found at $src)" >&2
+        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
         continue
     fi
 
     mkdir -p "$dst"
     echo "Syncing $skill_name"
     rsync "${RSYNC_OPTS[@]}" "$src/" "$dst/"
+    SYNCED_COUNT=$((SYNCED_COUNT + 1))
 done
+
+if [[ "$SYNCED_COUNT" -eq 0 ]]; then
+    echo
+    echo "No valid skills were synced. Check --skill names or source path." >&2
+    exit 1
+fi
 
 echo
 if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -150,3 +166,5 @@ else
     echo "Sync complete."
     echo "If Claude does not pick up changes immediately, restart Claude Desktop."
 fi
+
+echo "Summary: synced=$SYNCED_COUNT skipped=$SKIPPED_COUNT"

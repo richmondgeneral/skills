@@ -5,21 +5,64 @@
 - **Location ID:** B87BAEZ0NWV34 (Richmond General - ACTIVE)
 - **Merchant ID:** 7MM9AFJAD0XHW
 
+**Scope:** This reference is for Square catalog payloads only. GitHub Pages and Whatnot use separate category formats.
+
 ## Categories
 
-### RG Categories (choose ONE)
+### RG Type Categories (choose ONE primary)
 
 | Category | ID | Use For |
 |----------|-----|---------|
-| **The Real Rarities** | `FL4L42RRUE5UXMWFDLXOCNB5` | Rare, special, showcase-worthy pieces |
-| **The New Finds** | `P34KX3L7XRZJJ5RP6W35K4YO` | Regular new inventory arrivals |
+| **Books & Paper** | `CLZCJ62H4TTHDQ3ZBYMZQASQ` | Books, magazines, paper ephemera, cookbooks |
+| **Furniture** | `W3EYAJJPTNC46WSLNYI4WH7V` | Stools, trunks, tables, chairs, shelving |
+| **Pottery & Ceramics** | `APSTFSN4UXQI44HBFSDTSEX7` | Mugs, vases, plaques, figurines, Hummel |
+| **Collectibles** | `YQWBSOJDENMXDGUUQ3TGI3HF` | Games, toys, dolls, ornaments, vintage misc |
+| **Art & Craft Kits** | `F4JQYK4Z5MEBV5VFCDYHIAWT` | Watercolor kits, craft supplies, DIY art |
+| **Wellness & Apothecary** | `I5PMPWGTVR7IDBL4RUJWN3A4` | Teas, serums, tinctures, natural products, R&L brand |
+| **The Apothecary Cabinet** | `6E7UZYZFNZBGFRJFH272RVBE` | Sage bundles, ritual items, candles, display |
+| **Home & Gifts** | `AR3ZTA45KU4BH23AJ7LOLLRA` | Home decor, giftable items |
+| **Analog** | `N35REXL33FZWJNJV24IUQGPN` | Vinyl, pinball, film, analog tech |
 
-**Decision:** Is this genuinely rare/special → The Real Rarities. Standard new stock → The New Finds.
+### Snack Categories
+
+| Category | ID | Use For |
+|----------|-----|---------|
+| **Chips & Crisps** | `RZDJCH4X2C725QEU2AQCX2Y6` | Potato chips, tallow chips, savory snacks |
+| **Cookies & Sweets** | `E23E2FWMORU4VLHRVTDMNWKB` | Biscuits, candy, chocolate |
+| **Drinks** | `Z4CC7D2BNM5YLEQZXL6VA7I2` | Beverages, tea, juice |
+| **Asian Imports** | `3NDGJCHLWBB3D7XKRJLYGCPF` | Japanese/Korean/Chinese snacks |
+
+### Tier Categories (secondary overlay)
+
+| Category | ID | Use For |
+|----------|-----|---------|
+| **The Real Rarities** | `FL4L42RRUE5UXMWFDLXOCNB5` | Truly rare, showcase-worthy pieces (secondary only) |
+| **The New Finds** | `P34KX3L7XRZJJ5RP6W35K4YO` | Default intake category — new items land here, get sorted later |
+
+### TVM Categories (reserved)
+
+| Category | ID | Use For |
+|----------|-----|---------|
+| Classic Beauty | `FRBSRJRTP5Q5UQXPHK5JB666` | Vintage beauty, fashion |
+| Timeless Treasures | `3N3II4W6Q7AA43RWQGEEWELY` | Rare French/European vintage |
+| Expressly TVM | `JSL7MTE6Y2QRXTV2VCASRF2R` | TVM exclusives |
+| Whimsical Gifts | `RXMZRCGB2XUBRSB4FQYZE464` | Giftable vintage |
+
+### Category Assignment Rules
+
+1. **Primary category** = type-based (Books & Paper, Furniture, etc.) — determines reporting
+2. **Secondary category** = The New Finds (default intake) — items get moved out over time
+3. **The Real Rarities** = reserved for genuinely rare/special items — replaces The New Finds as secondary
+4. **Reporting category** = ALWAYS set to the type-based primary category (for Square sales reports)
+
+**Decision flow:**
+- Pick the type category that best fits → set as primary + reporting_category
+- Add The New Finds as secondary (or The Real Rarities if genuinely special)
 
 ### Reporting Category
 
 - **MUST be set** for items to appear in Category Sales reports
-- Use the same category as the item assignment
+- Use the type-based **primary** category ID (not the tier category)
 - If not set via API, item won't be attributed to any category in reports
 
 ### Tax ID
@@ -50,11 +93,12 @@ Fallback: `catalog.upsertCatalogObject`
       "present_at_location_ids": ["B87BAEZ0NWV34"],
       "item_data": {
         "name": "Product Name",
-        "description": "Description with <br> for line breaks",
+        "description_html": "<p>Description paragraph one.</p><p>&nbsp;</p><p><b>Condition:</b> Good.</p>",
         "categories": [
-          {"id": "CHOSEN_CATEGORY_ID"}
+          {"id": "TYPE_CATEGORY_ID"},
+          {"id": "TIER_CATEGORY_ID"}
         ],
-        "reporting_category": {"id": "CHOSEN_CATEGORY_ID"},
+        "reporting_category": {"id": "TYPE_CATEGORY_ID"},
         "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
         "is_taxable": true,
         "ecom_visibility": "VISIBLE",
@@ -95,9 +139,12 @@ Fallback: `catalog.upsertCatalogObject`
     "present_at_location_ids": ["B87BAEZ0NWV34"],
     "item_data": {
       "name": "Product Name",
-      "description": "Description with <br> for line breaks",
-      "categories": [{"id": "CHOSEN_CATEGORY_ID"}],
-      "reporting_category": {"id": "CHOSEN_CATEGORY_ID"},
+      "description_html": "<p>Description paragraph one.</p><p>&nbsp;</p><p><b>Condition:</b> Good.</p>",
+      "categories": [
+        {"id": "TYPE_CATEGORY_ID"},
+        {"id": "TIER_CATEGORY_ID"}
+      ],
+      "reporting_category": {"id": "TYPE_CATEGORY_ID"},
       "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
       "is_taxable": true,
       "ecom_visibility": "VISIBLE",
@@ -172,9 +219,10 @@ When updating, you MUST include the current `version` and use `sparse_update: tr
       "version": 1234567890123,
       "item_data": {
         "categories": [
-          {"id": "CHOSEN_CATEGORY_ID"}
+          {"id": "TYPE_CATEGORY_ID"},
+          {"id": "TIER_CATEGORY_ID"}
         ],
-        "reporting_category": {"id": "CHOSEN_CATEGORY_ID"}
+        "reporting_category": {"id": "TYPE_CATEGORY_ID"}
       }
     }]
   }]

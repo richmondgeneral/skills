@@ -2,10 +2,15 @@
 name: image-processor
 description: Unified image processing with background removal, generation, editing, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "photos library", "get from photos", or when rg-full-auto needs image processing.
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: scottybe
-  updated: "2025-12-21"
+  updated: "2026-02-15"
   changelog: |
+    v1.1 - Background removal reliability improvements:
+    - `process.py --model` now enforces preferred model ordering
+    - Added remove.bg request profile fallbacks and retry handling
+    - Added output mask-quality check with auto-recovery retry via remove.bg
+
     v1.0 - Initial consolidated release:
     - Merged gemini-chat, image-generation-skill, image-editing-skill
     - Unified model routing with fallback chain
@@ -105,10 +110,14 @@ Options:
   -o, --output PATH  Output image path
   -t, --task TASK    Task type: remove-bg, analyze (default: remove-bg)
   -q, --quality LVL  Quality: low, medium, high, premium (default: high)
-  -m, --model MODEL  Model: nano-banana, gemini25, removebg, auto
+  -m, --model MODEL  Model preference: nano-banana, gemini25, removebg, auto
   --json             Output JSON
   -v, --verbose      Verbose output
 ```
+
+Notes:
+- `--model` is honored as first-choice routing (with fallback chain if it fails).
+- `remove-bg` runs a mask-quality check and auto-retries with `removebg` when output looks like a rectangular box mask.
 
 ### generate.py
 
@@ -297,6 +306,7 @@ uv run --project ~/.claude/skills python \
 **Poor background removal:**
 - Try `--quality premium`
 - Use `--model removebg` for best results (paid)
+- Re-run with `-v` to see mask-quality metrics and auto-recovery behavior
 
 **Generation timeout:**
 - Try `--quality fast` for quicker results

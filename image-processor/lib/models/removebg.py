@@ -3,7 +3,7 @@ import os
 import time
 import requests
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 
 try:
     from .base import BaseModel, ProcessingResult, TaskConfig, TaskType
@@ -61,16 +61,7 @@ class RemoveBgModel(BaseModel):
             input_path = Path(image_path)
             output_path = str(input_path.parent / f"{input_path.stem}-nobg.{task_config.output_format}")
 
-        with open(image_path, 'rb') as image_file:
-            response = requests.post(
-                f"{self.base_url}/removebg",
-                files={'image_file': image_file},
-                headers={'X-Api-Key': self.api_key},
-                timeout=30
-            )
-
-        if response.status_code != 200:
-            raise Exception(f"API error: {response.status_code} - {response.text}")
+        response, payload_used = self._call_removebg_with_fallbacks(image_path)
 
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, 'wb') as out_file:
@@ -86,7 +77,68 @@ class RemoveBgModel(BaseModel):
             cost=self.cost_per_image,
             output_path=output_path,
             metadata={
-                'credits_charged': response.headers.get('X-Credits-Charged', 1)
+                'credits_charged': response.headers.get('X-Credits-Charged', 1),
+                'credits_remaining': response.headers.get('X-Credits-Remaining'),
+                'request_profile': payload_used
             },
             success=True
         )
+
+    def _call_removebg_with_fallbacks(self, image_path: str) -> Tuple[requests.Response, str]:
+        """
+        Call remove.bg with retries and profile fallbacks.
+
+        Returns:
+            Tuple of (successful HTTP response, profile label used)
+        """
+        profiles = [
+            ('product', {'size': 'auto', 'type': 'product', 'format': 'png'}),
+            ('generic_png', {'size': 'auto', 'format': 'png'}),
+            ('basic', {'size': 'auto'}),
+        ]
+        max_attempts = 2
+        last_error = None
+
+        for profile_name, payload in profiles:
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    with open(image_path, 'rb') as image_file:
+                        response = requests.post(
+                            f"{self.base_url}/removebg",
+                            files={'image_file': image_file},
+                            data=payload,
+                            headers={'X-Api-Key': self.api_key},
+                            timeout=45
+                        )
+                except requests.RequestException as e:
+                    last_error = f"{profile_name} attempt {attempt}: {e}"
+                    if attempt < max_attempts:
+                        time.sleep(0.75 * attempt)
+                        continue
+                    break
+
+                if response.status_code == 200:
+                    return response, profile_name
+
+                # Retry transient upstream failures.
+                if response.status_code in (429, 500, 502, 503, 504) and attempt < max_attempts:
+                    last_error = (
+                        f"{profile_name} attempt {attempt}: "
+                        f"HTTP {response.status_code} - {response.text[:200]}"
+                    )
+                    time.sleep(0.75 * attempt)
+                    continue
+
+                # Profile might be rejected for this image/account; fall through to next profile.
+                if response.status_code in (400, 422):
+                    last_error = (
+                        f"{profile_name} rejected: HTTP {response.status_code} - "
+                        f"{response.text[:200]}"
+                    )
+                    break
+
+                # Non-recoverable for this profile.
+                last_error = f"{profile_name}: HTTP {response.status_code} - {response.text[:200]}"
+                break
+
+        raise Exception(last_error or "remove.bg request failed")

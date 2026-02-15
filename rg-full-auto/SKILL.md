@@ -2,10 +2,14 @@
 name: rg-full-auto
 description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "2.6"
+  version: "2.7"
   author: scottybe
   updated: "2026-02-15"
   changelog: |
+    v2.7 - Background removal quality hardening:
+    - Phase 0.7 now requests premium remove.bg path (`--model removebg --quality premium`)
+    - Aligns onboarding workflow with improved image-processor model preference handling
+
     v2.6 - Photos Library auto-cluster intake:
     - Added Step 0.4 to discover product photo clusters via photos-library
     - Added UUID-based photo copy flow for the selected cluster
@@ -184,7 +188,7 @@ do shell script "sips -s format png '/ABSOLUTE/SOURCE_IMAGE_PATH' --out '/Users/
 ### Step 0.7: Remove background
 
 ```applescript
-do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/image-processor/scripts/process.py '/ABSOLUTE/REMOVE_BG_INPUT' --output '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' 2>&1"
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/image-processor/scripts/process.py '/ABSOLUTE/REMOVE_BG_INPUT' --output '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' --quality premium --model removebg 2>&1"
 ```
 
 **Prerequisites:** `~/.env` must have `REMOVEBG_API_KEY`. Note: Must `source ~/.env` to load API key.

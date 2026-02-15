@@ -48,6 +48,7 @@ class TaskConfig:
     output_path: Optional[str] = None
     output_format: str = 'png'
     prefer_free: bool = True
+    model_preference: str = 'auto'  # 'auto', 'nano-banana', 'gemini25', 'removebg'
 
     # Generation/editing specific
     prompt: Optional[str] = None

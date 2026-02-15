@@ -206,13 +206,36 @@ class ModelRouter:
         capable = [m for m in self.models if m.supports_task(task_config.task_type)]
         healthy = [m for m in capable if m.health_check()]
 
+        preferred_model = None
+        model_pref = (task_config.model_preference or 'auto').lower()
+        if model_pref != 'auto':
+            for model in healthy:
+                if self._matches_model_preference(model, model_pref):
+                    preferred_model = model
+                    break
+
         def sort_key(model):
             caps = model.get_capabilities()
             cost_value = 0 if caps['cost'] == 'free' else 1
             return (-caps['quality_score'], cost_value, caps['avg_time'])
 
         healthy.sort(key=sort_key)
+        if preferred_model:
+            return [preferred_model] + [m for m in healthy if m is not preferred_model]
+
         return healthy
+
+    @staticmethod
+    def _matches_model_preference(model: BaseModel, model_pref: str) -> bool:
+        """Check whether a model matches a CLI/user preference token."""
+        name = model.__class__.__name__
+        if model_pref == 'removebg':
+            return name == 'RemoveBgModel'
+        if model_pref == 'gemini25':
+            return name == 'Gemini25FlashModel'
+        if model_pref == 'nano-banana':
+            return name == 'NanaBananaModel'
+        return False
 
     def get_model_status(self) -> Dict[str, Any]:
         """Get status of all models."""

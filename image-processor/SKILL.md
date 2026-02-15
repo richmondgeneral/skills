@@ -215,7 +215,7 @@ Set in `~/.env` (sourced by `~/.zshrc`):
 ```bash
 export GEMINI_API_KEY="your-key"        # Gemini 2.5 Flash + image gen/edit
 export NANO_BANANA_API_KEY="your-key"   # Nano Banana Pro (Gemini 3)
-export REMOVE_BG_API_KEY="your-key"     # remove.bg (optional, paid)
+export REMOVE_BG_API_KEY="your-key"     # remove.bg (optional, paid; REMOVEBG_API_KEY also accepted)
 ```
 
 ## Python API

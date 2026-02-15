@@ -15,7 +15,11 @@ class RemoveBgModel(BaseModel):
     """remove.bg API image processing model."""
 
     def __init__(self, api_key: str = None):
-        super().__init__(api_key or os.getenv('REMOVE_BG_API_KEY'))
+        super().__init__(
+            api_key
+            or os.getenv('REMOVE_BG_API_KEY')
+            or os.getenv('REMOVEBG_API_KEY')
+        )
         self.base_url = 'https://api.remove.bg/v1.0'
         self.cost_per_image = 0.009
 

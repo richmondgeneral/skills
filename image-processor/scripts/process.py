@@ -88,7 +88,10 @@ def try_removebg_recovery(image_path: str, output_path: str, quality_mode: str,
         return None
 
     if verbose:
-        print("Mask quality check flagged rectangular output; retrying with remove.bg...")
+        print(
+            "Mask quality check flagged rectangular output; retrying with remove.bg...",
+            file=sys.stderr
+        )
 
     retry_config = TaskConfig(
         task_type=TaskType.REMOVE_BG,
@@ -153,8 +156,8 @@ def main():
     router = create_default_router()
 
     if args.verbose:
-        print(f"Processing: {args.image}")
-        print(f"Task: {args.task}, Quality: {args.quality}, Model: {args.model}")
+        print(f"Processing: {args.image}", file=sys.stderr)
+        print(f"Task: {args.task}, Quality: {args.quality}, Model: {args.model}", file=sys.stderr)
 
     result = router.process_with_fallback(args.image, task_config)
 
@@ -169,7 +172,8 @@ def main():
                     f"transparent={mask_quality['transparent_ratio']:.1%},",
                     f"occupancy={mask_quality['occupancy_ratio']:.1%},",
                     f"semi={mask_quality['semi_alpha_ratio']:.1%},",
-                    f"alpha_levels={mask_quality['unique_alpha_values']}"
+                    f"alpha_levels={mask_quality['unique_alpha_values']}",
+                    file=sys.stderr
                 )
 
             if mask_quality['suspicious_rect_mask'] and result.model_used != 'remove.bg':
@@ -182,7 +186,10 @@ def main():
                         retry_result.metadata['mask_quality'] = retry_quality
                     result = retry_result
                 elif args.verbose:
-                    print("remove.bg recovery unavailable or failed; keeping initial output.")
+                    print(
+                        "remove.bg recovery unavailable or failed; keeping initial output.",
+                        file=sys.stderr
+                    )
 
     if args.json:
         import json

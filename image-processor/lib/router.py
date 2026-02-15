@@ -1,4 +1,5 @@
 """Smart model routing logic for unified image processing."""
+import sys
 from typing import List, Optional, Dict, Any
 
 try:
@@ -174,7 +175,8 @@ class ModelRouter:
         last_error = None
         for model in models_to_try:
             try:
-                print(f"Trying {model.__class__.__name__}...")
+                # Route progress logs to stderr so JSON stdout remains parseable.
+                print(f"Trying {model.__class__.__name__}...", file=sys.stderr)
                 result = model.process_image(image_path, task_config)
 
                 if result.success:
@@ -202,6 +204,7 @@ class ModelRouter:
         # 1. Nano Banana Pro (98%, free, 7.9s)
         # 2. Gemini 2.5 Flash (95%, free, 8.4s)
         # 3. remove.bg (100%, paid, 2.8s)
+        # Keep paid remove.bg as fallback unless explicitly requested.
 
         capable = [m for m in self.models if m.supports_task(task_config.task_type)]
         healthy = [m for m in capable if m.health_check()]
@@ -216,10 +219,23 @@ class ModelRouter:
 
         def sort_key(model):
             caps = model.get_capabilities()
-            cost_value = 0 if caps['cost'] == 'free' else 1
-            return (-caps['quality_score'], cost_value, caps['avg_time'])
+            return (-caps['quality_score'], caps['avg_time'])
 
-        healthy.sort(key=sort_key)
+        if task_config.task_type == TaskType.REMOVE_BG:
+            preferred_order = {
+                'NanaBananaModel': 0,
+                'Gemini25FlashModel': 1,
+                'RemoveBgModel': 2,
+            }
+            healthy.sort(
+                key=lambda model: (
+                    preferred_order.get(model.__class__.__name__, 99),
+                    sort_key(model),
+                )
+            )
+        else:
+            healthy.sort(key=sort_key)
+
         if preferred_model:
             return [preferred_model] + [m for m in healthy if m is not preferred_model]
 

@@ -51,8 +51,35 @@ do shell script "source ~/.env && python3 ~/.claude/skills/[skill]/scripts/[scri
 | `get_type_info` | Get request/response schemas |
 | `make_api_request` | Execute API calls |
 
+### Required usage pattern
+
+For new methods (especially catalog/beta features), always use:
+
+1. Discover
+```
+get_service_info(service: "catalog")
+```
+
+2. Understand request shape
+```
+get_type_info(service: "catalog", method: "list")
+```
+
+3. Execute
+```
+make_api_request(service: "catalog", method: "list", request: {})
+```
+
 **Works:** Catalog CRUD, payment links, customers, inventory, orders
 **Multipart note:** Official Square MCP server may support `catalog.createImage` and `catalog.updateImage`, but behavior varies by MCP client/version.
+
+### Environment pin (local official server)
+
+Square MCP is configured for:
+- `PRODUCTION=true`
+- `SQUARE_VERSION=2026-01-22`
+
+This pins request behavior to the production API on the specified version.
 
 ### Image Upload Default
 

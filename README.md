@@ -71,6 +71,19 @@ cd ~/.claude/skills
 git pull
 ```
 
+If your git repo lives elsewhere and you want to deploy into Claude's load path:
+
+```bash
+cd /path/to/skills-repo
+./docs/sync-to-claude.sh --target ~/.claude/skills
+```
+
+Preview without writing files:
+
+```bash
+./docs/sync-to-claude.sh --target ~/.claude/skills --dry-run
+```
+
 ## Related Repositories
 
 - **Items Site**: [richmondgeneral.github.io/items](https://richmondgeneral.github.io/items/) - Public gallery

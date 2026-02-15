@@ -4,7 +4,7 @@ Quick Square customer lookup by phone number.
 Outputs JSON with search request for Claude to use with Square MCP.
 
 This script doesn't call Square directly - it generates the request
-that Claude will execute via Square:make_api_request.
+that Claude will execute via mcp_square_api:make_api_request.
 
 Usage:
   python3 lookup_customer.py +13124483219
@@ -57,7 +57,7 @@ def build_search_request(phone):
     """
     Build Square customer search request for phone lookup.
     
-    Returns dict ready for Square:make_api_request with:
+    Returns dict ready for mcp_square_api:make_api_request with:
       service: "customers"
       method: "search"
     """
@@ -105,7 +105,7 @@ if __name__ == '__main__':
     # Also print MCP command example to stderr for reference
     print("", file=sys.stderr)
     print("# Use with Square MCP:", file=sys.stderr)
-    print(f"# Square:make_api_request", file=sys.stderr)
+    print(f"# mcp_square_api:make_api_request", file=sys.stderr)
     print(f"#   service='customers'", file=sys.stderr)
     print(f"#   method='search'", file=sys.stderr)
     print(f"#   request={json.dumps(request)}", file=sys.stderr)

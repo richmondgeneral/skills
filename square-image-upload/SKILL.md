@@ -168,7 +168,7 @@ do shell script "source ~/.env && python3 ~/.claude/skills/square-image-upload/s
 Use Square MCP to search catalog:
 
 ```
-Square:make_api_request
+mcp_square_api:make_api_request
   service: catalog
   method: searchItems
   request: {"text_filter": {"keywords": ["product name"]}}

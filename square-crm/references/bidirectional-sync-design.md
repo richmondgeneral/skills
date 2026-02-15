@@ -329,7 +329,7 @@ sync_version: 2"
 
 **Step 4: Pushes to Square via API**
 ```
-Square:make_api_request
+mcp_square_api:make_api_request
   service: "customers"
   method: "update"
   request: {customer_id: "...", note: "..."}

@@ -128,7 +128,7 @@ See `~/.claude/skills/PYTHON.md` for setup details.
 
 Use square-cache for fast lookup:
 ```
-square-cache:square_cache_search with sku_pattern: "RG-"
+RGSquareItemCache:square_cache_search with sku_pattern: "RG-"
 ```
 Find highest RG-XXXX and increment to get candidate SKU.
 
@@ -137,7 +137,7 @@ Find highest RG-XXXX and increment to get candidate SKU.
 **Cache may be stale.** Before committing to the SKU, verify via cache with exact match:
 
 ```
-square-cache:square_cache_search with sku_pattern: "RG-XXXX"
+RGSquareItemCache:square_cache_search with sku_pattern: "RG-XXXX"
 ```
 
 Check the results for an **exact SKU match** (not substring). The cache search returns partial matches, so verify the specific SKU string appears in results.
@@ -474,7 +474,7 @@ If lot tracking was skipped and no `allocated_cost` is available, skip this step
 
 **Use Square MCP:**
 ```
-Square:make_api_request
+mcp_square_api:make_api_request
   service: inventory
   method: batchChange   ← EXACT NAME (not batchChangeInventory)
 ```
@@ -522,7 +522,7 @@ After catalog create (Phase 2), inventory write (Phase 3), and image upload (Pha
 
 **Primary (MCP):**
 ```
-square-cache:square_cache_sync
+RGSquareItemCache:square_cache_sync
 ```
 
 **Fallback (local script):**
@@ -534,13 +534,13 @@ Then verify:
 
 1. Exact SKU exists in cache
 ```
-square-cache:square_cache_search with sku_pattern: "RG-XXXX"
+RGSquareItemCache:square_cache_search with sku_pattern: "RG-XXXX"
 ```
 Confirm exact `RG-XXXX` match (not substring only).
 
 2. Cached item includes uploaded image
 ```
-square-cache:square_cache_get_item with item_id: "CATALOG_ITEM_ID"
+RGSquareItemCache:square_cache_get_item with item_id: "CATALOG_ITEM_ID"
 ```
 Confirm `item_data.image_ids` contains the image ID from Phase 4. If not, run sync once more and re-check.
 
@@ -557,7 +557,7 @@ Confirm `item_data.image_ids` contains the image ID from Phase 4. If not, run sy
 
 **Use Square MCP:**
 ```
-Square:make_api_request
+mcp_square_api:make_api_request
   service: checkout
   method: createPaymentLink
 ```

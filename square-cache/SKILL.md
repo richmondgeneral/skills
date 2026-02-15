@@ -38,9 +38,9 @@ This skill supports **two access methods** depending on your environment:
 1. **Bash commands** (terminal/Warp CLI) - Use `square_cache.sh` wrapper
 2. **MCP tools** (Warp Agent Mode) - Native tool integration via MCP server
 
-### MCP Tools (Warp Agent Mode)
+### MCP Tools (Claude Desktop / Agent Mode)
 
-**Available MCP tools when square-cache MCP server is configured:**
+**Available MCP tools when `RGSquareItemCache` MCP server is configured:**
 - `square_cache_search` - Search by name or SKU
 - `square_cache_get_item` - Get full item details
 - `square_cache_status` - Check cache health

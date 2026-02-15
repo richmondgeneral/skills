@@ -215,7 +215,7 @@ def parse_contacts():
 def format_for_square(customer):
     """
     Format customer dict for Square API create request.
-    Returns dict ready to pass to Square:make_api_request.
+    Returns dict ready to pass to mcp_square_api:make_api_request.
     """
     req = {
         'given_name': customer['given_name'],

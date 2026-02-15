@@ -103,7 +103,7 @@ python3 ~/.claude/skills/square-crm/scripts/sync_to_apple_contacts.py +131291438
 
 **Search by phone:**
 ```javascript
-Square:make_api_request
+mcp_square_api:make_api_request
   service: "customers"
   method: "search"
   request: { query: { filter: { phone_number: { exact: "+13124483219" }}}}
@@ -111,7 +111,7 @@ Square:make_api_request
 
 **Create customer:**
 ```javascript
-Square:make_api_request
+mcp_square_api:make_api_request
   service: "customers"
   method: "create"
   characterization: "Creating customer from iMessage contact"
@@ -126,7 +126,7 @@ Square:make_api_request
 
 **Add to group:**
 ```javascript
-Square:make_api_request
+mcp_square_api:make_api_request
   service: "customers"
   method: "addGroupTo"
   request: { customer_id: "ID", group_id: "4A4AG6K8CYAYC7T2HSE2R04EJE" }

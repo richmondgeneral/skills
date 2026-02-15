@@ -24,14 +24,14 @@ Lightweight operations for modifying existing catalog items.
 | Key | Value |
 |-----|-------|
 | Square Location | B87BAEZ0NWV34 |
-| Search cache | `square_cache_search` (fast) |
+| Search cache | `RGSquareItemCache:square_cache_search` (fast) |
 | Direct API | `catalog.searchItems` |
 
 ## Find the Item First
 
 **Option 1: Cache search (fastest)**
 ```
-square_cache_search with name_pattern or sku_pattern
+RGSquareItemCache:square_cache_search with name_pattern or sku_pattern
 ```
 
 **Option 2: API search**
@@ -155,7 +155,7 @@ After any write to Square (price, description, category, image, inventory), sync
 
 **Primary (MCP):**
 ```
-square_cache_sync
+RGSquareItemCache:square_cache_sync
 ```
 
 **Fallback (local script):**
@@ -164,7 +164,7 @@ uv run --project ~/.claude/skills python ~/.claude/skills/square-cache/scripts/c
 ```
 
 Verification:
-- Query the changed SKU/item via `square_cache_search` or `square_cache_get_item`
+- Query the changed SKU/item via `RGSquareItemCache:square_cache_search` or `RGSquareItemCache:square_cache_get_item`
 - For image updates, confirm `item_data.image_ids` includes the new image
 - For batch updates, run one sync at the end, then spot-check at least 3 updated items
 

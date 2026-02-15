@@ -41,7 +41,7 @@ do shell script "source ~/.env && python3 ~/.claude/skills/[skill]/scripts/[scri
 
 ---
 
-## Square MCP (`Square:*`)
+## Square MCP (`mcp_square_api:*`)
 
 **Use for:** Square API operations (JSON-first; multipart support depends on connector build)
 
@@ -73,13 +73,12 @@ make_api_request(service: "catalog", method: "list", request: {})
 **Works:** Catalog CRUD, payment links, customers, inventory, orders
 **Multipart note:** Official Square MCP server may support `catalog.createImage` and `catalog.updateImage`, but behavior varies by MCP client/version.
 
-### Environment pin (local official server)
+### Runtime mode
 
-Square MCP is configured for:
-- `PRODUCTION=true`
-- `SQUARE_VERSION=2026-01-22`
+Configured as Square Remote MCP:
+- `npx mcp-remote https://mcp.squareup.com/sse`
 
-This pins request behavior to the production API on the specified version.
+This keeps Square auth/runtime managed by Square. If strict API version pinning is required later, switch to the local official server mode.
 
 ### Image Upload Default
 
@@ -97,7 +96,7 @@ do shell script "source ~/.env && python3 ~/.claude/skills/square-image-upload/s
 
 ---
 
-## square-cache MCP (`square-cache:*`)
+## Square Cache MCP (`RGSquareItemCache:*`)
 
 **Use for:** Fast catalog lookups (100x faster than API)
 
@@ -129,9 +128,9 @@ Need to...
 │
 ├─ Read/write text file on Mac? → Filesystem MCP
 ├─ Process binary image? → osascript + Python script
-├─ Call Square API (JSON)? → Square MCP
+├─ Call Square API (JSON)? → mcp_square_api
 ├─ Upload image to Square? → osascript + square-image-upload skill ✅
-├─ Search catalog fast? → square-cache MCP
+├─ Search catalog fast? → RGSquareItemCache
 ├─ Git commit/push? → osascript
 └─ Create Linear issue? → Linear MCP
 ```

@@ -10,6 +10,7 @@ dependencies = [
     "qrcode[pil]>=7.4.0",
     "pillow>=10.0.0",
     "google-generativeai>=0.4.0",
+    "squareup>=44.0.1.20260122",
 ]
 
 [project.optional-dependencies]

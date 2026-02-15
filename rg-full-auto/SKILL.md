@@ -1,11 +1,16 @@
 ---
 name: rg-full-auto
-description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
+description: End-to-end 9-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, info card publishing, and Whatnot CSV listing. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "2.8"
+  version: "2.9"
   author: scottybe
   updated: "2026-02-15"
   changelog: |
+    v2.9 - Whatnot workflow metadata alignment:
+    - Updated skill description to reflect 9-phase workflow
+    - Added Whatnot CSV listing to top-level capability summary
+    - Bumped metadata version to match current Phase 8 coverage
+
     v2.8 - Square Phase 2 connector compatibility hardening:
     - Added method fallback path (`batchInsertObjects` -> `upsertCatalogObject`)
     - Clarified `idempotency_key` must remain top-level for both payloads
@@ -58,7 +63,7 @@ metadata:
 
 # Richmond General Full Auto
 
-Complete 8-phase workflow for onboarding new vintage/antique items from acquisition to sale-ready.
+Complete 9-phase workflow for onboarding new vintage/antique items from acquisition to sale-ready.
 
 ## Architecture Note
 
@@ -677,6 +682,82 @@ do shell script "cd /Users/scottybe/workspace/square/items && git add RG-XXXX/ i
 
 ---
 
+## Phase 8: Whatnot Item Library Listing
+
+**Method:** CSV bulk import (no API/MCP connector exists for Whatnot)
+**Image hosting:** GitHub Pages — `https://richmondgeneral.github.io/items/RG-XXXX/hero.png`
+**Account:** richmondgeneral on whatnot.com
+
+### Step 8.1: Append row to Whatnot batch CSV
+
+**Batch file:** `/Users/scottybe/workspace/square/items/rg-inventory/whatnot-import.csv`
+
+**CSV columns (exact header names — must match Whatnot template):**
+
+```
+Category,Sub Category,Title,Description,Quantity,Type,Price,Shipping Profile,Offerable,Hazmat,Condition,Cost Per Item,SKU,Image URL 1,Image URL 2,Image URL 3,Image URL 4,Image URL 5,Image URL 6,Image URL 7,Image URL 8
+```
+
+**Field mapping from earlier phases:**
+
+| CSV Column | Source | Example |
+|------------|--------|---------|
+| Category | Whatnot category (see allowed values below) | `Rare & Vintage Books` |
+| Sub Category | Optional sub-category | _(leave empty if N/A)_ |
+| Title | Item title from Phase 1 | `Dick Tracy: The Art of Chester Gould (1978) Exhibition Catalogue` |
+| Description | Plain text description from Phase 1 (NOT HTML) | Full provenance + condition |
+| Quantity | Always `1` for unique items | `1` |
+| Type | Always `Buy it Now` for fixed-price | `Buy it Now` |
+| Price | Dollar amount (whole number or decimal) | `40` |
+| Shipping Profile | Weight bracket (must match allowed values) | `1-2 lbs` |
+| Offerable | `TRUE` to accept offers | `TRUE` |
+| Hazmat | Always `Not Hazmat` | `Not Hazmat` |
+| Condition | Item condition | `Good` |
+| Cost Per Item | Allocated cost from lot tracker (seller-only) | `66.66` |
+| SKU | Same SKU as Square | `RG-0015` |
+| Image URL 1 | GitHub Pages hero image | `https://richmondgeneral.github.io/items/RG-0015/hero.png` |
+| Image URL 2-8 | Additional images if available | _(leave empty)_ |
+
+**⚠️ IMPORTANT:** Values for Category, Condition, Type, and Shipping Profile must exactly match Whatnot's allowed values. See allowed values section below.
+
+**Append command:**
+```applescript
+do shell script "echo '\"Rare & Vintage Books\",,\"Item Title\",\"Plain text description\",1,Buy it Now,40,1-2 lbs,TRUE,Not Hazmat,Good,66.66,RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/hero.png,,,,,,,,' >> ~/workspace/square/items/rg-inventory/whatnot-import.csv"
+```
+
+### Step 8.2: Upload CSV to Whatnot
+
+**⚠️ REQUIRES GIT PUSH FIRST** — The hero.png must be live on GitHub Pages before Whatnot can fetch it. Ensure Step 7.6 (git push) has completed.
+
+1. Navigate to `https://www.whatnot.com/dashboard/inventory`
+2. Click the **Import CSV** button (cloud icon next to "Create Product")
+3. Upload the CSV file
+4. Click **Import**
+5. Products appear as **drafts** — verify image loaded, then **Publish**
+
+**Alternative:** If only importing a single item, can copy just the header + 1 data row to a temp CSV.
+
+### Whatnot Allowed Values Reference
+
+**Categories** (common for RG inventory):
+`Rare & Vintage Books`, `DVDs`, `VHS`, `Vintage Toys`, `Vintage Decor`, `Vintage Clothing`, `Art`
+
+**Condition:**
+`New`, `Like New`, `Very Good`, `Good`, `Fair`, `Poor`
+
+**Type:**
+`Auction`, `Buy it Now`, `Giveaway`
+
+**Shipping Profile:**
+`0-1 oz`, `1-4 oz`, `5-8 oz`, `9-15 oz`, `1-2 lbs`, `3-5 lbs`, `6-9 lbs`, `10-14 lbs`
+
+**Hazmat:**
+`Not Hazmat`
+
+**Full category/sub-category list:** See Values tab of the [Whatnot CSV template](https://docs.google.com/spreadsheets/d/1UNxbyQoXjpjuqYcCE_Ie94OTCEB7lXR7Yz84aynILW4/edit#gid=0)
+
+---
+
 ## Quick Tasks (Single Phase)
 
 | Request | Action |
@@ -686,6 +767,7 @@ do shell script "cd /Users/scottybe/workspace/square/items && git add RG-XXXX/ i
 | "upload this image to Square" | Phase 4 only |
 | "create a payment link" | Phase 5 only |
 | "what's the SKU for..." | Cache lookup only |
+| "add to whatnot" / "list on whatnot" | Phase 8 only |
 
 ---
 

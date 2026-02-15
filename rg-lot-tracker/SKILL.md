@@ -3,13 +3,8 @@ name: rg-lot-tracker
 description: >
   Financial tracking for Richmond General inventory — lot creation, cost allocation,
   ROI analysis, pricing validation, and sale recording. This is the single source of
-  truth for "what did we pay and are we making money." Use this skill whenever the user
-  mentions lots, acquisition costs, ROI, margins, profit, pricing validation against
-  cost basis, or wants to record a purchase or sale. Also triggers when rg-full-auto
-  delegates lot assignment during item onboarding (Phase 1). Trigger phrases include
-  "new lot", "create lot", "record purchase", "bought for $X", "allocate costs",
-  "ROI report", "profit report", "how's the lot doing", "price check against cost",
-  "lot status", "lot summary", "record sale", "sold for $X", "break even", "margin check".
+  truth for "what did we pay and are we making money." Triggers on "new lot",
+  "record purchase", "ROI report", "profit", "margin check", "record sale".
 metadata:
   version: "1.0"
   author: scottybe

@@ -2,10 +2,19 @@
 name: rg-full-auto
 description: End-to-end 10-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, info card publishing, Whatnot CSV listing, and Photos library cleanup. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this", "add to whatnot". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "3.2"
+  version: "3.3"
   author: scottybe
   updated: "2026-02-15"
   changelog: |
+    v3.3 - Whatnot Phase 8 overhaul (post DVD batch learnings):
+    - BREAKING: Category hierarchy fix — DVDs is Sub Category under Movies, not a Category
+    - BREAKING: Prices must be positive integers (no decimals) — added ceil() conversion rule
+    - Added Chrome automation upload process with DataTransfer API JavaScript injection
+    - Added category hierarchy reference table (Movies>DVDs, Movies>VHS, etc.)
+    - Added validation error troubleshooting table
+    - Added Whatnot price conversion rule (Square cents → Whatnot whole dollars)
+    - Cost Per Item must also be integer
+
     v3.2 - Fix Square description HTML formatting:
     - BREAKING: Switched from deprecated `description` field to `description_html`
     - Use `<p>` tags for paragraphs instead of `<br>` tags in plain text
@@ -807,7 +816,7 @@ do shell script "cd /Users/scottybe/workspace/square/items && git add RG-XXXX/ i
 
 Run this phase only if the item should be listed on Whatnot.
 
-**Method:** CSV bulk import (no API/MCP connector exists for Whatnot)
+**Method:** CSV bulk import via Chrome automation (no API/MCP connector exists for Whatnot)
 **Image hosting:** GitHub Pages — `https://richmondgeneral.github.io/items/RG-XXXX/hero.png`
 **Account:** richmondgeneral on whatnot.com
 
@@ -825,48 +834,100 @@ Category,Sub Category,Title,Description,Quantity,Type,Price,Shipping Profile,Off
 
 | CSV Column | Source | Example |
 |------------|--------|---------|
-| Category | Whatnot category (see allowed values below) | `Rare & Vintage Books` |
-| Sub Category | Optional sub-category | _(leave empty if N/A)_ |
+| Category | Whatnot **parent** category (see hierarchy below) | `Movies` |
+| Sub Category | Whatnot sub-category (required for some categories) | `DVDs` |
 | Title | Item title from Phase 1 | `Dick Tracy: The Art of Chester Gould (1978) Exhibition Catalogue` |
 | Description | Plain text description from Phase 1 (NOT HTML) | Full provenance + condition |
 | Quantity | Always `1` for unique items | `1` |
 | Type | Always `Buy it Now` for fixed-price | `Buy it Now` |
-| Price | Dollar amount (whole number or decimal) | `40` |
+| Price | **Positive integer only** (no decimals!) | `7` |
 | Shipping Profile | Weight bracket (must match allowed values) | `1-2 lbs` |
 | Offerable | `TRUE` to accept offers | `TRUE` |
 | Hazmat | Always `Not Hazmat` | `Not Hazmat` |
 | Condition | Item condition | `Good` |
-| Cost Per Item | Allocated cost from lot tracker (seller-only) | `66.66` |
+| Cost Per Item | Allocated cost from lot tracker (integer, seller-only) | `1` |
 | SKU | Same SKU as Square | `RG-0015` |
 | Image URL 1 | GitHub Pages hero image | `https://richmondgeneral.github.io/items/RG-0015/hero.png` |
 | Image URL 2-8 | Additional images if available | _(leave empty)_ |
 
-**⚠️ IMPORTANT:** Values for Category, Condition, Type, and Shipping Profile must exactly match Whatnot's allowed values. See allowed values section below.
+**⚠️ CRITICAL GOTCHAS:**
+1. **Price must be a positive integer.** Whatnot rejects decimals like `6.50`. Round up: `$6.50 → $7`.
+2. **Category hierarchy matters.** DVDs is NOT a top-level category — it's a sub-category under `Movies`. Use `Category=Movies, Sub Category=DVDs`.
+3. **Cost Per Item must also be integer** if provided.
+4. Values for Category, Sub Category, Condition, Type, and Shipping Profile must exactly match Whatnot's allowed values.
 
 **Append command:**
 ```applescript
-do shell script "echo '\"Rare & Vintage Books\",,\"Item Title\",\"Plain text description\",1,Buy it Now,40,1-2 lbs,TRUE,Not Hazmat,Good,66.66,RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/hero.png,,,,,,,,' >> ~/workspace/square/items/rg-inventory/whatnot-import.csv"
+do shell script "echo '\"Movies\",\"DVDs\",\"Item Title\",\"Plain text description\",1,Buy it Now,7,1-2 lbs,TRUE,Not Hazmat,Good,1,RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/hero.png,,,,,,,,' >> ~/workspace/square/items/rg-inventory/whatnot-import.csv"
 ```
 
-### Step 8.2: Upload CSV to Whatnot
+### Step 8.2: Upload CSV to Whatnot (Chrome Automation)
 
 **⚠️ REQUIRES GIT PUSH FIRST** — The hero.png must be live on GitHub Pages before Whatnot can fetch it. Ensure Step 7.6 (git push) has completed.
 
-1. Navigate to `https://www.whatnot.com/dashboard/inventory`
-2. Click the **Import CSV** button (cloud icon next to "Create Product")
-3. Upload the CSV file
-4. Click **Import**
-5. Products appear as **drafts** — verify image loaded, then **Publish**
+**Automated upload via Claude in Chrome:**
 
-**Alternative:** If only importing a single item, can copy just the header + 1 data row to a temp CSV.
+1. Navigate to `https://www.whatnot.com/dashboard/inventory`
+
+2. Open the CSV import modal — click the cloud/upload icon next to "Create Product" (approximate coordinate: `1122, 110`):
+   ```
+   computer tool: left_click at [1122, 110]
+   ```
+
+3. Inject CSV via JavaScript DataTransfer API (bypasses native file picker):
+   ```javascript
+   const csvContent = `Category,Sub Category,Title,...`; // full CSV content with header + data rows
+   const blob = new Blob([csvContent], { type: 'text/csv' });
+   const file = new File([blob], 'whatnot-import.csv', { type: 'text/csv' });
+   const fileInput = document.querySelector('input[type="file"]');
+   const dataTransfer = new DataTransfer();
+   dataTransfer.items.add(file);
+   fileInput.files = dataTransfer.files;
+   fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+   fileInput.dispatchEvent(new Event('input', { bubbles: true }));
+   ```
+
+4. After injection: modal shows "filename.csv — Ready to import" with a yellow **Import** button.
+
+5. Click **Import** → server-side validation runs.
+
+6. On success: "Your products have successfully imported" with "View Drafts" link. Products import as **Drafts**.
+
+7. Verify drafts at `https://www.whatnot.com/dashboard/inventory?tab=drafts`
+
+**If validation fails**, common errors and fixes:
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| "Subcategory not provided" | Category requires a sub-category | Check hierarchy table below |
+| "Subcategory X is not part of Category Y" | Wrong parent/child pairing | Look up correct hierarchy in Values tab |
+| "Price must be a positive integer" | Decimal price like `6.50` | Round up to whole dollar `7` |
+
+**Manual fallback:** If Chrome automation isn't available, download the CSV file and upload manually through the Whatnot dashboard.
+
+### Whatnot Category Hierarchy Reference
+
+**⚠️ CRITICAL:** Some items that seem like categories are actually sub-categories. Always check the hierarchy.
+
+**Common RG inventory mappings:**
+
+| Item Type | Category (parent) | Sub Category | Notes |
+|-----------|-------------------|--------------|-------|
+| DVDs | `Movies` | `DVDs` | NOT `DVDs` as category! |
+| VHS tapes | `Movies` | `VHS` | |
+| Blu-ray | `Movies` | `Blu-ray` | |
+| Movie memorabilia | `Movies` | `Movie Memorabilia` | |
+| Rare/vintage books | `Rare & Vintage Books` | _(empty)_ | Top-level, no sub required |
+| Vintage toys | `Vintage Toys` | _(varies)_ | Check Values tab |
+| Vinyl records | `Vinyl Records` | _(varies)_ | |
+| Art | `Art` | _(varies)_ | |
+
+**Full category/sub-category list:** See Values tab (columns E & F) of the [Whatnot CSV template](https://docs.google.com/spreadsheets/d/1UNxbyQoXjpjuqYcCE_Ie94OTCEB7lXR7Yz84aynILW4/edit#gid=0)
 
 ### Whatnot Allowed Values Reference
 
-**Categories** (common for RG inventory):
-`Rare & Vintage Books`, `DVDs`, `VHS`, `Vintage Toys`, `Vintage Decor`, `Vintage Clothing`, `Art`
-
 **Condition:**
-`New`, `Like New`, `Very Good`, `Good`, `Fair`, `Poor`
+`Brand New`, `Like New`, `Very Good`, `Good`, `Fair`, `Poor`
 
 **Type:**
 `Auction`, `Buy it Now`, `Giveaway`
@@ -877,7 +938,18 @@ do shell script "echo '\"Rare & Vintage Books\",,\"Item Title\",\"Plain text des
 **Hazmat:**
 `Not Hazmat`
 
-**Full category/sub-category list:** See Values tab of the [Whatnot CSV template](https://docs.google.com/spreadsheets/d/1UNxbyQoXjpjuqYcCE_Ie94OTCEB7lXR7Yz84aynILW4/edit#gid=0)
+### Whatnot Price Conversion Rule
+
+Square prices use cents (e.g., `650` = $6.50), but Whatnot requires **whole dollar integers**. When converting:
+
+| Square Price (cents) | Whatnot Price | Rule |
+|---------------------|---------------|------|
+| 650 | 7 | Round up |
+| 1050 | 11 | Round up |
+| 4000 | 40 | Already whole |
+| 1999 | 20 | Round up |
+
+**Formula:** `ceil(square_price_cents / 100)`
 
 ---
 

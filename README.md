@@ -3,7 +3,7 @@
 A comprehensive collection of AI assistant skills for managing Richmond General's vintage and antique inventory system. These skills integrate with Square Catalog, Apple ecosystem (iMessage, Contacts, Notes), and external identification databases to streamline operations.
 
 **Repository:** `richmondgeneral/skills`
-**Current Version:** v2026.02.14
+**Current Version:** v2026.02.15
 
 ## Overview
 
@@ -14,7 +14,7 @@ This repository houses specialized workflows ("Skills") that autonomous agents (
 ### 📦 Inventory Management
 | Skill | Trigger | Purpose |
 |-------|---------|---------|
-| **rg-full-auto** | "new item", "sell this", "onboard" | **Main Workflow.** Complete 8-phase process: Image → Appraisal → Catalog → Labels → Web. |
+| **rg-full-auto** | "new item", "sell this", "onboard" | **Main Workflow.** Complete 10-phase process including Whatnot listing and Photos archive cleanup. |
 | **rg-item-update** | "update item", "change price" | Quick edits to existing items (price, description, images). |
 | **catalog-classifier** | "what category?", "classify" | *(Experimental)* Automatically routes items to the correct Square category. |
 
@@ -47,7 +47,7 @@ This repository houses specialized workflows ("Skills") that autonomous agents (
 | **image-processor** | "remove bg", "edit photo" | Unified tool for background removal, generation, and editing. |
 | **photos-library** | "recent photos", "find product shots" | Queries the local macOS Photos.app library. |
 | **alpaca-market-data** | "stock price", "market data" | Real-time financial market data. |
-| **skill-manager** | "update skill", "create skill" | Meta-skill for maintaining this repository. |
+| **skill-manager** | "update skill", "registry refresh" | Meta-skill for maintaining this repository and skill metadata hygiene. |
 
 ## Usage
 
@@ -58,6 +58,9 @@ Skills are **model-invoked**. You do not need to run scripts manually. Simply as
 > "Update the price of the 'Vintage Radio' to $45."
 
 The agent will automatically select the correct skill and execute the workflow.
+
+For creating new skills or major rewrites, use the canonical creator guidance:
+- `/Users/scottybe/.codex/skills/.system/skill-creator/SKILL.md`
 
 ## Installation
 

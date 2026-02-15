@@ -5,17 +5,20 @@ Claude beta skill for accessing MongoDB-cached Square catalog with comprehensive
 ## Quick Start
 
 ```bash
+# Token
+export SQUARE_ACCESS_TOKEN=your_token
+
 # Check cache status
-~/Workspace/square-tools/bin/square_cache.sh status
+~/workspace/square/square-tools/bin/square_cache.sh status
 
 # Sync catalog
-~/Workspace/square-tools/bin/square_cache.sh sync
+~/workspace/square/square-tools/bin/square_cache.sh sync
 
 # View recent changes
-~/Workspace/square-tools/bin/square_cache.sh changes
+~/workspace/square/square-tools/bin/square_cache.sh changes
 
 # Search cached items
-~/Workspace/square-tools/bin/square_cache.sh search "vinyl"
+~/workspace/square/square-tools/bin/square_cache.sh search "vinyl"
 ```
 
 ## Python Usage

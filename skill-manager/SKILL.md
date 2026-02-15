@@ -1,287 +1,131 @@
 ---
 name: skill-manager
-description: Meta-skill for managing and updating Claude skills. Use when creating new skills, updating existing skills, or tracking skill versions. Triggers on "update skill", "create skill", "skill changelog", or references to skill management.
+description: Maintain the local skills repository health and registry. Use for version bumps, metadata audits, registry refreshes, packaging checks, and cleanup across skills. For creating or rewriting skill content, delegate to the skill-creator standard first.
 metadata:
-  version: "1.3"
+  version: "1.5"
   author: scottybe
-  updated: "2025-12-21"
+  updated: "2026-02-15"
   changelog: |
-    v1.3 - Skill consolidation:
-    - Archived rg-new-item and rg-inventory (superseded by rg-full-auto)
-    - Updated registry with archived skills section
-
-    v1.2 - Anthropic skills update:
-    - Updated all skills to Anthropic Agent Skills best practices
-    - Added allowed-tools restrictions to read-only skills
-    - Enhanced trigger keywords across all skills
-    - Updated registry with new versions
-    - Added author/updated fields to all skills
-
-    v1.1 - Registry overhaul:
-    - Added all RG workflow skills (rg-full-auto, rg-new-item, rg-item-update)
-    - Added messaging skills (imessage-core, contacts-manager, daily-briefing)
-    - Organized registry by category
-    - Added experimental/archive section
-    - Note about Filesystem path case sensitivity
+    v1.5 - Aligned with Anthropic skill-creator conventions:
+    - Replaced stale static registry workflow with metadata-driven audit workflow
+    - Added explicit delegation to canonical skill-creator guidance
+    - Added frontmatter/structure validation checklist for all active skills
 ---
 
 # Skill Manager
 
-Meta-skill for collaboratively developing and maintaining Claude skills with Scotty.
+Repository maintenance skill for `~/.claude/skills`.
 
-## Quick Reference
+## Scope
 
-**Skills Directory:** `~/.claude/skills/`
-**Git Repo:** github.com/richmondgeneral/skills (version controlled)
-**Last synced:** 2025-12-21
+Use this skill for:
+- Skills repo hygiene (`metadata`, version drift, stale docs, packaging checks)
+- Registry refreshes
+- Cross-skill consistency fixes (paths, env vars, shared conventions)
 
-## Workflow: Updating Skills
+Do not use this skill as the canonical source for how to design a skill from scratch.
 
+## Canonical Skill-Creation Standard
+
+For creating or substantially rewriting skills, follow this first:
+- `/Users/scottybe/.codex/skills/.system/skill-creator/SKILL.md`
+
+Use this skill to enforce those standards across the repository after edits.
+
+## Required Skill Contract
+
+Each active skill directory must have:
+1. `SKILL.md` with YAML frontmatter
+2. `name` and `description` fields in frontmatter
+3. `metadata.version`, `metadata.author`, `metadata.updated`
+4. Optional `metadata.changelog` when changes are substantive
+
+Preferred structure:
+- `references/` for deep documentation (progressive disclosure)
+- `scripts/` for deterministic/repeated logic
+- `assets/` for reusable output assets
+- `agents/openai.yaml` when UI metadata is required
+
+## Repository Paths
+
+- Skills root: `~/.claude/skills/`
+- Archive: `~/.claude/skills/archive/`
+- Packaging helper: `~/.claude/skills/docs/build-skill.sh`
+- Template: `~/.claude/skills/docs/reference/SKILL_TEMPLATE.md`
+
+## Metadata Audit Commands
+
+List active skills and metadata snapshot:
+
+```bash
+for d in ~/.claude/skills/*; do
+  [ -d "$d" ] || continue
+  b=$(basename "$d")
+  case "$b" in .git|.venv|archive|docs|testing|.pytest_cache|__pycache__) continue;; esac
+  f="$d/SKILL.md"
+  [ -f "$f" ] || continue
+  ver=$(awk '/^metadata:/{m=1} m && /version:/{gsub(/"/,"",$2); print $2; exit}' "$f")
+  upd=$(awk '/^metadata:/{m=1} m && /updated:/{gsub(/"/,"",$2); print $2; exit}' "$f")
+  echo "$b|${ver:-?}|${upd:-?}"
+done | sort
 ```
-1. Scotty requests change or Claude identifies improvement needed
-          ↓
-2. Claude reads current skill from ~/.claude/skills/<skill-name>/SKILL.md
-          ↓
-3. Claude makes edits using Filesystem:write_file (or osascript if path issues)
-          ↓
-4. Claude confirms changes with Scotty
-          ↓
-5. Git commit and push to preserve version history
-          ↓
-6. (Optional) Scotty clicks "Save Skill" in Claude UI to sync to /mnt/skills/user/
+
+Find missing required frontmatter fields:
+
+```bash
+rg -n "^name:|^description:|^metadata:|version:|author:|updated:" ~/.claude/skills/*/SKILL.md
 ```
 
-**Key points:**
-- Claude CAN directly write to `~/.claude/skills/` via Filesystem tools
-- Claude CANNOT write to `/mnt/skills/user/` (read-only on Claude's side)
-- **⚠️ Path case sensitivity:** Filesystem tools may fail with "file not found" due to case mismatch. Fallback: use osascript with python/sed for reliable edits.
-
----
-
-## Active Skills Registry
+## Active Skills Snapshot (2026-02-15)
 
 ### Richmond General Workflows
 
-| Skill | Version | Purpose | Last Updated |
-|-------|---------|---------|--------------|
-| **rg-full-auto** | v2.3 | End-to-end item onboarding (8 phases) | 2025-12-21 |
-| **rg-item-update** | v1.1 | Quick edits to existing items | 2025-12-21 |
-
-### Appraisal & Identification
-
-| Skill | Version | Purpose | Last Updated |
-|-------|---------|---------|--------------|
-| **book-appraiser** | v1.1 | Antiquarian books, LOC cross-reference | 2025-12-21 |
-| **carnival-glass-appraiser** | v1.1 | Pressed iridescent glass 1908-1930s | 2025-12-21 |
-| **maker-mark-identifier** | v1.1 | Pottery, silver, furniture marks | 2025-12-21 |
+| Skill | Version | Updated |
+|-------|---------|---------|
+| `rg-full-auto` | 3.1 | 2026-02-15 |
+| `rg-item-update` | 1.2 | 2026-02-15 |
+| `rg-lot-tracker` | in progress | in progress |
 
 ### Square Integration
 
-| Skill | Version | Purpose | Last Updated |
-|-------|---------|---------|--------------|
-| **square-cache** | v1.1 | MongoDB cache for catalog (100x faster) | 2025-12-21 |
-| **square-image-upload** | v1.3 | Image upload via multipart form data | 2025-12-21 |
-| **square-crm** | v1.1 | Square customer sync from contacts | 2025-12-21 |
-| **product-labeler** | v1.1 | Thermal labels, Square descriptions | 2025-12-21 |
+| Skill | Version | Updated |
+|-------|---------|---------|
+| `square-cache` | 1.2 | 2026-02-15 |
+| `square-image-upload` | 1.4 | 2026-02-15 |
+| `square-crm` | 1.1 | 2025-12-21 |
+| `product-labeler` | 1.1 | 2025-12-21 |
 
-### Messaging & CRM
+### Image / Intake
 
-|| Skill | Version | Purpose | Last Updated |
-||-------|---------|---------|--------------|
-|| **imessage-core** | v1.1 | Read/send iMessage, RCS, SMS | 2025-12-21 |
-|| **contacts-manager** | v1.1 | Contact lookup, spam filtering, profiles | 2025-12-21 |
-|| **daily-briefing** | v2.0 | Morning CRM briefing to Apple Notes | 2025-12-22 |
-|| **imessage-archiver** | v1.1 | Archive conversations to Apple Notes | 2025-12-21 |
+| Skill | Version | Updated |
+|-------|---------|---------|
+| `image-processor` | 1.3 | 2026-02-15 |
+| `photos-library` | 1.2 | 2026-01-18 |
 
-### Image Processing
+## Maintenance Workflow
 
-|| Skill | Version | Purpose | Last Updated |
-||-------|---------|---------|--------------|
-|| **image-processor** | v1.0 | Unified image processing (bg removal, generation, editing, Photos.app) | 2025-12-21 |
-|| **photos-library** | v1.0 | Query Photos.app SQLite library | 2026-01-17 |
+1. Run metadata snapshot command.
+2. Patch target skills (frontmatter, stale paths, outdated claims).
+3. Validate scripts when changed (`python3 -m py_compile` or skill tests).
+4. Update this registry snapshot if versions changed.
+5. Commit only intended files; avoid sweeping unrelated changes.
 
-### Meta / Utility
+## Packaging
 
-|| Skill | Version | Purpose | Last Updated |
-||-------|---------|---------|--------------|
-|| **skill-manager** | v1.4 | This skill - registry & management | 2026-01-18 |
-
-### Experimental
-
-|| Skill | Status | Notes |
-||-------|--------|-------|
-|| **catalog-classifier** | Experimental | Auto-categorization |
-
-### Archived (`archive/` folder)
-
-| Skill | Reason | Superseded By |
-|-------|--------|---------------|
-| **rg-new-item** | Consolidated | rg-full-auto |
-| **rg-inventory** | Consolidated | rg-full-auto |
-
----
-
-## Creating New Skills
-
-### Directory Structure
-```
-~/.claude/skills/<skill-name>/
-├── SKILL.md           ← Main skill file (required)
-├── references/        ← Supporting docs (optional)
-│   ├── api-reference.md
-│   └── examples.md
-└── scripts/           ← Helper scripts (optional)
-    └── helper.py
-```
-
-### SKILL.md Template
-```markdown
----
-name: skill-name
-description: Brief description for Claude to match queries. Include trigger words.
-metadata:
-  version: "1.0"
-  author: scottybe
-  updated: "YYYY-MM-DD"
----
-
-# Skill Title
-
-One-line summary.
-
-## Quick Reference
-
-Key IDs, paths, constants.
-
-## Workflow
-
-Step-by-step process.
-
-## API Reference (if applicable)
-
-Endpoints, parameters, examples.
-
-## References
-
-- `references/file.md` - Description
-```
-
-### Frontmatter Rules
-- `name`: lowercase, hyphenated (must match folder name)
-- `description`: 1-2 sentences, include trigger keywords Claude should match on
-- `metadata.version`: Semver-ish (v1.0, v1.1, v2.0)
-- `metadata.changelog`: Inline changelog for quick reference
-
----
-
-## Changelog Format
-
-For complex skills, maintain `references/changelog.md`:
-
-```markdown
-## YYYY-MM-DD - vX.X
-
-### Added
-- New feature or section
-
-### Changed  
-- Modified behavior or content
-
-### Fixed
-- Bug fixes or corrections
-
-### Removed
-- Deprecated content
-```
-
-For simpler skills, inline changelog in frontmatter metadata is sufficient.
-
----
-
-## .skill File Format Specification
-
-The `.skill` file format is a ZIP archive with a specific internal structure:
-
-```
-.skill file = ZIP archive renamed to .skill extension
-              └── skill-name/
-                  └── SKILL.md
-```
-
-### Creating Exportable .skill Files
-
-To trigger Claude's "Copy to your skills" button:
+Build one skill:
 
 ```bash
-# 1. Create folder with SKILL.md
-mkdir skill-name
-cp SKILL.md skill-name/
-
-# 2. ZIP the folder (not just the file)
-zip -r skill-name.zip skill-name/
-
-# 3. Rename .zip to .skill
-mv skill-name.zip skill-name.skill
-
-# 4. Use present_files tool to offer download
-# Claude will show "Copy to your skills" button
+~/.claude/skills/docs/build-skill.sh <skill-name>
 ```
 
-### Critical Requirements
-
-- ✅ **Must** have folder as top-level in ZIP
-- ✅ **Must** contain `SKILL.md` inside folder
-- ✅ **Must** use `.skill` extension
-- ❌ **Won't work** if SKILL.md is at ZIP root
-- ❌ **Won't work** without folder wrapper
-
----
-
-## Commands for Claude
-
-### When asked to update a skill:
-
-```
-1. Read: Filesystem:read_file on ~/.claude/skills/<skill>/SKILL.md
-2. Edit: Filesystem:write_file with updated content
-   - If "file not found" due to path case: use osascript + python/sed
-3. Confirm: Show summary of changes
-4. Commit: git add, commit, push in ~/.claude/skills/
-5. Update: Bump version in this registry if significant change
-```
-
-### When asked to create a skill:
-
-```
-1. Create: Filesystem:create_directory for ~/.claude/skills/<skill>/
-2. Write: SKILL.md with frontmatter + content
-3. (Optional) Create references/ and scripts/ subdirectories
-4. Commit: git add, commit, push
-5. Register: Add to Active Skills Registry in this file
-```
-
-### When doing postmortem on workflow:
-
-```
-1. Identify issues from the run
-2. Propose skill updates
-3. Get user approval
-4. Update skill(s)
-5. Update this registry with new version/date
-6. Git commit all changes
-```
-
----
-
-## Version Control
-
-The `~/.claude/skills/` directory is git-controlled:
+Build all:
 
 ```bash
-cd ~/.claude/skills
-git add .
-git commit -m "<skill-name> vX.X: <brief description>"
-git push origin main
+~/.claude/skills/docs/build-skill.sh --all
 ```
 
-Remote: `github.com/richmondgeneral/skills`
+## Safety Rules
+
+- Do not delete archived skills unless explicitly asked.
+- Do not rewrite unrelated skills in bulk just for style.
+- Prefer targeted, reversible changes and keep diffs small.

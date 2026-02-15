@@ -341,7 +341,7 @@ pymongo.errors.ServerSelectionTimeoutError: localhost:27017
 ```
 401 Unauthorized: Invalid token
 ```
-**Fix:** Verify `SQUARE_TOKEN` is valid with `ITEMS_READ` permission
+**Fix:** Verify `SQUARE_ACCESS_TOKEN` (or legacy `SQUARE_TOKEN`) is valid with `ITEMS_READ` permission
 
 **Rate Limiting:**
 ```
@@ -458,7 +458,7 @@ mongosh square_cache --eval "
 ## Security Considerations
 
 **Access Token Protection:**
-- Never log `SQUARE_TOKEN` in plain text
+- Never log `SQUARE_ACCESS_TOKEN` (or `SQUARE_TOKEN`) in plain text
 - Use environment variables, not hardcoded values
 - Token has `ITEMS_READ` permission (read-only)
 - Sync operations don't modify Square catalog

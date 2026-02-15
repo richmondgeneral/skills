@@ -9,7 +9,7 @@ Square's Catalog API supports image management through two key endpoints:
 | `/v2/catalog/images` | POST | Create new CatalogImage |
 | `/v2/catalog/images/{image_id}` | PUT | Replace existing image file |
 
-Both endpoints use **multipart form data** (not JSON), which is why they cannot be called through the standard Square MCP connector.
+Both endpoints use **multipart form data** (not JSON). Official/newer Square MCP servers may support these endpoints, but connector coverage varies; use this skill's scripts as the stable default path.
 
 ## CreateCatalogImage (POST)
 

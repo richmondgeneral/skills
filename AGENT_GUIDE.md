@@ -9,6 +9,7 @@
 2.  **Environment Awareness:** Distinguish between **Container** (Agent runtime) and **Host** (macOS).
 3.  **Safety:** Never delete user data without confirmation. Explain destructive actions.
 4.  **Metadata:** All skills must have valid YAML frontmatter (v1.1 standard).
+5.  **Skill Creation Standard:** For new or heavily revised skills, follow `/Users/scottybe/.codex/skills/.system/skill-creator/SKILL.md`.
 
 ## System Architecture
 
@@ -66,11 +67,12 @@ uv run --project ~/.claude/skills python ~/.claude/skills/<skill>/scripts/script
 ```
 
 ### Creating a New Skill
-1.  Create directory: `mkdir <skill-name>`
-2.  Create `SKILL.md` with standard frontmatter.
-3.  (Optional) Add scripts/references.
-4.  Register in `skill-manager/SKILL.md`.
-5.  Git commit.
+1.  Read and follow `/Users/scottybe/.codex/skills/.system/skill-creator/SKILL.md`.
+2.  Create directory: `mkdir <skill-name>`.
+3.  Create `SKILL.md` from `docs/reference/SKILL_TEMPLATE.md`.
+4.  Add only necessary `scripts/`, `references/`, and `assets/`.
+5.  Register/update metadata snapshot in `skill-manager/SKILL.md`.
+6.  Git commit.
 
 ### Updating Documentation
 Run the audit checklist to ensure compliance:
@@ -94,7 +96,7 @@ Run the audit checklist to ensure compliance:
 ### Common Gotchas
 *   **Path Case Sensitivity:** The Filesystem tool on Linux is case-sensitive. macOS is usually case-insensitive but can report paths differently (`/Users/` vs `/users/`). Always verify paths.
 *   **Apple Notes:** Inline images require sequential attachment with delays (see `imessage-archiver`).
-*   **Square API:** Image uploads require multipart form data (use `square-image-upload` script, NOT standard MCP).
+*   **Square API:** Multipart image uploads are connector-dependent. Keep `square-image-upload` as the deterministic default path; use MCP image methods only when explicitly verified in the active Square MCP server/client.
 
 ## Troubleshooting
 

@@ -2,10 +2,15 @@
 name: rg-full-auto
 description: End-to-end 10-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, info card publishing, Whatnot CSV listing, and Photos library cleanup. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this", "add to whatnot". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "3.0"
+  version: "3.1"
   author: scottybe
   updated: "2026-02-15"
   changelog: |
+    v3.1 - square-cache reconciliation after writes:
+    - Added Step 4.1 to sync square-cache after Phase 2/3/4 write operations
+    - Added post-sync verification for exact SKU + cached image linkage
+    - Added fallback sync command via square-cache wrapper script
+
     v3.0 - Photos library cleanup phase + sold-state flow:
     - Added Phase 9: Photos Library Archive — organizes source photos into
       per-item albums under "Richmond General Archive" folder in Photos.app
@@ -511,6 +516,34 @@ do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/
 sips -s format png image.webp --out hero.png
 ```
 
+### Step 4.1: Sync and verify square-cache
+
+After catalog create (Phase 2), inventory write (Phase 3), and image upload (Phase 4), reconcile cache before moving on:
+
+**Primary (MCP):**
+```
+square-cache:square_cache_sync
+```
+
+**Fallback (local script):**
+```applescript
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/square-cache/scripts/cache_wrapper.py sync --json 2>&1"
+```
+
+Then verify:
+
+1. Exact SKU exists in cache
+```
+square-cache:square_cache_search with sku_pattern: "RG-XXXX"
+```
+Confirm exact `RG-XXXX` match (not substring only).
+
+2. Cached item includes uploaded image
+```
+square-cache:square_cache_get_item with item_id: "CATALOG_ITEM_ID"
+```
+Confirm `item_data.image_ids` contains the image ID from Phase 4. If not, run sync once more and re-check.
+
 ---
 
 ## Phase 5: Payment Link
@@ -843,6 +876,7 @@ After completing full workflow:
 🖼️ Image
    Hero: /Users/scottybe/workspace/square/items/RG-XXXX/hero.png
    Square Image ID: {IMAGE_ID}
+   Cache Sync: verified (SKU + image_ids)
 
 🔍 SEO
    Title: {PAGE_TITLE}

@@ -1,6 +1,6 @@
 ---
 name: square-image-upload
-description: Upload and manage images in Square Catalog via API. Use when the user needs to upload product photos, replace existing catalog images, or attach images to Square items/variations. Triggers on "upload image to Square", "add photo to item", "replace product image", "Square catalog image", or any request to programmatically manage Square product images. Required because Square's image endpoints use multipart form data which the standard MCP connector cannot handle.
+description: Upload and manage images in Square Catalog via API. Use when the user needs to upload product photos, replace existing catalog images, or attach images to Square items/variations. Triggers on "upload image to Square", "add photo to item", "replace product image", "Square catalog image", or any request to programmatically manage Square product images. This skill is the deterministic default for image uploads, even when some Square MCP connectors expose multipart methods.
 metadata:
   version: "1.4"
   author: scottybe
@@ -30,11 +30,11 @@ Image ID: JBV4V5HST6EAUXWB5ZPYP52G
 URL: https://items-images-production.s3.us-west-2.amazonaws.com/files/.../original.jpeg
 ```
 
-**Note:** Square MCP connector cannot upload images (JSON-only). This skill handles multipart/form-data uploads directly.
+**Note:** Some Square MCP connectors now expose multipart image methods. Keep this skill as the default upload path for consistent behavior across environments.
 
 ## Why This Skill Exists
 
-The Square MCP connector only supports JSON-based API calls. Image upload endpoints require **multipart form data**, so this skill provides a Python script to handle the upload directly.
+Square image endpoints require **multipart form data**. Connector behavior varies by client/server version, so this skill provides a stable Python path that works regardless of MCP multipart support.
 
 ## Quick Start
 

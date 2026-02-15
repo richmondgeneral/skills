@@ -2,10 +2,15 @@
 name: square-cache
 description: Access MongoDB-cached Square catalog with change tracking and audit trails. Use when checking catalog status, searching items (faster than API), viewing change history, monitoring updates, or querying cached data. Triggers on "Square cache", "catalog changes", "what changed", "search cached items", "sync catalog", "item history", "cache status". Required for offline catalog access and automated change detection.
 metadata:
-  version: "1.1"
+  version: "1.2"
   author: scottybe
-  updated: "2025-12-21"
+  updated: "2026-02-15"
   changelog: |
+    v1.2 - path and token compatibility update:
+    - Updated square-tools path references to ~/workspace/square/square-tools
+    - Standardized token guidance to SQUARE_ACCESS_TOKEN with SQUARE_TOKEN fallback
+    - Aligned documentation with wrapper path/token auto-resolution
+
     v1.1 - Anthropic skills update:
     - Added author and updated fields
 ---
@@ -50,7 +55,7 @@ This skill supports **two access methods** depending on your environment:
 "What changed in the catalog today?"
 ```
 
-See MCP server setup: `~/Workspace/square-tools/mcp-server/README.md`
+See MCP server setup: `~/workspace/square/square-tools/mcp-server/README.md`
 
 ## Quick Start
 
@@ -58,15 +63,15 @@ See MCP server setup: `~/Workspace/square-tools/mcp-server/README.md`
 
 1. MongoDB running: `brew services start mongodb-community@8.0`
 2. Python 3.7+ with pymongo, requests
-3. Set environment variable: `export SQUARE_TOKEN=your_token`
-4. Initial sync: `~/Workspace/square-tools/bin/square_cache.sh sync`
+3. Set environment variable: `export SQUARE_ACCESS_TOKEN=your_token` (or legacy `SQUARE_TOKEN`)
+4. Initial sync: `~/workspace/square/square-tools/bin/square_cache.sh sync`
 5. (Optional) Configure MCP server for Warp Agent Mode
 
 ### Verify Setup
 
 ```bash
 # Check cache status
-~/Workspace/square-tools/bin/square_cache.sh status
+~/workspace/square/square-tools/bin/square_cache.sh status
 
 # Should show MongoDB running, items cached, last sync time
 ```
@@ -77,7 +82,7 @@ See MCP server setup: `~/Workspace/square-tools/mcp-server/README.md`
 
 ```bash
 # Full sync from Square API to MongoDB
-~/Workspace/square-tools/bin/square_cache.sh sync
+~/workspace/square/square-tools/bin/square_cache.sh sync
 ```
 
 Fetches all catalog items, detects changes, creates snapshots. Run after making changes in Square dashboard or via API.
@@ -85,7 +90,7 @@ Fetches all catalog items, detects changes, creates snapshots. Run after making 
 ### Check Status
 
 ```bash
-~/Workspace/square-tools/bin/square_cache.sh status
+~/workspace/square/square-tools/bin/square_cache.sh status
 ```
 
 Shows:
@@ -98,10 +103,10 @@ Shows:
 
 ```bash
 # All recent changes
-~/Workspace/square-tools/bin/square_cache.sh changes
+~/workspace/square/square-tools/bin/square_cache.sh changes
 
 # Changes since specific date
-~/Workspace/square-tools/bin/square_cache.sh changes --since 2025-12-01
+~/workspace/square/square-tools/bin/square_cache.sh changes --since 2025-12-01
 ```
 
 Displays changes with emoji indicators:
@@ -113,14 +118,14 @@ Displays changes with emoji indicators:
 
 ```bash
 # Search by name pattern (case-insensitive, default)
-~/Workspace/square-tools/bin/square_cache.sh search "Trading Places"
+~/workspace/square/square-tools/bin/square_cache.sh search "Trading Places"
 
 # Search by SKU (exact or prefix)
-~/Workspace/square-tools/bin/square_cache.sh search --sku RG-0005
-~/Workspace/square-tools/bin/square_cache.sh search --sku "RG-"
+~/workspace/square/square-tools/bin/square_cache.sh search --sku RG-0005
+~/workspace/square/square-tools/bin/square_cache.sh search --sku "RG-"
 
 # Explicit name search
-~/Workspace/square-tools/bin/square_cache.sh search --name "Bears"
+~/workspace/square/square-tools/bin/square_cache.sh search --name "Bears"
 
 # Returns matching items instantly from cache (100x faster than API)
 ```
@@ -129,17 +134,17 @@ Displays changes with emoji indicators:
 
 ```bash
 # Get cached item by ID
-~/Workspace/square-tools/bin/square_cache.sh item ANE5SXKQR4JZ6AYEZDO26IMX
+~/workspace/square/square-tools/bin/square_cache.sh item ANE5SXKQR4JZ6AYEZDO26IMX
 ```
 
 ### Generate Change Report
 
 ```bash
 # Detailed change report
-~/Workspace/square-tools/bin/square_cache.sh report
+~/workspace/square/square-tools/bin/square_cache.sh report
 
 # JSON format for parsing
-~/Workspace/square-tools/bin/square_cache.sh report --json
+~/workspace/square/square-tools/bin/square_cache.sh report --json
 ```
 
 ## Direct MongoDB Queries
@@ -351,7 +356,7 @@ brew services list | grep mongodb
 brew services start mongodb-community@8.0
 
 # Test connection
-mongosh --eval "db.runCommand('ismaster')" --quiet
+mongosh --eval "db.runCommand('ping')" --quiet
 ```
 
 ### Sync Errors
@@ -361,11 +366,11 @@ mongosh --eval "db.runCommand('ismaster')" --quiet
 mongosh square_cache --eval "db.sync_log.find({error: {\$exists: true}}).sort({timestamp: -1}).limit(5).pretty()"
 
 # Verify Square token
-echo $SQUARE_TOKEN
+echo $SQUARE_ACCESS_TOKEN
 
 # Test Square API connectivity
 curl -H "Square-Version: 2024-09-18" \
-     -H "Authorization: Bearer $SQUARE_TOKEN" \
+     -H "Authorization: Bearer $SQUARE_ACCESS_TOKEN" \
      "https://connect.squareup.com/v2/catalog/list?types=ITEM&limit=1"
 ```
 
@@ -376,7 +381,7 @@ curl -H "Square-Version: 2024-09-18" \
 mongosh square_cache --eval "db.catalog_items.deleteMany({}); db.change_snapshots.deleteMany({}); db.sync_log.deleteMany({})"
 
 # Resync from scratch
-~/Workspace/square-tools/bin/square_cache.sh sync
+~/workspace/square/square-tools/bin/square_cache.sh sync
 ```
 
 ### Cache Out of Sync
@@ -391,7 +396,10 @@ If cache doesn't match Square dashboard:
 
 ```bash
 # Required
-export SQUARE_TOKEN="your_square_access_token"
+export SQUARE_ACCESS_TOKEN="your_square_access_token"
+
+# Optional legacy alias
+export SQUARE_TOKEN="$SQUARE_ACCESS_TOKEN"
 
 # Optional (defaults in square-tools/config.sh)
 export SQUARE_ENVIRONMENT="production"  # or 'sandbox'

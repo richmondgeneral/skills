@@ -1,6 +1,6 @@
 # MCP Connector Quick Reference
 
-Last updated: 2024-12-21
+Last updated: 2026-02-15
 
 ## Filesystem MCP (`Filesystem:*`)
 
@@ -43,7 +43,7 @@ do shell script "source ~/.env && python3 ~/.claude/skills/[skill]/scripts/[scri
 
 ## Square MCP (`Square:*`)
 
-**Use for:** JSON-only API operations
+**Use for:** Square API operations (JSON-first; multipart support depends on connector build)
 
 | Tool | Purpose |
 |------|---------|
@@ -52,11 +52,11 @@ do shell script "source ~/.env && python3 ~/.claude/skills/[skill]/scripts/[scri
 | `make_api_request` | Execute API calls |
 
 **Works:** Catalog CRUD, payment links, customers, inventory, orders
-**Cannot do:** Image uploads (requires multipart/form-data)
+**Multipart note:** Official Square MCP server may support `catalog.createImage` and `catalog.updateImage`, but behavior varies by MCP client/version.
 
-### Image Upload Solution
+### Image Upload Default
 
-Square MCP cannot upload images (JSON-only). Use `square-image-upload` skill instead:
+Use `square-image-upload` as the default production path for image uploads:
 
 ```applescript
 do shell script "source ~/.env && python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
@@ -66,7 +66,7 @@ do shell script "source ~/.env && python3 ~/.claude/skills/square-image-upload/s
   --primary"
 ```
 
-✅ **Verified working** (2024-12-21) - Token has required scopes.
+✅ Deterministic across environments, independent of connector multipart support.
 
 ---
 

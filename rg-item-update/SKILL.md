@@ -2,10 +2,14 @@
 name: rg-item-update
 description: Quick edits to existing Richmond General catalog items. Use for price changes, description updates, SEO tweaks, adding/replacing images, category changes, or fixing typos. Triggers on "update item", "change price", "edit description", "fix", "modify existing". Also handles BATCH operations like "move all food items" or "update category for multiple items". NOT for new items—use rg-full-auto for complete onboarding workflow.
 metadata:
-  version: "1.1"
+  version: "1.2"
   author: scottybe
-  updated: "2025-12-21"
+  updated: "2026-02-15"
   changelog: |
+    v1.2 - cache reconciliation update:
+    - Added required post-write square-cache sync/verification step
+    - Updated related skills table to current rg-full-auto phase count
+
     v1.1 - Anthropic skills update:
     - Added batch operation triggers to description
     - Added author and updated fields
@@ -145,6 +149,25 @@ To **replace** primary image: delete old image first via `catalog.deleteObjects`
 }
 ```
 
+## Cache Reconciliation (Required)
+
+After any write to Square (price, description, category, image, inventory), sync cache and verify the update is visible.
+
+**Primary (MCP):**
+```
+square_cache_sync
+```
+
+**Fallback (local script):**
+```bash
+uv run --project ~/.claude/skills python ~/.claude/skills/square-cache/scripts/cache_wrapper.py sync --json
+```
+
+Verification:
+- Query the changed SKU/item via `square_cache_search` or `square_cache_get_item`
+- For image updates, confirm `item_data.image_ids` includes the new image
+- For batch updates, run one sync at the end, then spot-check at least 3 updated items
+
 ## Common Fixes
 
 | Issue | Solution |
@@ -158,5 +181,6 @@ To **replace** primary image: delete old image first via `catalog.deleteObjects`
 
 | Skill | Use For |
 |-------|---------|
-| `rg-full-auto` | New item onboarding (7-phase workflow) |
+| `rg-full-auto` | New item onboarding (10-phase workflow) |
 | `square-image-upload` | Dedicated image upload handling |
+| `square-cache` | Sync and verify cached catalog state after updates |

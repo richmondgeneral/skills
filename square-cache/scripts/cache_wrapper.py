@@ -9,15 +9,40 @@ Provides common operations without requiring direct CLI usage.
 """
 
 import os
-import sys
 import json
 import subprocess
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from pymongo import MongoClient
 
-# Add square-tools to path
-sys.path.insert(0, os.path.expanduser('~/Workspace/square-tools/cache-system'))
+CACHE_CLI_CANDIDATES = (
+    os.environ.get("SQUARE_CACHE_SH"),
+    os.path.expanduser("~/workspace/square/square-tools/bin/square_cache.sh"),
+    os.path.expanduser("~/Workspace/square-tools/bin/square_cache.sh"),
+    "/Users/scottybe/workspace/square/square-tools/bin/square_cache.sh",
+)
+
+
+def resolve_cache_cli_path() -> str:
+    """Resolve square_cache.sh path across current and legacy layouts."""
+    for raw_path in CACHE_CLI_CANDIDATES:
+        if not raw_path:
+            continue
+        path = os.path.expanduser(raw_path)
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    raise FileNotFoundError(
+        "square_cache.sh not found. Set SQUARE_CACHE_SH or install square-tools at "
+        "~/workspace/square/square-tools/bin/square_cache.sh"
+    )
+
+
+def resolve_square_token(token: Optional[str] = None) -> str:
+    """Resolve Square token from explicit argument or environment."""
+    value = token or os.environ.get("SQUARE_ACCESS_TOKEN") or os.environ.get("SQUARE_TOKEN")
+    if not value:
+        raise ValueError("Set SQUARE_ACCESS_TOKEN or SQUARE_TOKEN")
+    return value
 
 class SquareCacheWrapper:
     """Wrapper for Square catalog cache operations"""
@@ -35,9 +60,9 @@ class SquareCacheWrapper:
         """Get current cache status"""
         try:
             # Test MongoDB connection
-            self.client.admin.command('ismaster')
+            self.client.admin.command('ping')
             mongodb_running = True
-        except Exception as e:
+        except Exception:
             mongodb_running = False
             
         last_sync = self.sync_log.find_one({}, sort=[('timestamp', -1)])
@@ -167,15 +192,15 @@ class SquareCacheWrapper:
     
     def sync_cache(self, token: Optional[str] = None) -> Dict[str, Any]:
         """Trigger cache sync via CLI"""
-        token = token or os.environ.get('SQUARE_TOKEN')
-        if not token:
-            raise ValueError("SQUARE_TOKEN not set")
+        token = resolve_square_token(token)
+        cache_cli = resolve_cache_cli_path()
             
         env = os.environ.copy()
+        env['SQUARE_ACCESS_TOKEN'] = token
         env['SQUARE_TOKEN'] = token
         
         result = subprocess.run(
-            [os.path.expanduser('~/Workspace/square-tools/bin/square_cache.sh'), 'sync'],
+            [cache_cli, 'sync'],
             env=env,
             capture_output=True,
             text=True
@@ -183,6 +208,7 @@ class SquareCacheWrapper:
         
         return {
             'success': result.returncode == 0,
+            'cache_cli': cache_cli,
             'stdout': result.stdout,
             'stderr': result.stderr
         }
@@ -197,6 +223,7 @@ def main():
     parser.add_argument('--pattern', help='Search pattern')
     parser.add_argument('--item-id', help='Item ID')
     parser.add_argument('--since', help='Date filter (YYYY-MM-DD)')
+    parser.add_argument('--token', help='Square token (or use SQUARE_ACCESS_TOKEN/SQUARE_TOKEN)')
     parser.add_argument('--limit', type=int, default=50, help='Result limit')
     parser.add_argument('--json', action='store_true', help='Output JSON')
     
@@ -224,7 +251,7 @@ def main():
     elif args.command == 'changes':
         result = cache.get_recent_changes(args.since, args.limit)
     elif args.command == 'sync':
-        result = cache.sync_cache()
+        result = cache.sync_cache(args.token)
     else:
         print(f"Unknown command: {args.command}")
         sys.exit(1)

@@ -2,10 +2,15 @@
 name: rg-full-auto
 description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "2.5"
+  version: "2.6"
   author: scottybe
   updated: "2026-02-15"
   changelog: |
+    v2.6 - Photos Library auto-cluster intake:
+    - Added Step 0.4 to discover product photo clusters via photos-library
+    - Added UUID-based photo copy flow for the selected cluster
+    - Added manual fallback path when clustering is unavailable
+
     v2.5 - Lot tracking delegation refinement:
     - Moved margin validation before catalog write (Step 1.5)
     - Delegated lot assignment/cost allocation to rg-lot-tracker
@@ -122,39 +127,64 @@ Check the results for an **exact SKU match** (not substring). The cache search r
 do shell script "mkdir -p /Users/scottybe/workspace/square/items/RG-XXXX"
 ```
 
-### Step 0.4: Locate user's image
+### Step 0.4: Auto-discover product photo cluster (preferred)
 
-User uploads appear in `/mnt/user-data/uploads/` in Claude's container, but we need the file on user's Mac. 
+Use `photos-library` clustering to find likely product shoots from the local Photos database:
 
-**⚠️ CHECK BOTH LOCATIONS:** User often places images on Desktop, not just Downloads!
+```applescript
+do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills python ~/.claude/skills/photos-library/scripts/find_product_clusters.py --days 14 --type product"
+```
+
+If product clusters are found:
+- Prefer the most recent cluster by default
+- Ask user to confirm cluster/date-time before copying
+- Select the best image from that cluster (portrait-first, highest resolution)
+- Copy by UUID to the item folder and set `SOURCE_IMAGE_PATH` (`EXT` should match source format, e.g., `heic` or `jpg`):
+
+```applescript
+do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills python ~/.claude/skills/image-processor/scripts/photos.py --copy 'PHOTO_UUID' --output '/Users/scottybe/workspace/square/items/RG-XXXX/source-original.EXT' 2>&1"
+```
+
+If no cluster is found (or Photos DB access fails), fall back to Step 0.5.
+
+### Step 0.5: Locate user's image (manual fallback)
+
+User uploads appear in `/mnt/user-data/uploads/` in Claude's container, but we need the file on user's Mac.
+
+**⚠️ CHECK BOTH LOCATIONS:** User often places images on Desktop, not just Downloads.
 
 ```applescript
 do shell script "ls -lt ~/Desktop/*.jpg ~/Desktop/*.jpeg ~/Desktop/*.png ~/Desktop/*.heic ~/Downloads/*.jpg ~/Downloads/*.jpeg ~/Downloads/*.png 2>/dev/null | head -10"
 ```
 
 Or use `Filesystem:list_directory` on `/Users/scottybe/Desktop` to see all files.
+Set `SOURCE_IMAGE_PATH` to the selected absolute path.
 
-### Step 0.5: Check file size & compress if needed
+### Step 0.6: Check file size & prepare input
 
 **⚠️ remove.bg has a 22MB limit.** Check file size first:
 
 ```applescript
-do shell script "stat -f%z '/Users/scottybe/Desktop/IMAGE_NAME.png'"
+do shell script "stat -f%z '/ABSOLUTE/SOURCE_IMAGE_PATH'"
 ```
 
 **If > 20MB (20000000 bytes):** Compress before background removal:
 ```applescript
-do shell script "sips -Z 3000 '/Users/scottybe/Desktop/IMAGE_NAME.png' --out '/Users/scottybe/workspace/square/items/RG-XXXX/hero_temp.png'"
+do shell script "sips -Z 3000 '/ABSOLUTE/SOURCE_IMAGE_PATH' --out '/Users/scottybe/workspace/square/items/RG-XXXX/hero_temp.png'"
 ```
+Set `REMOVE_BG_INPUT=/Users/scottybe/workspace/square/items/RG-XXXX/hero_temp.png`
 
-Then use `hero_temp.png` as input for background removal.
+**If ≤ 20MB:** Use original directly unless it's HEIC.
+- HEIC source: convert to PNG first and set `REMOVE_BG_INPUT` to `hero_temp.png`
+```applescript
+do shell script "sips -s format png '/ABSOLUTE/SOURCE_IMAGE_PATH' --out '/Users/scottybe/workspace/square/items/RG-XXXX/hero_temp.png'"
+```
+- Non-HEIC source: set `REMOVE_BG_INPUT=/ABSOLUTE/SOURCE_IMAGE_PATH`
 
-**If ≤ 20MB:** Use original file directly.
-
-### Step 0.6: Remove background
+### Step 0.7: Remove background
 
 ```applescript
-do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/image-processor/scripts/process.py '/Users/scottybe/workspace/square/items/RG-XXXX/hero_temp.png' --output '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' 2>&1"
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/image-processor/scripts/process.py '/ABSOLUTE/REMOVE_BG_INPUT' --output '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' 2>&1"
 ```
 
 **Prerequisites:** `~/.env` must have `REMOVEBG_API_KEY`. Note: Must `source ~/.env` to load API key.
@@ -651,6 +681,12 @@ Next: Print label, place item on floor
 - Ensure image is accessible on user's Mac (not just in Claude's container)
 - Check remaining credits in script output
 
+**Photos cluster discovery fails:**
+- Check Photos DB path exists: `~/Pictures/Photos Library.photoslibrary/database/Photos.sqlite`
+- Ensure terminal/Codex has Full Disk Access on macOS
+- If you see `sqlite3.OperationalError: unable to open database file`, this is usually a macOS privacy permission issue
+- Fall back to Step 0.5 manual image selection
+
 **Binary file transfer fails:**
 - Binary files (PNG, JPEG) cannot transfer between Claude's container and user's Mac
 - Solution: Generate binaries via osascript on user's Mac directly
@@ -685,6 +721,7 @@ Next: Print label, place item on floor
 | `maker-mark-identifier` | Pottery, silver, furniture marks |
 | `product-labeler` | Label generation, Square descriptions |
 | `square-cache` | Fast catalog lookups |
+| `photos-library` | Auto-discover and cluster local Photos shoots |
 | `rg-lot-tracker` | Lot tracking, cost allocation, margin validation |
 
 ## References

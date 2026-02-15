@@ -11,7 +11,9 @@ SKILL_DIRS = [
     "imessage-archiver/scripts",  # Added this
     "image-processor/lib",
     "image-processor/scripts",
+    "square-cache/scripts",
     "square-crm/scripts",
+    "rg-full-auto/scripts",
     "product-labeler/scripts",
     "photos-library/scripts",
     "alpaca-market-data/scripts"

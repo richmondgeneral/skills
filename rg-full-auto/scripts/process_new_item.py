@@ -162,76 +162,158 @@ class RGItemProcessor:
             'original_path': str(original_path),
             'converted_path': str(converted_path)
         }
-    
+
+    def _square_headers(self) -> Dict[str, str]:
+        """Shared headers for Square API calls."""
+        return {
+            'Square-Version': '2025-10-16',
+            'Authorization': f'Bearer {self.square_token}',
+            'Content-Type': 'application/json'
+        }
+
+    def _build_catalog_object(self, item_data: Dict, price_cents: int, sku: str) -> Dict:
+        """Build a catalog ITEM object shared by both create methods."""
+        return {
+            "type": "ITEM",
+            "id": f"#{sku}",
+            "present_at_all_locations": False,
+            "present_at_location_ids": [self.location_id],
+            "item_data": {
+                "name": item_data['title'],
+                "description": item_data['description'],
+                "categories": [
+                    {"id": self.categories['new_finds']}
+                ],
+                "reporting_category": {"id": self.categories['new_finds']},
+                "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
+                "is_taxable": True,
+                "ecom_visibility": "VISIBLE",
+                "ecom_seo_data": {
+                    "page_title": item_data['seo_title'],
+                    "page_description": item_data['seo_description'],
+                    "permalink": item_data['permalink']
+                },
+                "variations": [{
+                    "type": "ITEM_VARIATION",
+                    "id": f"#{sku}-var",
+                    "present_at_all_locations": False,
+                    "present_at_location_ids": [self.location_id],
+                    "item_variation_data": {
+                        "item_id": f"#{sku}",
+                        "name": "Regular",
+                        "sku": sku,
+                        "pricing_type": "FIXED_PRICING",
+                        "price_money": {
+                            "amount": price_cents,
+                            "currency": "USD"
+                        },
+                        "track_inventory": True,
+                        "sellable": True,
+                        "stockable": True
+                    }
+                }]
+            }
+        }
+
+    def _extract_catalog_ids(self, result: Dict, sku: str) -> Dict[str, str]:
+        """
+        Extract item and variation IDs from Square catalog responses.
+
+        Prioritizes `id_mappings` for reliability, then falls back to object traversal.
+        """
+        temp_item_id = f"#{sku}"
+        temp_variation_id = f"#{sku}-var"
+
+        id_mappings = result.get('id_mappings', []) or []
+        mapped = {
+            m.get('client_object_id'): m.get('object_id')
+            for m in id_mappings
+            if m.get('client_object_id') and m.get('object_id')
+        }
+
+        item_id = mapped.get(temp_item_id)
+        variation_id = mapped.get(temp_variation_id)
+
+        catalog_object = result.get('catalog_object')
+        if not catalog_object:
+            objects = result.get('objects', []) or []
+            catalog_object = objects[0] if objects else {}
+
+        if not item_id:
+            item_id = catalog_object.get('id')
+
+        if not variation_id:
+            variations = catalog_object.get('item_data', {}).get('variations', []) or []
+            if variations:
+                variation_id = variations[0].get('id')
+
+        if not item_id or not variation_id:
+            raise ValueError("Could not resolve catalog item/variation IDs from Square response")
+
+        return {
+            'item_id': item_id,
+            'variation_id': variation_id,
+        }
+
     def phase3_catalog(self, item_data: Dict) -> Dict:
         """Phase 3: Square Catalog Creation."""
         print(f"\n=== PHASE 3: SQUARE CATALOG CREATION ===")
         
         price_cents = int(item_data['price'] * 100)
         sku = item_data['sku']
-        
-        catalog_request = {
-            "idempotency_key": str(uuid.uuid4()),
-            "batches": [{
-                "objects": [{
-                    "type": "ITEM",
-                    "id": f"#{sku}",
-                    "present_at_all_locations": False,
-                    "present_at_location_ids": [self.location_id],
-                    "item_data": {
-                        "name": item_data['title'],
-                        "description": item_data['description'],
-                        "categories": [
-                            {"id": self.categories['new_finds']}
-                        ],
-                        "reporting_category": {"id": self.categories['new_finds']},
-                        "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
-                        "is_taxable": True,
-                        "ecom_visibility": "VISIBLE",
-                        "ecom_seo_data": {
-                            "page_title": item_data['seo_title'],
-                            "page_description": item_data['seo_description'],
-                            "permalink": item_data['permalink']
-                        },
-                        "variations": [{
-                            "type": "ITEM_VARIATION",
-                            "id": f"#{sku}-var",
-                            "present_at_all_locations": False,
-                            "present_at_location_ids": [self.location_id],
-                            "item_variation_data": {
-                                "item_id": f"#{sku}",
-                                "name": "Regular",
-                                "sku": sku,
-                                "pricing_type": "FIXED_PRICING",
-                                "price_money": {
-                                    "amount": price_cents,
-                                    "currency": "USD"
-                                },
-                                "track_inventory": True,
-                                "sellable": True,
-                                "stockable": True
-                            }
-                        }]
-                    }
-                }]
-            }]
-        }
-        
+
+        catalog_object = self._build_catalog_object(item_data, price_cents, sku)
+        idempotency_key = str(uuid.uuid4())
+
+        attempts = [
+            (
+                'batch-upsert',
+                "https://connect.squareup.com/v2/catalog/batch-upsert",
+                {
+                    "idempotency_key": idempotency_key,
+                    "batches": [{
+                        "objects": [catalog_object]
+                    }]
+                }
+            ),
+            (
+                'upsertCatalogObject',
+                "https://connect.squareup.com/v2/catalog/object",
+                {
+                    "idempotency_key": idempotency_key,
+                    "object": catalog_object
+                }
+            )
+        ]
+
         print(f"📦 Creating catalog item: {sku}")
-        response = requests.post(
-            "https://connect.squareup.com/v2/catalog/batch-upsert",
-            headers={
-                'Square-Version': '2025-10-16',
-                'Authorization': f'Bearer {self.square_token}',
-                'Content-Type': 'application/json'
-            },
-            json=catalog_request
-        )
-        response.raise_for_status()
-        
-        result = response.json()
-        item_id = result['objects'][0]['id']
-        variation_id = result['objects'][0]['item_data']['variations'][0]['id']
+        last_error: Optional[Exception] = None
+        catalog_ids: Optional[Dict[str, str]] = None
+
+        for index, (method_name, url, payload) in enumerate(attempts):
+            try:
+                print(f"   → Trying {method_name}")
+                response = requests.post(
+                    url,
+                    headers=self._square_headers(),
+                    json=payload
+                )
+                response.raise_for_status()
+                result = response.json()
+                catalog_ids = self._extract_catalog_ids(result, sku)
+                break
+            except Exception as e:
+                last_error = e
+                if index < len(attempts) - 1:
+                    print(f"   ⚠️ {method_name} failed ({e}); attempting fallback.")
+                    continue
+                raise
+
+        if not catalog_ids:
+            raise RuntimeError(f"Catalog creation failed: {last_error}")
+
+        item_id = catalog_ids['item_id']
+        variation_id = catalog_ids['variation_id']
         
         print(f"✅ Catalog item created!")
         print(f"   Item ID: {item_id}")
@@ -265,11 +347,7 @@ class RGItemProcessor:
         
         response = requests.post(
             "https://connect.squareup.com/v2/inventory/batch-change",
-            headers={
-                'Square-Version': '2025-10-16',
-                'Authorization': f'Bearer {self.square_token}',
-                'Content-Type': 'application/json'
-            },
+            headers=self._square_headers(),
             json=inventory_request
         )
         response.raise_for_status()

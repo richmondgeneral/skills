@@ -41,7 +41,9 @@ on run argv
         set skippedCount to 0
         repeat with pId in photoIds
             try
-                set end of itemsToArchive to (first media item whose id is pId)
+                -- Photos media item IDs include a suffix (e.g., "/L0/001").
+                -- Upstream UUIDs from Photos.sqlite are bare ZUUID values.
+                set end of itemsToArchive to (first media item whose id starts with (contents of pId))
             on error
                 -- UUID not found (deleted or invalid), skip
                 set skippedCount to skippedCount + 1

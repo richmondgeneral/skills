@@ -6,6 +6,7 @@ Usage:
   python edit.py --input photo.jpg --instruction "remove the background" --output result.png
   python edit.py --input photo.jpg --instruction "change to sunset lighting" --output sunset.png
   python edit.py --input subject.jpg --instruction "place in scene" --reference bg.jpg --output composite.png
+  python edit.py --input subject.jpg --odd-placement "a moon rover lab" --output silly.png
 """
 import argparse
 import sys
@@ -18,12 +19,29 @@ from models import TaskConfig, TaskType
 from router import create_default_router
 
 
+def build_odd_placement_instruction(scene: str, extra_instruction: str = "") -> str:
+    """Build a robust instruction for surreal-but-recognizable odd placements."""
+    base = (
+        f"Create a playful composite by placing the main item naturally in {scene}. "
+        "Keep the item itself recognizable and true to shape, text, and colors. "
+        "Match perspective and lighting to the new scene, add realistic contact shadows, "
+        "and avoid stretching or deforming the item."
+    )
+    if extra_instruction:
+        return f"{base} Additional direction: {extra_instruction}"
+    return base
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Edit images with natural language instructions'
     )
     parser.add_argument('--input', '-i', required=True, help='Input image to edit')
-    parser.add_argument('--instruction', '-I', required=True, help='Edit instruction')
+    parser.add_argument('--instruction', '-I', help='Edit instruction')
+    parser.add_argument(
+        '--odd-placement',
+        help='Scene for playful placement (example: "a lunar command center")'
+    )
     parser.add_argument('--output', '-o', required=True, help='Output image path')
     parser.add_argument(
         '--reference', '-r',
@@ -52,8 +70,16 @@ def main():
             print(f"Error: Reference image not found: {ref}", file=sys.stderr)
             sys.exit(1)
 
+    if not args.instruction and not args.odd_placement:
+        print("Error: Provide --instruction or --odd-placement", file=sys.stderr)
+        sys.exit(1)
+
+    final_instruction = args.instruction or ""
+    if args.odd_placement:
+        final_instruction = build_odd_placement_instruction(args.odd_placement, final_instruction)
+
     task_config = TaskConfig.for_edit(
-        instruction=args.instruction,
+        instruction=final_instruction,
         output_path=args.output,
         quality=args.quality,
         references=references
@@ -62,11 +88,11 @@ def main():
     router = create_default_router()
 
     if args.verbose:
-        print(f"Input: {args.input}")
-        print(f"Instruction: {args.instruction}")
-        print(f"Quality: {args.quality}")
+        print(f"Input: {args.input}", file=sys.stderr)
+        print(f"Instruction: {final_instruction}", file=sys.stderr)
+        print(f"Quality: {args.quality}", file=sys.stderr)
         if references:
-            print(f"References: {len(references)}")
+            print(f"References: {len(references)}", file=sys.stderr)
 
     result = router.process(args.input, task_config)
 
@@ -76,10 +102,11 @@ def main():
             'success': result.success,
             'model': result.model_used,
             'input_image': args.input,
-            'instruction': args.instruction,
+            'instruction': final_instruction,
             'output_path': result.output_path,
             'reference_count': len(references),
             'processing_time': result.processing_time,
+            'mode': 'odd-placement' if args.odd_placement else 'edit',
         }
         if not result.success:
             output['error'] = result.error

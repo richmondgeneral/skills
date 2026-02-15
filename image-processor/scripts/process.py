@@ -130,6 +130,11 @@ def main():
         default='auto',
         help='Model to use (default: auto)'
     )
+    parser.add_argument(
+        '--allow-rect-mask',
+        action='store_true',
+        help='Allow rectangular mask outputs without failing the command'
+    )
     parser.add_argument('--json', action='store_true', help='Output JSON')
     parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
 
@@ -160,6 +165,7 @@ def main():
         print(f"Task: {args.task}, Quality: {args.quality}, Model: {args.model}", file=sys.stderr)
 
     result = router.process_with_fallback(args.image, task_config)
+    strict_mask_qa = (args.task == 'remove-bg' and not args.allow_rect_mask)
 
     # Post-process quality check for background removal outputs.
     if args.task == 'remove-bg' and result.success and result.output_path:
@@ -190,6 +196,20 @@ def main():
                         "remove.bg recovery unavailable or failed; keeping initial output.",
                         file=sys.stderr
                     )
+
+        final_quality = result.metadata.get('mask_quality') if result.metadata else None
+        if (
+            strict_mask_qa
+            and final_quality
+            and final_quality.get('suspicious_rect_mask')
+        ):
+            result.success = False
+            result.error = (
+                "Rectangular mask detected and no acceptable recovery output was produced. "
+                "Re-run with --model removebg or pass --allow-rect-mask to bypass."
+            )
+            result.metadata = result.metadata or {}
+            result.metadata['qa_guard'] = 'failed_rectangular_mask'
 
     if args.json:
         import json

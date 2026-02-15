@@ -2,10 +2,15 @@
 name: image-processor
 description: Unified image processing with background removal, generation, editing, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "photos library", "get from photos", or when rg-full-auto needs image processing.
 metadata:
-  version: "1.1"
+  version: "1.2"
   author: scottybe
   updated: "2026-02-15"
   changelog: |
+    v1.2 - QA guard and odd-placement editing:
+    - Added strict rectangular-mask guard in `process.py` (with `--allow-rect-mask` bypass)
+    - Added `edit.py --odd-placement` mode for playful scene placement composites
+    - Updated CLI output behavior so verbose logs stay on stderr
+
     v1.1 - Background removal reliability improvements:
     - `process.py --model` now enforces preferred model ordering
     - Added remove.bg request profile fallbacks and retry handling
@@ -46,6 +51,7 @@ python scripts/generate.py --prompt "Professional product photo" --quality pro -
 python scripts/edit.py --input photo.jpg --instruction "remove the background" --output result.png
 python scripts/edit.py --input photo.jpg --instruction "change to sunset lighting" --output sunset.png
 python scripts/edit.py --input subject.jpg --instruction "place in scene" --reference bg.jpg --output composite.png
+python scripts/edit.py --input subject.jpg --odd-placement "the dashboard of a spaceship" --output odd-scene.png --quality pro
 ```
 
 ### Photos.app Access
@@ -111,6 +117,7 @@ Options:
   -t, --task TASK    Task type: remove-bg, analyze (default: remove-bg)
   -q, --quality LVL  Quality: low, medium, high, premium (default: high)
   -m, --model MODEL  Model preference: nano-banana, gemini25, removebg, auto
+  --allow-rect-mask  Do not fail when output appears to be a rectangular/box mask
   --json             Output JSON
   -v, --verbose      Verbose output
 ```
@@ -118,6 +125,7 @@ Options:
 Notes:
 - `--model` is honored as first-choice routing (with fallback chain if it fails).
 - `remove-bg` runs a mask-quality check and auto-retries with `removebg` when output looks like a rectangular box mask.
+- By default, suspicious rectangular masks fail the command unless recovery succeeds (`--allow-rect-mask` bypasses this guard).
 
 ### generate.py
 
@@ -140,13 +148,17 @@ python scripts/edit.py --input PATH --instruction TEXT --output PATH [OPTIONS]
 
 Options:
   -i, --input PATH       Input image to edit (required)
-  -I, --instruction TEXT Edit instruction (required)
+  -I, --instruction TEXT Edit instruction
+  --odd-placement TEXT   Place item in a playful scene (example: "inside a submarine control room")
   -o, --output PATH      Output image path (required)
   -r, --reference PATH   Reference image(s)
   -q, --quality LVL      Quality: auto, fast, pro (default: auto)
   --json                 Output JSON
   -v, --verbose          Verbose output
 ```
+
+Notes:
+- Pass either `--instruction` or `--odd-placement` (or both).
 
 ### photos.py
 

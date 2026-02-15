@@ -2,10 +2,15 @@
 name: image-processor
 description: Unified image processing with background removal, generation, editing, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "photos library", "get from photos", or when rg-full-auto needs image processing.
 metadata:
-  version: "1.2"
+  version: "1.3"
   author: scottybe
   updated: "2026-02-15"
   changelog: |
+    v1.3 - Group background-removal workflow:
+    - Added `process_group.py` for batch background removal in item folders
+    - Added skip logic for QR/label assets and already-transparent images
+    - Added strict rectangular-mask QA guard support in batch mode
+
     v1.2 - QA guard and odd-placement editing:
     - Added strict rectangular-mask guard in `process.py` (with `--allow-rect-mask` bypass)
     - Added `edit.py --odd-placement` mode for playful scene placement composites
@@ -35,6 +40,7 @@ Unified image processing skill combining background removal, image generation, i
 python scripts/process.py image.jpg
 python scripts/process.py image.jpg --output result.png
 python scripts/process.py image.jpg --quality premium
+python scripts/process_group.py --input-dir /Users/scottybe/workspace/square/items/RG-0015 --quality premium --model auto --json
 ```
 
 ### Image Generation
@@ -159,6 +165,32 @@ Options:
 
 Notes:
 - Pass either `--instruction` or `--odd-placement` (or both).
+
+### process_group.py
+
+```
+python scripts/process_group.py --input-dir PATH [OPTIONS]
+
+Options:
+  --output-dir PATH       Optional output root (default: same folder as source)
+  --recursive             Include subdirectories
+  --include GLOB          Include glob pattern (repeatable)
+  --exclude GLOB          Exclude glob pattern (repeatable)
+  --suffix TEXT           Output suffix before .png (default: -nobg)
+  --quality LVL           low, medium, high, premium (default: premium)
+  --model MODEL           nano-banana, gemini25, removebg, auto
+  --overwrite             Overwrite existing output files
+  --process-transparent   Re-process images that already have transparency
+  --allow-rect-mask       Do not fail on suspicious rectangular masks
+  --max-files N           Process only the first N discovered files
+  --fail-fast             Stop after first processing failure
+  --json                  Output JSON summary
+  -v, --verbose           Verbose progress logs to stderr
+```
+
+Notes:
+- Defaults exclude `qr-code*`, `*label*`, and existing `*-nobg.png` files.
+- Helps enforce full-folder cleanup so detail images are not left with backgrounds.
 
 ### photos.py
 

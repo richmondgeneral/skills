@@ -2,10 +2,15 @@
 name: square-image-upload
 description: Upload and manage images in Square Catalog via API. Use when the user needs to upload product photos, replace existing catalog images, or attach images to Square items/variations. Triggers on "upload image to Square", "add photo to item", "replace product image", "Square catalog image", or any request to programmatically manage Square product images. Required because Square's image endpoints use multipart form data which the standard MCP connector cannot handle.
 metadata:
-  version: "1.3"
+  version: "1.4"
   author: scottybe
-  updated: "2025-12-21"
+  updated: "2026-02-15"
   changelog: |
+    v1.4 - Bulk upload support:
+    - Added `upload_batch.py` for directory/manifest-based multi-image uploads
+    - Added `*-nobg` preference logic and hero-first primary ordering
+    - Added dry-run mode for safe upload planning
+
     v1.3 - Anthropic skills update:
     - Added author field
     - Updated date to 2025
@@ -65,6 +70,31 @@ python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
   --variation-id VARIATION_ID
 ```
 
+### Bulk Upload All Item Photos (Hero + Details)
+
+```bash
+python3 ~/.claude/skills/square-image-upload/scripts/upload_batch.py \
+  --directory /Users/scottybe/workspace/square/items/RG-0015 \
+  --item-id CATALOG_ITEM_ID \
+  --include \"*.png\" --include \"*.jpg\" --include \"*.jpeg\" \
+  --json
+```
+
+### Bulk Upload via Manifest CSV
+
+```bash
+python3 ~/.claude/skills/square-image-upload/scripts/upload_batch.py \
+  --manifest /path/to/upload-manifest.csv \
+  --json
+```
+
+Manifest columns:
+- `image_path` (required)
+- `item_id` or `variation_id` (required unless supplied via CLI)
+- `name` (optional)
+- `caption` (optional)
+- `is_primary` (optional: true/false)
+
 ## Script Options
 
 | Flag | Description |
@@ -79,11 +109,31 @@ python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
 | `--token`, `-t` | Square access token (or use env var) |
 | `--json`, `-j` | Output full JSON response |
 
+### `upload_batch.py` options
+
+| Flag | Description |
+|------|-------------|
+| `--directory` | Directory mode source |
+| `--manifest` | CSV manifest mode source |
+| `--item-id` | Target item ID (directory mode, or manifest fallback) |
+| `--variation-id` | Target variation ID (directory mode, or manifest fallback) |
+| `--recursive` | Recurse through subfolders in directory mode |
+| `--include` | Include glob pattern (repeatable) |
+| `--exclude` | Exclude glob pattern (repeatable) |
+| `--primary-file` | Force a specific file as primary |
+| `--no-auto-primary` | Keep existing primary image; do not set primary in directory mode |
+| `--no-prefer-nobg` | Disable `*-nobg` variant preference |
+| `--dry-run` | Build and print upload plan without API calls |
+| `--continue-on-error` | Keep uploading after individual failures |
+| `--json` | Output JSON summary |
+
 ## Workflow: Add Images to New Item
 
 1. Create item via Square MCP (returns item ID)
-2. Run upload script with `--item-id` and `--primary` for main image
-3. Run upload script again for additional images
+2. Process image group with image-processor batch mode if needed:
+   - `process_group.py --input-dir /Users/scottybe/workspace/square/items/RG-XXXX`
+3. Run batch upload for all processed photos:
+   - `upload_batch.py --directory /Users/scottybe/workspace/square/items/RG-XXXX --item-id CATALOG_ITEM_ID`
 
 **Important:** Item must exist before attaching image. Create catalog item first, then upload image.
 

@@ -57,8 +57,11 @@ def find_uuids_by_filename(
     """Reverse-lookup Photos library UUIDs by original filename.
 
     Searches the Photos SQLite database for assets whose original filename
-    matches any of the provided filenames. Returns a dict mapping
-    filename -> uuid and an optional error message.
+    matches any of the provided filenames. If exact filename lookup misses
+    (for example local JPG files from HEIC originals), it falls back to
+    base-name lookup across extensions (e.g., IMG_0077.jpg -> IMG_0077.HEIC).
+
+    Returns a dict mapping local filename -> uuid and an optional error message.
     """
     if not filenames:
         return {}, None
@@ -78,25 +81,42 @@ def find_uuids_by_filename(
             f"and retry. SQLite error: {exc}"
         )
 
-    # Build filename match conditions
-    placeholders = ",".join("?" for _ in filenames)
+    normalized_filenames = {fname: fname.lower() for fname in filenames}
+    normalized_bases = {fname: Path(fname).stem.lower() for fname in filenames}
+    exact_names = sorted(set(normalized_filenames.values()))
+    base_names = sorted(set(normalized_bases.values()))
+
+    exact_placeholders = ",".join("?" for _ in exact_names)
+    base_placeholders = ",".join("?" for _ in base_names)
+    base_expr = (
+        "lower(CASE "
+        "WHEN instr(aa.ZORIGINALFILENAME, '.') > 0 "
+        "THEN substr(aa.ZORIGINALFILENAME, 1, instr(aa.ZORIGINALFILENAME, '.') - 1) "
+        "ELSE aa.ZORIGINALFILENAME END)"
+    )
 
     query = f"""
     SELECT
         a.ZUUID,
         aa.ZORIGINALFILENAME,
         a.ZDATECREATED,
-        datetime(a.ZDATECREATED + {COCOA_EPOCH_OFFSET}, 'unixepoch', 'localtime') as created
+        datetime(a.ZDATECREATED + {COCOA_EPOCH_OFFSET}, 'unixepoch', 'localtime') as created,
+        lower(aa.ZORIGINALFILENAME) as original_lower,
+        {base_expr} as base_lower
     FROM ZASSET a
     LEFT JOIN ZADDITIONALASSETATTRIBUTES aa ON a.ZADDITIONALATTRIBUTES = aa.Z_PK
-    WHERE aa.ZORIGINALFILENAME IN ({placeholders})
+    WHERE (
+        lower(aa.ZORIGINALFILENAME) IN ({exact_placeholders})
+        OR {base_expr} IN ({base_placeholders})
+    )
+      AND aa.ZORIGINALFILENAME IS NOT NULL
       AND a.ZTRASHEDSTATE = 0
       AND a.ZKIND = 0
     ORDER BY a.ZDATECREATED DESC
     """
 
     try:
-        cursor.execute(query, filenames)
+        cursor.execute(query, exact_names + base_names)
         rows = cursor.fetchall()
         conn.close()
     except sqlite3.Error as exc:
@@ -106,39 +126,58 @@ def find_uuids_by_filename(
             pass
         return {}, f"Photos database query failed: {exc}"
 
-    # Build candidate list for each filename.
-    candidates_by_filename = {}
-    for uuid, fname, cocoa_created, created in rows:
-        if fname not in candidates_by_filename:
-            candidates_by_filename[fname] = []
-        candidates_by_filename[fname].append(
-            {
-                "uuid": uuid,
-                "filename": fname,
-                "cocoa_created": cocoa_created,
-                "created": created,
-            }
-        )
+    # Build candidates indexed by exact filename and by base filename.
+    candidates_by_exact = {}
+    candidates_by_base = {}
+    for uuid, fname, cocoa_created, created, original_lower, base_lower in rows:
+        candidate = {
+            "uuid": uuid,
+            "filename": fname,
+            "cocoa_created": cocoa_created,
+            "created": created,
+        }
 
-    # Map filename -> best UUID match.
-    # If file mtimes are available, choose closest timestamp to reduce collisions
-    # when iPhone camera roll reuses names like IMG_1234.JPG.
+        if original_lower:
+            if original_lower not in candidates_by_exact:
+                candidates_by_exact[original_lower] = []
+            candidates_by_exact[original_lower].append(candidate)
+
+        if base_lower:
+            if base_lower not in candidates_by_base:
+                candidates_by_base[base_lower] = []
+            candidates_by_base[base_lower].append(candidate)
+
+    # Map local filename -> best UUID match.
+    # Prefer exact filename match; fallback to base-name match.
     result = {}
-    for fname, candidates in candidates_by_filename.items():
-        chosen = candidates[0]
-        match_method = "most_recent"
+    for local_name in filenames:
+        exact_key = normalized_filenames[local_name]
+        base_key = normalized_bases[local_name]
 
-        if file_mtimes and fname in file_mtimes:
-            target_unix = file_mtimes[fname]
+        if exact_key in candidates_by_exact:
+            candidates = candidates_by_exact[exact_key]
+            match_scope = "exact"
+        elif base_key in candidates_by_base:
+            candidates = candidates_by_base[base_key]
+            match_scope = "base"
+        else:
+            continue
+
+        chosen = candidates[0]
+        match_method = f"{match_scope}_most_recent"
+
+        if file_mtimes and local_name in file_mtimes:
+            target_unix = file_mtimes[local_name]
             chosen = min(
                 candidates,
                 key=lambda c: abs((c["cocoa_created"] + COCOA_EPOCH_OFFSET) - target_unix),
             )
-            match_method = "closest_mtime"
+            match_method = f"{match_scope}_closest_mtime"
 
-        result[fname] = {
+        result[local_name] = {
             "uuid": chosen["uuid"],
-            "filename": fname,
+            "filename": local_name,
+            "photos_filename": chosen["filename"],
             "created": chosen["created"],
             "match_method": match_method,
             "candidate_count": len(candidates),
@@ -328,7 +367,8 @@ def main():
             if matched:
                 print(f"Found {len(matched)} of {len(filenames)} photos in Photos library:")
                 for m in matched:
-                    print(f"  {m['filename']} -> {m['uuid']}")
+                    photos_name = m.get("photos_filename", m["filename"])
+                    print(f"  {m['filename']} -> {m['uuid']} (Photos: {photos_name})")
             if unmatched:
                 print(f"Not found in Photos library ({len(unmatched)}):")
                 for u in unmatched:

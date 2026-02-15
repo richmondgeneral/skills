@@ -2,10 +2,15 @@
 name: rg-full-auto
 description: End-to-end 8-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, and info card publishing. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "2.7"
+  version: "2.8"
   author: scottybe
   updated: "2026-02-15"
   changelog: |
+    v2.8 - Square Phase 2 connector compatibility hardening:
+    - Added method fallback path (`batchInsertObjects` -> `upsertCatalogObject`)
+    - Clarified `idempotency_key` must remain top-level for both payloads
+    - Added resilient ID extraction using `id_mappings` before object traversal
+
     v2.7 - Background removal quality hardening:
     - Phase 0.7 now requests premium remove.bg path (`--model removebg --quality premium`)
     - Aligns onboarding workflow with improved image-processor model preference handling
@@ -339,15 +344,26 @@ If lot tracking was skipped and no `allocated_cost` is available, skip this step
 
 ## Phase 2: Square Catalog Creation
 
-**Use Square MCP:**
+**Primary method (if available in connector):**
 ```
 Square:make_api_request
   service: catalog
-  method: batchInsertObjects   ← EXACT NAME (not batchUpsertCatalogObjects)
+  method: batchInsertObjects
 ```
 
-**⚠️ CRITICAL:** Variation MUST have `present_at_all_locations: false` at the variation level, not just the item level.
+**Fallback method (if connector rejects `batchInsertObjects`):**
+```
+Square:make_api_request
+  service: catalog
+  method: upsertCatalogObject
+```
 
+**⚠️ CRITICAL:**
+- `idempotency_key` stays at the **top level** for both payload styles.
+- Do NOT move `idempotency_key` inside `batches`.
+- Variation MUST have `present_at_all_locations: false` at the variation level.
+
+**Payload A: `batchInsertObjects`**
 ```json
 {
   "idempotency_key": "rg-XXXX-create-TIMESTAMP",
@@ -392,9 +408,57 @@ Square:make_api_request
 }
 ```
 
-**Capture from response:**
-- `objects[0].id` → CATALOG_ITEM_ID (e.g., `6CYX5VOFKOK2QN3P7TYVXSEH`)
-- `objects[0].item_data.variations[0].id` → VARIATION_ID (e.g., `AR63H4MGON7VTBQ3TZB3KOHJ`)
+**Payload B: `upsertCatalogObject`**
+```json
+{
+  "idempotency_key": "rg-XXXX-create-TIMESTAMP",
+  "object": {
+    "type": "ITEM",
+    "id": "#RG-XXXX",
+    "present_at_all_locations": false,
+    "present_at_location_ids": ["B87BAEZ0NWV34"],
+    "item_data": {
+      "name": "Item Title",
+      "description": "HTML description with <br> tags",
+      "categories": [{"id": "CHOSEN_CATEGORY_ID"}],
+      "reporting_category": {"id": "CHOSEN_CATEGORY_ID"},
+      "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
+      "is_taxable": true,
+      "ecom_visibility": "VISIBLE",
+      "ecom_seo_data": {
+        "page_title": "[Era] [Item] - [Feature] | Richmond General",
+        "page_description": "Keyword-rich, ends with Richmond, IL",
+        "permalink": "lowercase-hyphenated-slug"
+      },
+      "variations": [{
+        "type": "ITEM_VARIATION",
+        "id": "#RG-XXXX-var",
+        "present_at_all_locations": false,
+        "present_at_location_ids": ["B87BAEZ0NWV34"],
+        "item_variation_data": {
+          "item_id": "#RG-XXXX",
+          "name": "Regular",
+          "sku": "RG-XXXX",
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {"amount": 1999, "currency": "USD"},
+          "track_inventory": true,
+          "sellable": true,
+          "stockable": true
+        }
+      }]
+    }
+  }
+}
+```
+
+**Capture IDs from response (in order of reliability):**
+1. Prefer `id_mappings` lookup by temp IDs:
+   - `#RG-XXXX` -> CATALOG_ITEM_ID
+   - `#RG-XXXX-var` -> VARIATION_ID
+2. If no mappings:
+   - `batchInsertObjects`: `objects[0].id` and `objects[0].item_data.variations[0].id`
+   - `upsertCatalogObject`: `catalog_object.id` and `catalog_object.item_data.variations[0].id`
+3. If variation ID is still missing, call `retrieveCatalogObject` with related objects and resolve by SKU.
 
 ---
 

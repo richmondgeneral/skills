@@ -30,7 +30,12 @@ Query all categories with: `catalog.searchObjects` with `object_types: ["CATEGOR
 ## Creating Catalog Items
 
 ### Endpoint
-`catalog.batchInsertObjects` (use `batchUpdateObjects` with `sparse_update: true` for updates)
+Primary: `catalog.batchInsertObjects`
+Fallback: `catalog.upsertCatalogObject`
+
+**Compatibility note:** Connector method availability varies. If `batchInsertObjects` returns method/schema errors, switch to `upsertCatalogObject` using the alternate payload below.
+
+**Idempotency rule:** `idempotency_key` remains top-level for both methods.
 
 ### Complete Item Creation (with required fields)
 
@@ -77,6 +82,55 @@ Query all categories with: `catalog.searchObjects` with `object_types: ["CATEGOR
   }]
 }
 ```
+
+### Alternate Item Creation (upsertCatalogObject)
+
+```json
+{
+  "idempotency_key": "uuid-v4-here",
+  "object": {
+    "type": "ITEM",
+    "id": "#temp-id",
+    "present_at_all_locations": false,
+    "present_at_location_ids": ["B87BAEZ0NWV34"],
+    "item_data": {
+      "name": "Product Name",
+      "description": "Description with <br> for line breaks",
+      "categories": [{"id": "CHOSEN_CATEGORY_ID"}],
+      "reporting_category": {"id": "CHOSEN_CATEGORY_ID"},
+      "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
+      "is_taxable": true,
+      "ecom_visibility": "VISIBLE",
+      "variations": [{
+        "type": "ITEM_VARIATION",
+        "id": "#temp-var-id",
+        "present_at_all_locations": false,
+        "present_at_location_ids": ["B87BAEZ0NWV34"],
+        "item_variation_data": {
+          "item_id": "#temp-id",
+          "name": "Regular",
+          "sku": "RG-XXXX",
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 1999,
+            "currency": "USD"
+          },
+          "track_inventory": true,
+          "sellable": true,
+          "stockable": true
+        }
+      }]
+    }
+  }
+}
+```
+
+### Extracting IDs Robustly
+
+Use this order:
+1. `id_mappings` by temp IDs (`#temp-id`, `#temp-var-id`)
+2. `batchInsertObjects`: `objects[0].id` and nested variation ID
+3. `upsertCatalogObject`: `catalog_object.id` and nested variation ID
 
 ### Set Inventory Count (Required after item creation)
 

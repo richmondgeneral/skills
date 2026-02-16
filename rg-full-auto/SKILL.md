@@ -2,10 +2,20 @@
 name: rg-full-auto
 description: End-to-end 10-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, info card publishing, Whatnot CSV listing, and Photos library cleanup. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this", "add to whatnot". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "3.3"
+  version: "3.4"
   author: scottybe
-  updated: "2026-02-15"
+  updated: "2026-02-16"
   changelog: |
+    v3.4 - Phase 8.3: Post-import metadata editing & shipping profile fix:
+    - BREAKING: Fixed Shipping Profile values — old values (0-1 oz, 1-4 oz, etc.) were wrong
+    - Correct values: 1-3 oz, 4-7 oz, 8-11 oz, 12-15 oz, 1 lb, 1-2 lbs
+    - Added Phase 8.3: Post-Import Metadata Editing (Chrome Automation)
+    - Documents category-specific fields (Movie/TV Show Title, Genre, Type, Edition) for Movies > DVDs
+    - Clarifies two "Type" fields: CSV listing type vs. edit page content type
+    - Added React combobox interaction patterns and known quirks
+    - Added Shipping Profile weight heuristic table (DVDs, VHS, books, vinyl, collectibles)
+    - Updated CSV example and append command to use 4-7 oz default
+
     v3.3 - Whatnot Phase 8 overhaul (post DVD batch learnings):
     - BREAKING: Category hierarchy fix — DVDs is Sub Category under Movies, not a Category
     - BREAKING: Prices must be positive integers (no decimals) — added ceil() conversion rule
@@ -841,7 +851,7 @@ Category,Sub Category,Title,Description,Quantity,Type,Price,Shipping Profile,Off
 | Quantity | Always `1` for unique items | `1` |
 | Type | Always `Buy it Now` for fixed-price | `Buy it Now` |
 | Price | **Positive integer only** (no decimals!) | `7` |
-| Shipping Profile | Weight bracket (must match allowed values) | `1-2 lbs` |
+| Shipping Profile | Weight bracket (must match allowed values — see heuristic table below) | `4-7 oz` |
 | Offerable | `TRUE` to accept offers | `TRUE` |
 | Hazmat | Always `Not Hazmat` | `Not Hazmat` |
 | Condition | Item condition | `Good` |
@@ -858,7 +868,7 @@ Category,Sub Category,Title,Description,Quantity,Type,Price,Shipping Profile,Off
 
 **Append command:**
 ```applescript
-do shell script "echo '\"Movies\",\"DVDs\",\"Item Title\",\"Plain text description\",1,Buy it Now,7,1-2 lbs,TRUE,Not Hazmat,Good,1,RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/hero.png,,,,,,,,' >> ~/workspace/square/items/rg-inventory/whatnot-import.csv"
+do shell script "echo '\"Movies\",\"DVDs\",\"Item Title\",\"Plain text description\",1,Buy it Now,7,4-7 oz,TRUE,Not Hazmat,Good,1,RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/hero.png,,,,,,,,' >> ~/workspace/square/items/rg-inventory/whatnot-import.csv"
 ```
 
 ### Step 8.2: Upload CSV to Whatnot (Chrome Automation)
@@ -905,6 +915,74 @@ do shell script "echo '\"Movies\",\"DVDs\",\"Item Title\",\"Plain text descripti
 
 **Manual fallback:** If Chrome automation isn't available, download the CSV file and upload manually through the Whatnot dashboard.
 
+### Step 8.3: Post-Import Metadata Editing (Chrome Automation)
+
+**Purpose:** After CSV import, certain category-specific fields are only available on the Whatnot edit page — they cannot be set via CSV. This step fills those fields using Claude in Chrome.
+
+**⚠️ IMPORTANT DISTINCTION — Two different "Type" fields:**
+- **CSV column "Type"** = Listing type (`Buy it Now`, `Auction`, `Giveaway`)
+- **Edit page "Type" dropdown** = Content type (e.g., `Movie`, `Mini Series`, `TV Series` for DVDs)
+
+These are completely separate fields. The CSV "Type" is set during import; the edit page "Type" must be set manually afterward.
+
+**Edit page URL pattern:**
+```
+https://www.whatnot.com/dashboard/inventory/TGlzdGluZ05vZGU6XXXXXXXXXX==
+```
+(Base64-encoded Whatnot node IDs — find these by clicking items from the inventory list)
+
+**Workflow per item:**
+
+1. Navigate to `https://www.whatnot.com/dashboard/inventory` (or use `?tab=drafts` for newly imported items)
+2. Click the item to open its edit page
+3. Scroll down to find the category-specific metadata fields
+4. For each combobox field:
+   - Use `find` tool to locate the field by label (e.g., `"Genre combobox"`, `"Type combobox"`)
+   - Use `form_input` with the ref to type a filter string (e.g., `"Horror"`, `"Movie"`)
+   - Click the matching dropdown option that appears
+5. Verify Shipping Profile is correct (CSV import may have used a default value)
+6. Click **Save** button
+7. Navigate back to inventory list and repeat for next item
+
+**⚠️ React combobox quirks:**
+- Whatnot uses React comboboxes — typing into them filters the dropdown options
+- If dropdown shows "No options available," the typed value is NOT a valid option
+- Don't try to force invalid values (e.g., typing "DVD" into the content Type field won't work)
+- Always click an option from the dropdown to ensure React state updates properly
+
+#### Category-Specific Metadata Fields
+
+**Movies > DVDs:**
+
+| Field | Required | Valid Values | Notes |
+|-------|----------|-------------|-------|
+| Movie/TV Show Title | Yes | Free text | Use the actual film title, not the listing title |
+| Genre | Yes | Action, Comedy, Drama, Horror, Sci-Fi, Thriller, etc. | Combobox with typeahead filtering |
+| Type (content) | Yes | `Movie`, `Mini Series`, `TV Series` | NOT the CSV "Type" column |
+| Edition | No | `Standard Edition`, `Collector's Edition`, `Unrated Edition`, `Special Edition`, `Director's Cut`, etc. | Combobox with typeahead |
+
+> **TODO:** Document metadata fields for other categories (Vinyl Records, Vintage Toys, etc.) as they are onboarded.
+
+#### Shipping Profile Weight Heuristic
+
+Use this table to select the correct Shipping Profile value:
+
+| Item Type | Weight Estimate | Shipping Profile |
+|-----------|----------------|-----------------|
+| Single DVD (standard case) | ~4-5 oz | `4-7 oz` |
+| DVD multi-pack (2-4 discs) | ~5-6 oz | `4-7 oz` |
+| DVD box set (5-8 discs) | ~6-7 oz | `4-7 oz` |
+| DVD large box set (9+ discs) | ~8-10 oz | `8-11 oz` |
+| Single Blu-ray | ~4-5 oz | `4-7 oz` |
+| VHS tape (single) | ~8-10 oz | `8-11 oz` |
+| Paperback book | ~4-7 oz | `4-7 oz` |
+| Hardcover book (small) | ~8-12 oz | `8-11 oz` |
+| Hardcover book (large/coffee table) | ~1-2 lbs | `1-2 lbs` |
+| Vinyl record (single LP) | ~8-10 oz | `8-11 oz` |
+| Small collectible / figurine | ~4-6 oz | `4-7 oz` |
+
+> When in doubt, weigh the item. Accurate shipping prevents losses on lightweight items and buyer complaints on heavy ones.
+
 ### Whatnot Category Hierarchy Reference
 
 **⚠️ CRITICAL:** Some items that seem like categories are actually sub-categories. Always check the hierarchy.
@@ -932,8 +1010,10 @@ do shell script "echo '\"Movies\",\"DVDs\",\"Item Title\",\"Plain text descripti
 **Type:**
 `Auction`, `Buy it Now`, `Giveaway`
 
-**Shipping Profile:**
-`0-1 oz`, `1-4 oz`, `5-8 oz`, `9-15 oz`, `1-2 lbs`, `3-5 lbs`, `6-9 lbs`, `10-14 lbs`
+**Shipping Profile (must match Whatnot dropdown exactly):**
+`1-3 oz`, `4-7 oz`, `8-11 oz`, `12-15 oz`, `1 lb`, `1-2 lbs`
+
+> **⚠️ Updated Feb 2026:** Previous values (`0-1 oz`, `1-4 oz`, `5-8 oz`, etc.) were incorrect. The values above are the actual Whatnot dropdown options.
 
 **Hazmat:**
 `Not Hazmat`

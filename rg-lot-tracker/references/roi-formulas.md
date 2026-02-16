@@ -1,10 +1,20 @@
 # ROI Formulas & Fee Schedule
 
-## Fee Schedule
+## Fee Schedule by Channel
 
-### Square Payment Processing
+### Square (payment links, in-person)
 - **Rate:** 2.9% + $0.30 per transaction
-- **Applies to:** All payment link sales
+- **Applies to:** All Square payment link and in-person sales
+
+### Whatnot (live auctions, buy-now)
+- **Seller fee:** 9.9% of sale price
+- **Payment processing:** 3.0% of sale price
+- **Total:** ~12.9% of sale price
+- **Note:** No per-transaction flat fee. Shipping handled separately by buyer.
+
+### Local Pickup / Cash
+- **Fees:** $0
+- **Shipping:** $0
 
 ### Shipping (if applicable)
 - **Materials:** $2–5 per item (varies by size/weight)
@@ -18,12 +28,20 @@
 
 ## Formulas
 
-### Per-Item Calculations
+### Per-Item Calculations (Channel-Branched)
 
 ```
-Square Fee = (Sale Price × 0.029) + 0.30
+# Fee calculation branches by channel:
+if channel == "Square":
+    Fees = (Sale Price × 0.029) + 0.30
+elif channel == "Whatnot":
+    Fees = Sale Price × 0.129
+elif channel == "Local Pickup" or channel == "Cash":
+    Fees = 0
+else:
+    Fees = ask user for fee amount
 
-Net Revenue = Sale Price − Square Fee − Shipping Cost
+Net Revenue = Sale Price − Fees − Shipping Cost
 
 Net Profit = Net Revenue − Allocated Cost
 
@@ -32,17 +50,24 @@ Margin % = (Net Profit / Allocated Cost) × 100
 Multiplier = Sale Price / Allocated Cost
 ```
 
-**Example:**
+**Example (Square):**
 ```
 Item: RG-0015 (Vintage milk glass vase)
-Allocated Cost: $8.20
-Sale Price: $24.99
-Square Fee: ($24.99 × 0.029) + $0.30 = $1.02
+Channel: Square | Allocated Cost: $8.20 | Sale Price: $24.99
+Fees: ($24.99 × 0.029) + $0.30 = $1.02
 Shipping: $0 (local pickup)
 Net Revenue: $24.99 − $1.02 = $23.97
-Net Profit: $23.97 − $8.20 = $15.77
-Margin: 192%
-Multiplier: 3.0×
+Net Profit: $15.77 | Margin: 192% | Multiplier: 3.0×
+```
+
+**Example (Whatnot):**
+```
+Item: RG-0020 (Vintage VHS tape)
+Channel: Whatnot | Allocated Cost: $2.00 | Sale Price: $8.00
+Fees: $8.00 × 0.129 = $1.03
+Shipping: $0 (buyer pays on Whatnot)
+Net Revenue: $8.00 − $1.03 = $6.97
+Net Profit: $4.97 | Margin: 249% | Multiplier: 4.0×
 ```
 
 ### Lot-Level Calculations

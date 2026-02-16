@@ -1,13 +1,21 @@
 ---
-name: rg-new-item
-description: Process new Richmond General items from photo to live listing. Use when the user provides an item photo and wants to create a complete listing including Square catalog, payment link, and GitHub Pages card. Triggers on "new item", "process this photo", "add to inventory", "create listing", or when user uploads a product photo for Richmond General. Claude-supervised workflow with user approval at key phases.
+name: rg-new-item-legacy
+description: >
+  DEPRECATED — Superseded by rg-full-auto (v3.6). Original 7-phase photo-to-listing workflow.
+  Kept for reference only. Do NOT trigger on new work — use rg-full-auto instead.
 metadata:
   version: "1.0"
+  deprecated: true
+  superseded_by: rg-full-auto
+  author: scottybe
+  updated: "2026-02-16"
 ---
 
-# Richmond General - New Item Workflow
+# Richmond General - New Item Workflow (DEPRECATED)
 
-Complete Claude-supervised workflow for processing vintage/antique items from a single photo to live listing.
+> **This skill is deprecated.** Use `rg-full-auto` for full item onboarding (photo to sale-ready).
+
+Original 7-phase Claude-supervised workflow for processing vintage/antique items from a single photo to live listing.
 
 ## When to Use This Skill
 

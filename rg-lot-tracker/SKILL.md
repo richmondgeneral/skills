@@ -6,10 +6,18 @@ description: >
   truth for "what did we pay and are we making money." Triggers on "new lot",
   "record purchase", "ROI report", "profit", "margin check", "record sale".
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: scottybe
-  updated: "2026-02-15"
+  updated: "2026-02-16"
   changelog: |
+    v1.1 - Multi-channel awareness + auto-detect sales:
+    - Added channel field (Square / Whatnot / Local / Other) to sale recording
+    - Added channel-branched fee calculations (Whatnot 12.9%, Square 2.9%+$0.30, Local $0)
+    - Added auto-detect sales from Square completed orders (Phase 3 Option A)
+    - Removed hardcoded Active Lots table from references (dynamic dashboard handles this)
+    - Updated lot-file-template with Channel column
+    - Updated roi-formulas.md with Whatnot fee schedule and branched examples
+
     v1.0 - Metadata normalization:
     - Added required metadata fields for repository consistency checks
 ---
@@ -139,10 +147,10 @@ User specifies exact cost. Use for direct purchases or standout pieces.
 Add a row to the Items table:
 
 ```
-| RG-0015 | Vintage milk glass vase | $8.20 | $25.00 | — | Listed |
+| RG-0015 | Vintage milk glass vase | $8.20 | $25.00 | — | — | Listed |
 ```
 
-Fields: SKU | Description | Allocated Cost | List Price | Sale Price | Status
+Fields: SKU | Description | Allocated Cost | List Price | Sale Price | Channel | Status
 
 ---
 
@@ -202,12 +210,38 @@ sure they see the math before deciding.
 
 When an item sells, update lot tracking.
 
+### Option A: Auto-detect from Square (recommended)
+
+Search recent completed Square orders for items matching lot SKUs:
+
+1. Use `orders.searchOrders` with `state: COMPLETED` and recent date range
+2. Match line item SKUs against items in lot files with status "Listed"
+3. Present matches for user confirmation:
+   ```
+   Found 2 recent sales:
+   ✅ RG-0015 — Vintage milk glass vase — sold $25.00 on 2026-02-14 via Square
+   ✅ RG-0020 — VHS tape lot — sold $8.00 on 2026-02-13 via Square
+   Record these? [Y/n]
+   ```
+4. On confirmation, proceed to "Update the lot file" below
+
+### Option B: Manual entry
+
+User tells you directly: "RG-0015 sold for $25.00" or "record sale".
+
 ### What to capture
 
 - **Sale price** — what the buyer paid
 - **Sale date**
-- **Fees** — Square processing: 2.9% + $0.30 per transaction. Shipping: $2–5 (ask or use $3 default)
-- **Net profit** — sale price − allocated cost − fees
+- **Channel** — where the sale happened:
+  | Channel | Fees |
+  |---------|------|
+  | Square | 2.9% + $0.30 |
+  | Whatnot | 12.9% (9.9% seller + 3% payment) |
+  | Local Pickup / Cash | $0 |
+  | Other | Ask user |
+- **Shipping** — $2–5 if shipped (ask or use $3 default); $0 for local/Whatnot
+- **Net profit** — sale price − allocated cost − fees − shipping
 
 See `references/roi-formulas.md` for the complete fee schedule and formulas.
 
@@ -215,7 +249,7 @@ See `references/roi-formulas.md` for the complete fee schedule and formulas.
 
 Change the item's row:
 ```
-| RG-0015 | Vintage milk glass vase | $8.20 | $25.00 | $25.00 | Sold 2026-02-14 |
+| RG-0015 | Vintage milk glass vase | $8.20 | $25.00 | $25.00 | Square | Sold 2026-02-14 |
 ```
 
 Recalculate the Running Totals section:

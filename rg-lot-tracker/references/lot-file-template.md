@@ -19,9 +19,9 @@ and fill in the bracketed fields.
 
 ## Items
 
-| SKU | Item | Allocated Cost | List Price | Sale Price | Status |
-|-----|------|----------------|------------|------------|--------|
-| | | | | | |
+| SKU | Item | Allocated Cost | List Price | Sale Price | Channel | Status |
+|-----|------|----------------|------------|------------|---------|--------|
+| | | | | | | |
 
 ### Status values
 - **Pending** — identified but not yet listed
@@ -52,5 +52,7 @@ and fill in the bracketed fields.
   (see SKILL.md Phase 2).
 - **Sale Price**: What the buyer actually paid. May differ from list price
   if discounted.
+- **Channel**: Where the sale happened — `Square`, `Whatnot`, `Local`, or `Other`.
+  Determines fee calculation (see `roi-formulas.md`). Leave blank until sold.
 - **Running Totals**: Recalculate after every sale or new listing.
   See `roi-formulas.md` for the math.

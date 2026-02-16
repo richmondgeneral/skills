@@ -17,14 +17,6 @@ Format encodes the source type:
 | Free/Found | FREE-NAME | FREE-JERRY (gift from Jerry) |
 | Direct purchase | DIRECT-YYYYMMDD | DIRECT-20251215 |
 
-## Active Lots (as of last update)
-
-| Lot ID | Description | Date | Total Cost | Items | Status |
-|--------|-------------|------|------------|-------|--------|
-| PETER-002 | Peter's Estate, visit 2 | 2025-11-19 | $200.00 | ~4 | Processing |
-| IOWA-0925 | Iowa Auction, Charles City | 2025-09 | $771.09 | 94 | Processing |
-| FREE-JERRY | Jerry's bar stool | 2025 | $0.00 | 1 | Listed |
-
 ## Cost Allocation Methods
 
 ### Method 1: Equal Split

@@ -1,13 +1,21 @@
 ---
-name: rg-inventory
-description: Richmond General inventory management system. Use when processing items for the store, creating Square catalog entries, pricing vintage/antique items, generating labels, or tracking purchase lots and provenance. Triggers on inventory, pricing, labeling, Square catalog, or Richmond General store tasks.
+name: rg-inventory-legacy
+description: >
+  DEPRECATED — Superseded by rg-full-auto (v3.6). Original 7-phase inventory workflow.
+  Kept for reference only. Do NOT trigger on new work — use rg-full-auto instead.
 metadata:
   version: "1.0"
+  deprecated: true
+  superseded_by: rg-full-auto
+  author: scottybe
+  updated: "2026-02-16"
 ---
 
-# Richmond General Inventory System
+# Richmond General Inventory System (DEPRECATED)
 
-Complete workflow for processing vintage and antique items from acquisition through sale.
+> **This skill is deprecated.** Use `rg-full-auto` for full item onboarding and `rg-item-update` for edits.
+
+Original 7-phase workflow for processing vintage and antique items from acquisition through sale.
 
 ## Trigger Patterns
 

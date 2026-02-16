@@ -56,6 +56,8 @@ Returns `item_id` and `variation_id` needed for updates.
 
 ### Price Change
 
+**Margin check:** If repricing significantly, consider running `rg-lot-tracker` Phase 2 to verify the new price still covers allocated cost. Trigger: "margin check for RG-XXXX at $NEW_PRICE".
+
 **Endpoint:** `catalog.batchUpdateObjects` with `sparse_update: true`
 
 ```json

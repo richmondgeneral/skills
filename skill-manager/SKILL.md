@@ -2,10 +2,16 @@
 name: skill-manager
 description: Maintain the local skills repository health and registry. Use for version bumps, metadata audits, registry refreshes, packaging checks, and cleanup across skills. For creating or rewriting skill content, delegate to the skill-creator standard first.
 metadata:
-  version: "1.6"
+  version: "1.7"
   author: scottybe
   updated: "2026-02-16"
   changelog: |
+    v1.7 - Full registry refresh:
+    - Updated rg-lot-tracker to 2.0 (aging, health scoring, enhanced reporting)
+    - Added whatnot-create-product 1.0, catalog-classifier 2.1, whatnot-catalog/chrome 1.0
+    - Added Whatnot, Appraisal, Messaging, Trading, and Deprecated skill sections
+    - Reflects full 25-skill inventory
+
     v1.6 - Square ops skill expansion:
     - Added `square-catalog-ops` and `square-webhook-monitor` to active snapshot
     - Updated snapshot date to reflect current skill inventory
@@ -88,7 +94,9 @@ rg -n "^name:|^description:|^metadata:|version:|author:|updated:" ~/.claude/skil
 |-------|---------|---------|
 | `rg-full-auto` | 3.6 | 2026-02-16 |
 | `rg-item-update` | 1.4 | 2026-02-16 |
-| `rg-lot-tracker` | 1.0 | 2026-02-15 |
+| `rg-lot-tracker` | 2.0 | 2026-02-16 |
+| `catalog-classifier` | 2.1 | 2026-02-16 |
+| `product-labeler` | 1.1 | 2025-12-21 |
 
 ### Square Integration
 
@@ -99,7 +107,14 @@ rg -n "^name:|^description:|^metadata:|version:|author:|updated:" ~/.claude/skil
 | `square-image-upload` | 1.4 | 2026-02-15 |
 | `square-webhook-monitor` | 1.0 | 2026-02-16 |
 | `square-crm` | 1.1 | 2025-12-21 |
-| `product-labeler` | 1.1 | 2025-12-21 |
+
+### Whatnot
+
+| Skill | Version | Updated |
+|-------|---------|---------|
+| `whatnot-create-product` | 1.0 | 2026-02-16 |
+| `whatnot-chrome` | 1.0 | 2026-02-16 |
+| `whatnot-catalog` | 1.0 | 2026-02-16 |
 
 ### Image / Intake
 
@@ -107,6 +122,37 @@ rg -n "^name:|^description:|^metadata:|version:|author:|updated:" ~/.claude/skil
 |-------|---------|---------|
 | `image-processor` | 1.3 | 2026-02-15 |
 | `photos-library` | 1.2 | 2026-01-18 |
+
+### Appraisal
+
+| Skill | Version | Updated |
+|-------|---------|---------|
+| `book-appraiser` | 1.1 | 2025-12-21 |
+| `carnival-glass-appraiser` | 1.1 | 2025-12-21 |
+| `maker-mark-identifier` | 1.1 | 2025-12-21 |
+
+### Messaging / CRM
+
+| Skill | Version | Updated |
+|-------|---------|---------|
+| `imessage-core` | 1.1 | 2025-12-21 |
+| `imessage-archiver` | 1.1 | 2025-12-21 |
+| `contacts-manager` | 1.1 | 2025-12-21 |
+| `daily-briefing` | 2.0 | 2025-12-22 |
+
+### Trading
+
+| Skill | Version | Updated |
+|-------|---------|---------|
+| `alpha-trader` | 2.0 | — |
+| `alpaca-market-data` | 1.0 | 2026-02-14 |
+
+### Deprecated
+
+| Skill | Superseded By |
+|-------|--------------|
+| `rg-inventory-legacy` | `rg-full-auto` |
+| `rg-new-item-legacy` | `rg-full-auto` |
 
 ## Maintenance Workflow
 

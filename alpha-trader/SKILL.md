@@ -139,11 +139,16 @@ Per 5 trades:
 
 | Time (ET) | Action |
 |-----------|--------|
+| 4:00-9:30 | PRE-MARKET - Limit orders only, headline-driven (equities only) |
 | 9:30-10:00 | AVOID - Wild spreads, price discovery |
 | 10:00-11:30 | BEST ENTRIES - Morning dip window |
 | 11:30-14:00 | Chop zone - Still acceptable |
 | 14:00-15:00 | Dead zone - Can find bargains |
 | 15:30-16:00 | AVOID - Spreads widen, MM reduce risk |
+| 16:00-20:00 | AFTER-HOURS - Limit orders only, earnings reactions (equities only) |
+| 20:00-4:00 | OVERNIGHT - Limit orders only, global macro (equities only) |
+
+**24/5 Trading Note:** SPY equity trades 24/5 (Sun 8 PM - Fri 8 PM ET) via Alpaca's BOATS exchange, but SPY **options** only trade during regular hours (9:30 AM - 4:00 PM ET). Extended hours sessions are useful for equity positioning and overnight thesis building. All extended hours orders must be LIMIT orders with TIF of "day" or "gtc".
 
 ### Technical Entry Triggers
 

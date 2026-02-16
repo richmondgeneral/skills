@@ -11,6 +11,11 @@
 #   Creates .skill files (ZIP archives) in dist/ directory
 #   Filename format: <skill-name>-v<version>.skill
 #
+# Packaging model (spec-aligned):
+#   - Required: SKILL.md
+#   - Optional: agents/, scripts/, references/, assets/, LICENSE*
+#   - Non-standard top-level files are excluded from the archive.
+#
 # Install:
 #   Drag the .skill file into Claude for Mac, or use the app's skill import UX.
 #   Claude Code (terminal) does NOT need .skill files — it auto-discovers from
@@ -26,6 +31,10 @@ DIST_DIR="${DIST_DIR:-$SKILLS_ROOT/dist}"
 # Skip these directories when building --all
 SKIP_DIRS=".git|.venv|.claude|archive|dist|docs|testing|.pytest_cache|__pycache__|node_modules"
 
+# Package allowlist (top-level entries under each skill directory)
+ALLOWED_TOP_LEVEL_DIRS=("agents" "scripts" "references" "assets" "lib")
+ALLOWED_TOP_LEVEL_FILES=("SKILL.md" "LICENSE" "LICENSE.txt" "LICENSE.md")
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -40,6 +49,58 @@ log_error() { echo -e "${RED}✗${NC} $1" >&2; }
 extract_version() {
     local skill_md="$1"
     awk '/^metadata:/{m=1} m && /version:/{gsub(/"/,"",$2); print $2; exit}' "$skill_md"
+}
+
+# Warn about unusually large SKILL.md content that may degrade import stability.
+warn_skill_md_risks() {
+    local skill_md="$1"
+    local line_count max_line_len description_len
+
+    line_count=$(wc -l < "$skill_md" | tr -d ' ')
+    max_line_len=$(awk 'length > max { max = length } END { print max + 0 }' "$skill_md")
+    description_len=$(awk '
+        BEGIN { in_fm=0 }
+        /^---$/ {
+            if (!in_fm) { in_fm=1; next }
+            exit
+        }
+        in_fm && /^description:[[:space:]]/ { print length($0); exit }
+    ' "$skill_md")
+
+    if [[ "$line_count" -gt 500 ]]; then
+        log_warn "SKILL.md is ${line_count} lines (recommended: <= 500)"
+    fi
+
+    if [[ "$max_line_len" -gt 512 ]]; then
+        log_warn "SKILL.md has a very long line (${max_line_len} chars)"
+    fi
+
+    if [[ -n "${description_len:-}" && "$description_len" -gt 512 ]]; then
+        log_warn "Frontmatter description is very long on one line (${description_len} chars). Consider folded YAML (description: >)"
+    fi
+}
+
+# Warn when top-level files/dirs will be excluded from the packaged artifact.
+warn_excluded_top_level_entries() {
+    local skill_dir="$1"
+    local skill_name entry base
+    skill_name=$(basename "$skill_dir")
+
+    while IFS= read -r -d '' entry; do
+        base=$(basename "$entry")
+
+        case "$base" in
+            ".DS_Store")
+                continue
+                ;;
+            "SKILL.md"|"LICENSE"|"LICENSE.txt"|"LICENSE.md"|"agents"|"scripts"|"references"|"assets"|"lib")
+                continue
+                ;;
+            *)
+                log_warn "Excluding non-standard top-level path from package: ${skill_name}/${base}"
+                ;;
+        esac
+    done < <(find "$skill_dir" -mindepth 1 -maxdepth 1 -print0)
 }
 
 # Validate that a directory is a valid skill
@@ -69,12 +130,16 @@ validate_skill() {
 build_skill() {
     local skill_name="$1"
     local skill_dir="$SKILLS_ROOT/$skill_name"
+    local -a package_entries=()
 
     echo "Building skill: $skill_name"
 
     if ! validate_skill "$skill_dir"; then
         return 1
     fi
+
+    warn_skill_md_risks "$skill_dir/SKILL.md"
+    warn_excluded_top_level_entries "$skill_dir"
 
     # Extract version for filename
     local version
@@ -91,8 +156,28 @@ build_skill() {
     # Remove old file if it exists
     rm -f "$out_file"
 
+    # Build a spec-aligned entry list (required SKILL.md + optional standard dirs/files)
+    package_entries+=("${skill_name}/SKILL.md")
+
+    local top_dir
+    for top_dir in "${ALLOWED_TOP_LEVEL_DIRS[@]}"; do
+        if [[ -d "$skill_dir/$top_dir" ]]; then
+            package_entries+=("${skill_name}/${top_dir}")
+        fi
+    done
+
+    local top_file
+    for top_file in "${ALLOWED_TOP_LEVEL_FILES[@]}"; do
+        if [[ "$top_file" == "SKILL.md" ]]; then
+            continue
+        fi
+        if [[ -f "$skill_dir/$top_file" ]]; then
+            package_entries+=("${skill_name}/${top_file}")
+        fi
+    done
+
     # Create .skill (ZIP) file
-    (cd "$SKILLS_ROOT" && zip -r "$out_file" "$skill_name" \
+    (cd "$SKILLS_ROOT" && zip -r "$out_file" "${package_entries[@]}" \
         -x "*.pyc" \
         -x "*__pycache__*" \
         -x "*.DS_Store" \
@@ -100,6 +185,7 @@ build_skill() {
         -x "*/node_modules/*" \
         -x "*/.vscode/*" \
         -x "*/.idea/*" \
+        -x "*/.fuse_hidden*" \
         > /dev/null)
 
     local size

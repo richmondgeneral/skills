@@ -62,27 +62,78 @@ The agent will automatically select the correct skill and execute the workflow.
 For creating new skills or major rewrites, use the canonical creator guidance:
 - `/Users/scottybe/.claude/skills/.system/skill-creator/SKILL.md`
 
-## Installation
+## How Skills Are Loaded
 
-Skills reside in `~/.claude/skills/`. To update or install:
+Skills work in two environments with **different loading mechanisms**:
+
+### Claude Code (terminal)
+
+- **Auto-discovers** `SKILL.md` files from `~/.claude/skills/*/`
+- Parses YAML frontmatter (`name`, `description`, `metadata`)
+- Injects matching skills as `<system-reminder>` blocks based on trigger keywords in `description`
+- **Hot-reloads** on file changes — no restart needed
+- Zero config required
+
+### Claude for Mac (desktop app — chat, cowork, code modes)
+
+- **Does NOT read** the `~/.claude/skills/` filesystem
+- Skills must be packaged as `.skill` files (ZIP archives) and **installed through the Mac app UX**
+- The UX handles installation and registration under the hood
+- MCP servers are separately configured in `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+### Symlink
+
+```
+~/.claude/skills/ → ~/workspace/richmondgeneral/skills/
+```
+
+The git repo lives at `~/workspace/richmondgeneral/skills/`. Claude Code reads skills through the symlink. Edits to the repo are immediately available in Claude Code.
+
+### Current MCP Servers (Claude for Mac)
+
+These provide tool access in the Mac app independent of skills:
+
+| Server | Type | Purpose |
+|--------|------|---------|
+| `mcp_square_api` | Remote (SSE) | Official Square API |
+| `square_cache_mcp` | Local | MongoDB-backed Square catalog cache |
+| `alpaca` | Local | Alpaca trading / market data |
+
+## Building .skill Packages
+
+To install or update skills in Claude for Mac, package them as `.skill` files:
 
 ```bash
-cd ~/.claude/skills
+# Build a single skill
+./docs/build-skill.sh contacts-manager
+
+# Build all skills
+./docs/build-skill.sh --all
+
+# Custom output directory
+./docs/build-skill.sh --all --output-dir ~/Desktop
+```
+
+Output: `dist/<skill-name>-v<version>.skill`
+
+Install by dragging the `.skill` file into Claude for Mac or using the app's skill import UX.
+
+### Keeping Mac App Skills in Sync
+
+1. Edit the skill source in this repo (Claude Code picks up changes automatically)
+2. Rebuild: `./docs/build-skill.sh <skill-name>`
+3. Re-install the `.skill` file through the Mac app UX
+
+## Installation (Claude Code)
+
+Skills auto-load from `~/.claude/skills/`. To update:
+
+```bash
+cd ~/workspace/richmondgeneral/skills
 git pull
 ```
 
-If your git repo lives elsewhere and you want to deploy into Claude's load path:
-
-```bash
-cd /path/to/skills-repo
-./docs/sync-to-claude.sh --target ~/.claude/skills
-```
-
-Preview without writing files:
-
-```bash
-./docs/sync-to-claude.sh --target ~/.claude/skills --dry-run
-```
+The symlink at `~/.claude/skills/` ensures Claude Code sees changes immediately.
 
 ## Related Repositories
 

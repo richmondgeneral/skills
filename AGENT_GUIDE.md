@@ -13,6 +13,20 @@
 
 ## System Architecture
 
+### Skill Loading by Environment
+
+Skills load differently depending on which Claude interface is in use:
+
+| Environment | Loading Mechanism | Update Workflow |
+|-------------|-------------------|-----------------|
+| **Claude Code** (terminal) | Auto-discovers `SKILL.md` from `~/.claude/skills/*/`. Parses YAML frontmatter. Hot-reloads on file changes. | Edit files in repo — changes are immediate. |
+| **Claude for Mac** (chat/cowork/code) | `.skill` files installed through the Mac app UX. No filesystem discovery. | Rebuild with `./docs/build-skill.sh`, re-install via UX. |
+| **MCP Tools** (Claude for Mac) | Configured in `claude_desktop_config.json`. Independent of skills. | Edit config, restart app. |
+
+**Symlink:** `~/.claude/skills/` → `~/workspace/richmondgeneral/skills/`
+
+**Build command:** `./docs/build-skill.sh <skill-name>` or `--all` to package skills as `.skill` (ZIP) files for the Mac app.
+
 ### Dual Environment Model
 The skills operate across a boundary between the AI's container and the User's Mac:
 
@@ -24,12 +38,13 @@ The skills operate across a boundary between the AI's container and the User's M
 ### Directory Structure
 
 ```
-~/.claude/skills/
+~/.claude/skills/            (symlink → ~/workspace/richmondgeneral/skills/)
 ├── <skill-name>/
 │   ├── SKILL.md           # DEFINITION (Required)
 │   ├── references/        # DOCS (Optional)
 │   └── scripts/           # CODE (Optional - Python/Bash)
-├── docs/                  # Global documentation
+├── docs/                  # Global documentation + build-skill.sh
+├── dist/                  # Built .skill packages (gitignored)
 ├── archive/               # Deprecated skills
 └── .venv/                 # Shared Python environment
 ```

@@ -60,7 +60,7 @@ Skills are **model-invoked**. You do not need to run scripts manually. Simply as
 The agent will automatically select the correct skill and execute the workflow.
 
 For creating new skills or major rewrites, use the canonical creator guidance:
-- `/Users/scottybe/.codex/skills/.system/skill-creator/SKILL.md`
+- `/Users/scottybe/.claude/skills/.system/skill-creator/SKILL.md`
 
 ## Installation
 

@@ -2,10 +2,15 @@
 name: rg-item-update
 description: Quick edits to existing Richmond General catalog items. Use for price changes, description updates, SEO tweaks, adding/replacing images, category changes, or fixing typos. Triggers on "update item", "change price", "edit description", "fix", "modify existing". Also handles BATCH operations like "move all food items" or "update category for multiple items". NOT for new items—use rg-full-auto for complete onboarding workflow.
 metadata:
-  version: "1.3"
+  version: "1.4"
   author: scottybe
-  updated: "2026-02-15"
+  updated: "2026-02-16"
   changelog: |
+    v1.4 - catalog governance delegation:
+    - Added delegation to `square-catalog-ops` for category merge/audit/compliance checks
+    - Added post-write cleanup audit gate before cache reconciliation
+    - Added `Food & Pantry` guidance for consolidated food routing
+
     v1.3 - description_html + connector naming:
     - Switched item description guidance/template from `description` to `description_html`
     - Added paragraph/Unicode formatting note for Square rendering
@@ -96,7 +101,8 @@ Returns `item_id` and `variation_id` needed for updates.
 
 **Tier categories (secondary):** The New Finds `P34KX3L7XRZJJ5RP6W35K4YO` (default), The Real Rarities `FL4L42RRUE5UXMWFDLXOCNB5` (rare only)
 
-See `rg-full-auto/references/square-catalog.md` for full list including snack and TVM categories.
+For food items, route to consolidated `Food & Pantry` (`CYTCL6ES7TSG2XCUVHIDG5B2`) instead of legacy food categories.
+See `rg-full-auto/references/square-catalog.md` for full list including TVM categories.
 
 ```json
 {
@@ -161,9 +167,30 @@ To **replace** primary image: delete old image first via `catalog.deleteObjects`
 }
 ```
 
+## Catalog Governance Ops (Delegate)
+
+Use `square-catalog-ops` for taxonomy-level operations (not ad-hoc inline updates):
+
+```bash
+# Prove version + SDK compliance
+python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py compliance
+
+# Merge legacy food categories -> Food & Pantry
+python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py merge-food --apply
+
+# Verify cleanup/channel assignment integrity
+python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
+```
+
 ## Cache Reconciliation (Required)
 
 After any write to Square (price, description, category, image, inventory), sync cache and verify the update is visible.
+
+Before cache reconciliation on category/visibility updates, run cleanup audit:
+
+```bash
+python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
+```
 
 **Primary (MCP):**
 ```
@@ -195,4 +222,6 @@ Verification:
 |-------|---------|
 | `rg-full-auto` | New item onboarding (10-phase workflow) |
 | `square-image-upload` | Dedicated image upload handling |
+| `square-catalog-ops` | Category merge, cleanup audit, compliance proof |
+| `square-webhook-monitor` | Webhook subscription and monitor operations |
 | `square-cache` | Sync and verify cached catalog state after updates |

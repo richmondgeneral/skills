@@ -2,10 +2,23 @@
 name: rg-full-auto
 description: End-to-end 10-phase workflow for onboarding NEW items to Richmond General from acquisition through sale. Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload, payment links, labels, info card publishing, Whatnot CSV listing, and Photos library cleanup. Use when processing a new acquisition from scratch, doing a complete item redo, or user says "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard", "process acquisition", "add to inventory", "process this photo", "list item", "sell this", "add to whatnot". NOT for simple edits to existing items—use rg-item-update for price changes, description tweaks, or adding images.
 metadata:
-  version: "3.4"
+  version: "3.6"
   author: scottybe
   updated: "2026-02-16"
   changelog: |
+    v3.6 - Catalog governance delegation:
+    - Added delegation to `square-catalog-ops` for compliance and cleanup audits
+    - Added post-write category integrity audit in Step 4.1
+    - Added `square-webhook-monitor` as operational monitoring companion
+
+    v3.5 - Phase 8 refactor: extract Whatnot skills:
+    - BREAKING: Phase 8 refactored from ~210 inline lines to ~70-line thin orchestrator
+    - Extracted Chrome automation patterns to `whatnot-chrome` skill (v1.0)
+    - Extracted catalog reference data to `whatnot-catalog` skill (v1.0)
+    - Phase 8 now delegates to both skills instead of inlining all Whatnot knowledge
+    - Added Step 8.4: Publish Drafts (previously undocumented)
+    - CSV append command stays here (RG-specific file path)
+
     v3.4 - Phase 8.3: Post-import metadata editing & shipping profile fix:
     - BREAKING: Fixed Shipping Profile values — old values (0-1 oz, 1-4 oz, etc.) were wrong
     - Correct values: 1-3 oz, 4-7 oz, 8-11 oz, 12-15 oz, 1 lb, 1-2 lbs
@@ -623,6 +636,11 @@ square_cache_mcp:square_cache_sync
 do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/square-cache/scripts/cache_wrapper.py sync --json 2>&1"
 ```
 
+**Category governance gate (required after category/visibility changes):**
+```bash
+python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
+```
+
 Then verify:
 
 1. Exact SKU exists in cache
@@ -826,210 +844,72 @@ do shell script "cd /Users/scottybe/workspace/square/items && git add RG-XXXX/ i
 
 Run this phase only if the item should be listed on Whatnot.
 
-**Method:** CSV bulk import via Chrome automation (no API/MCP connector exists for Whatnot)
-**Image hosting:** GitHub Pages — `https://richmondgeneral.github.io/items/RG-XXXX/hero.png`
+**Dependencies:** Read these skills before starting:
+- `~/.claude/skills/whatnot-catalog/SKILL.md` (field values, category hierarchy, shipping heuristic)
+- `~/.claude/skills/whatnot-chrome/SKILL.md` (Chrome automation patterns)
+
 **Account:** richmondgeneral on whatnot.com
+**Image hosting:** GitHub Pages — images must be pushed (Step 7.6) before Whatnot can fetch them.
 
-### Step 8.1: Append row to Whatnot batch CSV
+### Step 8.1: Build CSV Row
 
+Read `whatnot-catalog` and look up:
+- **Category/Sub Category** from the Category Hierarchy table (e.g., DVDs → Category=`Movies`, Sub Category=`DVDs`)
+- **Shipping Profile** from the Weight Heuristic table (e.g., single DVD → `4-7 oz`)
+- **Price** converted via `ceil(square_price_cents / 100)`
+- **Condition**, **Hazmat** from the CSV-Level Allowed Values section
+
+Append row to batch CSV:
 **Batch file:** `/Users/scottybe/workspace/square/items/rg-inventory/whatnot-import.csv`
 
-**CSV columns (exact header names — must match Whatnot template):**
-
-```
-Category,Sub Category,Title,Description,Quantity,Type,Price,Shipping Profile,Offerable,Hazmat,Condition,Cost Per Item,SKU,Image URL 1,Image URL 2,Image URL 3,Image URL 4,Image URL 5,Image URL 6,Image URL 7,Image URL 8
-```
-
-**Field mapping from earlier phases:**
-
-| CSV Column | Source | Example |
-|------------|--------|---------|
-| Category | Whatnot **parent** category (see hierarchy below) | `Movies` |
-| Sub Category | Whatnot sub-category (required for some categories) | `DVDs` |
-| Title | Item title from Phase 1 | `Dick Tracy: The Art of Chester Gould (1978) Exhibition Catalogue` |
-| Description | Plain text description from Phase 1 (NOT HTML) | Full provenance + condition |
-| Quantity | Always `1` for unique items | `1` |
-| Type | Always `Buy it Now` for fixed-price | `Buy it Now` |
-| Price | **Positive integer only** (no decimals!) | `7` |
-| Shipping Profile | Weight bracket (must match allowed values — see heuristic table below) | `4-7 oz` |
-| Offerable | `TRUE` to accept offers | `TRUE` |
-| Hazmat | Always `Not Hazmat` | `Not Hazmat` |
-| Condition | Item condition | `Good` |
-| Cost Per Item | Allocated cost from lot tracker (integer, seller-only) | `1` |
-| SKU | Same SKU as Square | `RG-0015` |
-| Image URL 1 | GitHub Pages hero image | `https://richmondgeneral.github.io/items/RG-0015/hero.png` |
-| Image URL 2-8 | Additional images if available | _(leave empty)_ |
-
-**⚠️ CRITICAL GOTCHAS:**
-1. **Price must be a positive integer.** Whatnot rejects decimals like `6.50`. Round up: `$6.50 → $7`.
-2. **Category hierarchy matters.** DVDs is NOT a top-level category — it's a sub-category under `Movies`. Use `Category=Movies, Sub Category=DVDs`.
-3. **Cost Per Item must also be integer** if provided.
-4. Values for Category, Sub Category, Condition, Type, and Shipping Profile must exactly match Whatnot's allowed values.
-
-**Append command:**
-```applescript
-do shell script "echo '\"Movies\",\"DVDs\",\"Item Title\",\"Plain text description\",1,Buy it Now,7,4-7 oz,TRUE,Not Hazmat,Good,1,RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/hero.png,,,,,,,,' >> ~/workspace/square/items/rg-inventory/whatnot-import.csv"
+**CSV must have headers on first row.** If the file doesn't exist yet, create it:
+```bash
+echo 'Category,Sub Category,Title,Description,Quantity,Type,Price,Shipping Profile,Offerable,Hazmat,Condition,Cost Per Item,SKU,Image URL 1,Image URL 2,Image URL 3,Image URL 4,Image URL 5,Image URL 6,Image URL 7,Image URL 8' > /Users/scottybe/workspace/square/items/rg-inventory/whatnot-import.csv
 ```
 
-### Step 8.2: Upload CSV to Whatnot (Chrome Automation)
+**Append command (example for a DVD):**
+```bash
+echo '"Movies","DVDs","Item Title","Plain text description",1,Buy it Now,7,4-7 oz,TRUE,Not Hazmat,Good,1,RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/hero.png,,,,,,,,' >> /Users/scottybe/workspace/square/items/rg-inventory/whatnot-import.csv
+```
+
+### Step 8.2: Upload CSV to Whatnot
 
 **⚠️ REQUIRES GIT PUSH FIRST** — The hero.png must be live on GitHub Pages before Whatnot can fetch it. Ensure Step 7.6 (git push) has completed.
 
-**Automated upload via Claude in Chrome:**
+Read `whatnot-chrome` section "CSV Import via Chrome" and follow those steps:
+1. Get tab context (`tabs_context_mcp`)
+2. Navigate to inventory dashboard
+3. Find and click the import button
+4. Inject CSV via DataTransfer API JavaScript
+5. Click Import, wait for success message
+6. Verify drafts appear at `?tab=drafts`
 
-1. Navigate to `https://www.whatnot.com/dashboard/inventory`
+**If import fails:** See whatnot-chrome "Validation Errors" and "Manual Fallback" sections.
 
-2. Open the CSV import modal — click the cloud/upload icon next to "Create Product" (approximate coordinate: `1122, 110`):
-   ```
-   computer tool: left_click at [1122, 110]
-   ```
+### Step 8.3: Fill Category-Specific Metadata
 
-3. Inject CSV via JavaScript DataTransfer API (bypasses native file picker):
-   ```javascript
-   const csvContent = `Category,Sub Category,Title,...`; // full CSV content with header + data rows
-   const blob = new Blob([csvContent], { type: 'text/csv' });
-   const file = new File([blob], 'whatnot-import.csv', { type: 'text/csv' });
-   const fileInput = document.querySelector('input[type="file"]');
-   const dataTransfer = new DataTransfer();
-   dataTransfer.items.add(file);
-   fileInput.files = dataTransfer.files;
-   fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-   fileInput.dispatchEvent(new Event('input', { bubbles: true }));
-   ```
+Read `whatnot-catalog` section "Category-Specific Metadata Fields" to find which fields exist and their valid values for this item's category.
 
-4. After injection: modal shows "filename.csv — Ready to import" with a yellow **Import** button.
+Read `whatnot-chrome` section "React Combobox Interaction" and follow the pattern for each field.
 
-5. Click **Import** → server-side validation runs.
+1. For each imported item:
+   a. Click item from inventory/drafts list to open edit page
+   b. Fill each metadata field using the combobox pattern (find → form_input → click option → verify)
+   c. Check Shipping Profile matches the `whatnot-catalog` weight heuristic — if CSV imported a wrong default, correct it now
+   d. Click Save, wait for "Product Updated" toast
 
-6. On success: "Your products have successfully imported" with "View Drafts" link. Products import as **Drafts**.
+**If `whatnot-catalog` has a TODO for this category's fields:**
+- Screenshot the edit page to discover what fields exist
+- Ask user what values to use
+- Fill them manually this time
+- After completion, update `whatnot-catalog` SKILL.md with the discovered fields for next time
 
-7. Verify drafts at `https://www.whatnot.com/dashboard/inventory?tab=drafts`
+### Step 8.4: Publish Drafts
 
-**If validation fails**, common errors and fixes:
-
-| Error | Cause | Fix |
-|-------|-------|-----|
-| "Subcategory not provided" | Category requires a sub-category | Check hierarchy table below |
-| "Subcategory X is not part of Category Y" | Wrong parent/child pairing | Look up correct hierarchy in Values tab |
-| "Price must be a positive integer" | Decimal price like `6.50` | Round up to whole dollar `7` |
-
-**Manual fallback:** If Chrome automation isn't available, download the CSV file and upload manually through the Whatnot dashboard.
-
-### Step 8.3: Post-Import Metadata Editing (Chrome Automation)
-
-**Purpose:** After CSV import, certain category-specific fields are only available on the Whatnot edit page — they cannot be set via CSV. This step fills those fields using Claude in Chrome.
-
-**⚠️ IMPORTANT DISTINCTION — Two different "Type" fields:**
-- **CSV column "Type"** = Listing type (`Buy it Now`, `Auction`, `Giveaway`)
-- **Edit page "Type" dropdown** = Content type (e.g., `Movie`, `Mini Series`, `TV Series` for DVDs)
-
-These are completely separate fields. The CSV "Type" is set during import; the edit page "Type" must be set manually afterward.
-
-**Edit page URL pattern:**
-```
-https://www.whatnot.com/dashboard/inventory/TGlzdGluZ05vZGU6XXXXXXXXXX==
-```
-(Base64-encoded Whatnot node IDs — find these by clicking items from the inventory list)
-
-**Workflow per item:**
-
-1. Navigate to `https://www.whatnot.com/dashboard/inventory` (or use `?tab=drafts` for newly imported items)
-2. Click the item to open its edit page
-3. Scroll down to find the category-specific metadata fields
-4. For each combobox field:
-   - Use `find` tool to locate the field by label (e.g., `"Genre combobox"`, `"Type combobox"`)
-   - Use `form_input` with the ref to type a filter string (e.g., `"Horror"`, `"Movie"`)
-   - Click the matching dropdown option that appears
-5. Verify Shipping Profile is correct (CSV import may have used a default value)
-6. Click **Save** button
-7. Navigate back to inventory list and repeat for next item
-
-**⚠️ React combobox quirks:**
-- Whatnot uses React comboboxes — typing into them filters the dropdown options
-- If dropdown shows "No options available," the typed value is NOT a valid option
-- Don't try to force invalid values (e.g., typing "DVD" into the content Type field won't work)
-- Always click an option from the dropdown to ensure React state updates properly
-
-#### Category-Specific Metadata Fields
-
-**Movies > DVDs:**
-
-| Field | Required | Valid Values | Notes |
-|-------|----------|-------------|-------|
-| Movie/TV Show Title | Yes | Free text | Use the actual film title, not the listing title |
-| Genre | Yes | Action, Comedy, Drama, Horror, Sci-Fi, Thriller, etc. | Combobox with typeahead filtering |
-| Type (content) | Yes | `Movie`, `Mini Series`, `TV Series` | NOT the CSV "Type" column |
-| Edition | No | `Standard Edition`, `Collector's Edition`, `Unrated Edition`, `Special Edition`, `Director's Cut`, etc. | Combobox with typeahead |
-
-> **TODO:** Document metadata fields for other categories (Vinyl Records, Vintage Toys, etc.) as they are onboarded.
-
-#### Shipping Profile Weight Heuristic
-
-Use this table to select the correct Shipping Profile value:
-
-| Item Type | Weight Estimate | Shipping Profile |
-|-----------|----------------|-----------------|
-| Single DVD (standard case) | ~4-5 oz | `4-7 oz` |
-| DVD multi-pack (2-4 discs) | ~5-6 oz | `4-7 oz` |
-| DVD box set (5-8 discs) | ~6-7 oz | `4-7 oz` |
-| DVD large box set (9+ discs) | ~8-10 oz | `8-11 oz` |
-| Single Blu-ray | ~4-5 oz | `4-7 oz` |
-| VHS tape (single) | ~8-10 oz | `8-11 oz` |
-| Paperback book | ~4-7 oz | `4-7 oz` |
-| Hardcover book (small) | ~8-12 oz | `8-11 oz` |
-| Hardcover book (large/coffee table) | ~1-2 lbs | `1-2 lbs` |
-| Vinyl record (single LP) | ~8-10 oz | `8-11 oz` |
-| Small collectible / figurine | ~4-6 oz | `4-7 oz` |
-
-> When in doubt, weigh the item. Accurate shipping prevents losses on lightweight items and buyer complaints on heavy ones.
-
-### Whatnot Category Hierarchy Reference
-
-**⚠️ CRITICAL:** Some items that seem like categories are actually sub-categories. Always check the hierarchy.
-
-**Common RG inventory mappings:**
-
-| Item Type | Category (parent) | Sub Category | Notes |
-|-----------|-------------------|--------------|-------|
-| DVDs | `Movies` | `DVDs` | NOT `DVDs` as category! |
-| VHS tapes | `Movies` | `VHS` | |
-| Blu-ray | `Movies` | `Blu-ray` | |
-| Movie memorabilia | `Movies` | `Movie Memorabilia` | |
-| Rare/vintage books | `Rare & Vintage Books` | _(empty)_ | Top-level, no sub required |
-| Vintage toys | `Vintage Toys` | _(varies)_ | Check Values tab |
-| Vinyl records | `Vinyl Records` | _(varies)_ | |
-| Art | `Art` | _(varies)_ | |
-
-**Full category/sub-category list:** See Values tab (columns E & F) of the [Whatnot CSV template](https://docs.google.com/spreadsheets/d/1UNxbyQoXjpjuqYcCE_Ie94OTCEB7lXR7Yz84aynILW4/edit#gid=0)
-
-### Whatnot Allowed Values Reference
-
-**Condition:**
-`Brand New`, `Like New`, `Very Good`, `Good`, `Fair`, `Poor`
-
-**Type:**
-`Auction`, `Buy it Now`, `Giveaway`
-
-**Shipping Profile (must match Whatnot dropdown exactly):**
-`1-3 oz`, `4-7 oz`, `8-11 oz`, `12-15 oz`, `1 lb`, `1-2 lbs`
-
-> **⚠️ Updated Feb 2026:** Previous values (`0-1 oz`, `1-4 oz`, `5-8 oz`, etc.) were incorrect. The values above are the actual Whatnot dropdown options.
-
-**Hazmat:**
-`Not Hazmat`
-
-### Whatnot Price Conversion Rule
-
-Square prices use cents (e.g., `650` = $6.50), but Whatnot requires **whole dollar integers**. When converting:
-
-| Square Price (cents) | Whatnot Price | Rule |
-|---------------------|---------------|------|
-| 650 | 7 | Round up |
-| 1050 | 11 | Round up |
-| 4000 | 40 | Already whole |
-| 1999 | 20 | Round up |
-
-**Formula:** `ceil(square_price_cents / 100)`
+Read `whatnot-chrome` section "Publish Drafts Pass" and follow those steps:
+1. Navigate to drafts tab
+2. For each draft: open → publish → confirm
+3. Verify all items show as live on the main inventory tab
 
 ---
 
@@ -1182,6 +1062,8 @@ Next: Print label, place item on floor
 |-------|---------|
 | `rg-item-update` | Quick edits to existing items |
 | `square-image-upload` | Image upload via API |
+| `square-catalog-ops` | Compliance proof, category merges, cleanup audits |
+| `square-webhook-monitor` | Webhook subscription operations and local monitoring |
 | `book-appraiser` | Antiquarian books, LOC cross-reference |
 | `carnival-glass-appraiser` | Pressed iridescent glass 1908-1930s |
 | `maker-mark-identifier` | Pottery, silver, furniture marks |
@@ -1189,6 +1071,8 @@ Next: Print label, place item on floor
 | `square-cache` | Fast catalog lookups |
 | `photos-library` | Auto-discover and cluster local Photos shoots |
 | `rg-lot-tracker` | Lot tracking, cost allocation, margin validation |
+| `whatnot-catalog` | Whatnot category data, allowed values, shipping heuristics (Phase 8) |
+| `whatnot-chrome` | Whatnot Chrome automation patterns — combobox, CSV import (Phase 8) |
 
 ## References
 

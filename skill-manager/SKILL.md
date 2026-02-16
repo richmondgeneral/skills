@@ -2,10 +2,14 @@
 name: skill-manager
 description: Maintain the local skills repository health and registry. Use for version bumps, metadata audits, registry refreshes, packaging checks, and cleanup across skills. For creating or rewriting skill content, delegate to the skill-creator standard first.
 metadata:
-  version: "1.5"
+  version: "1.6"
   author: scottybe
-  updated: "2026-02-15"
+  updated: "2026-02-16"
   changelog: |
+    v1.6 - Square ops skill expansion:
+    - Added `square-catalog-ops` and `square-webhook-monitor` to active snapshot
+    - Updated snapshot date to reflect current skill inventory
+
     v1.5 - Aligned with Anthropic skill-creator conventions:
     - Replaced stale static registry workflow with metadata-driven audit workflow
     - Added explicit delegation to canonical skill-creator guidance
@@ -28,7 +32,7 @@ Do not use this skill as the canonical source for how to design a skill from scr
 ## Canonical Skill-Creation Standard
 
 For creating or substantially rewriting skills, follow this first:
-- `/Users/scottybe/.codex/skills/.system/skill-creator/SKILL.md`
+- `/Users/scottybe/.claude/skills/.system/skill-creator/SKILL.md`
 
 Use this skill to enforce those standards across the repository after edits.
 
@@ -76,22 +80,24 @@ Find missing required frontmatter fields:
 rg -n "^name:|^description:|^metadata:|version:|author:|updated:" ~/.claude/skills/*/SKILL.md
 ```
 
-## Active Skills Snapshot (2026-02-15)
+## Active Skills Snapshot (2026-02-16)
 
 ### Richmond General Workflows
 
 | Skill | Version | Updated |
 |-------|---------|---------|
-| `rg-full-auto` | 3.2 | 2026-02-15 |
-| `rg-item-update` | 1.3 | 2026-02-15 |
+| `rg-full-auto` | 3.6 | 2026-02-16 |
+| `rg-item-update` | 1.4 | 2026-02-16 |
 | `rg-lot-tracker` | 1.0 | 2026-02-15 |
 
 ### Square Integration
 
 | Skill | Version | Updated |
 |-------|---------|---------|
-| `square-cache` | 1.2 | 2026-02-15 |
+| `square-cache` | 1.3 | 2026-02-16 |
+| `square-catalog-ops` | 1.0 | 2026-02-16 |
 | `square-image-upload` | 1.4 | 2026-02-15 |
+| `square-webhook-monitor` | 1.0 | 2026-02-16 |
 | `square-crm` | 1.1 | 2025-12-21 |
 | `product-labeler` | 1.1 | 2025-12-21 |
 

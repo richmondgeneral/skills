@@ -2,10 +2,15 @@
 name: catalog-classifier
 description: Determines Square category assignment based on item attributes. Use when onboarding items, bulk categorization, or when unsure which category an item belongs to. Routes items to correct brand (TVM/RG/Snacks), type category (Books, Furniture, Collectibles, etc.), and tier (Real Rarities vs New Finds). Triggers on "what category", "classify", "which category", "categorize item".
 metadata:
-  version: "2.0"
+  version: "2.1"
   author: scottybe
-  updated: "2026-02-15"
+  updated: "2026-02-16"
   changelog: |
+    v2.1 - food taxonomy consolidation:
+    - Replaced legacy snack split categories with `Food & Pantry`
+    - Marked old snack categories as legacy-hidden (do not assign)
+    - Added delegation note to `square-catalog-ops` for cleanup verification
+
     v2.0 - Category refactor:
     - Replaced 2-category RG system (Real Rarities/New Finds) with type-based categories
     - Added: Books & Paper, Furniture, Pottery & Ceramics, Collectibles, Art & Craft Kits
@@ -27,7 +32,7 @@ Assigns Square categories based on item attributes. Returns category ID(s) with 
 |-------|--------------|----------|
 | **TVM** (Trésor Vintage Market) | French, Paris, 🇫🇷, European vintage | — |
 | **RG** (Richmond General) | Vintage, antique, collectible, estate | B87BAEZ0NWV34 |
-| **Snacks** | Food, candy, chips, drinks, imported | — |
+| **General Store Food** | Food, candy, chips, drinks, imported | — |
 
 ### TVM Categories (🇫🇷 branding)
 
@@ -59,14 +64,13 @@ Assigns Square categories based on item attributes. Returns category ID(s) with 
 | **The New Finds** | `P34KX3L7XRZJJ5RP6W35K4YO` | Default intake — most new items get this as secondary |
 | **The Real Rarities** | `FL4L42RRUE5UXMWFDLXOCNB5` | Truly rare/showcase-worthy — replaces New Finds as secondary |
 
-### Snack Categories
+### Food Category
 
 | Category | ID | Products |
 |----------|-----|----------|
-| Chips & Crisps | `RZDJCH4X2C725QEU2AQCX2Y6` | Potato chips, rice crackers, savory |
-| Cookies & Sweets | `E23E2FWMORU4VLHRVTDMNWKB` | Biscuits, candy, chocolate |
-| Drinks | `Z4CC7D2BNM5YLEQZXL6VA7I2` | Beverages, tea, juice |
-| Asian Imports | `3NDGJCHLWBB3D7XKRJLYGCPF` | Japanese/Korean/Chinese snacks |
+| Food & Pantry | `CYTCL6ES7TSG2XCUVHIDG5B2` | Snacks, candy, drinks, imported foods |
+
+Legacy categories (do not assign; kept hidden for history): `Chips & Crisps`, `Cookies & Sweets`, `Drinks`, `Asian Imports`.
 
 ### Wellness Categories (subset of RG Type)
 
@@ -80,11 +84,7 @@ Assigns Square categories based on item attributes. Returns category ID(s) with 
 ```
 Item Input
     │
-    ├─► Is it food/snack? ──────► Snack Categories
-    │                              ├─ Sweet → Cookies & Sweets
-    │                              ├─ Savory → Chips & Crisps
-    │                              ├─ Beverage → Drinks
-    │                              └─ Asian packaging → Asian Imports
+    ├─► Is it food/snack? ──────► Food & Pantry
     │
     ├─► French/Paris/🇫🇷? ──────► TVM Categories
     │                              └─ Apply TVM tier logic
@@ -130,7 +130,7 @@ Some items may warrant multiple categories:
 
 | Scenario | Categories |
 |----------|------------|
-| Japanese candy | Asian Imports + Cookies & Sweets |
+| Japanese candy | Food & Pantry |
 | French crystal | 🇫🇷 Timeless Treasures (primary) |
 | Vintage radio | Analog + The New Finds (or Real Rarities if rare) |
 
@@ -156,3 +156,7 @@ This skill is called by:
 - `rg-full-auto` - Phase 1 category assignment
 - `rg-item-update` - Category changes
 - `product-labeler` - Batch categorization
+
+After bulk category changes, run:
+
+`python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues`

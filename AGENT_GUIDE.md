@@ -9,7 +9,7 @@
 2.  **Environment Awareness:** Distinguish between **Container** (Agent runtime) and **Host** (macOS).
 3.  **Safety:** Never delete user data without confirmation. Explain destructive actions.
 4.  **Metadata:** All skills must have valid YAML frontmatter (v1.1 standard).
-5.  **Skill Creation Standard:** For new or heavily revised skills, follow `/Users/scottybe/.codex/skills/.system/skill-creator/SKILL.md`.
+5.  **Skill Creation Standard:** For new or heavily revised skills, follow `/Users/scottybe/.claude/skills/.system/skill-creator/SKILL.md`.
 
 ## System Architecture
 
@@ -67,7 +67,7 @@ uv run --project ~/.claude/skills python ~/.claude/skills/<skill>/scripts/script
 ```
 
 ### Creating a New Skill
-1.  Read and follow `/Users/scottybe/.codex/skills/.system/skill-creator/SKILL.md`.
+1.  Read and follow `/Users/scottybe/.claude/skills/.system/skill-creator/SKILL.md`.
 2.  Create directory: `mkdir <skill-name>`.
 3.  Create `SKILL.md` from `docs/reference/SKILL_TEMPLATE.md`.
 4.  Add only necessary `scripts/`, `references/`, and `assets/`.

@@ -1,19 +1,34 @@
 ---
 name: rg-lot-tracker
 description: >
-  Financial tracking for Richmond General inventory — lot creation, cost allocation,
-  ROI analysis, pricing validation, and sale recording. This is the single source of
-  truth for "what did we pay and are we making money." Triggers on "new lot",
-  "record purchase", "ROI report", "profit", "margin check", "record sale".
+  Financial tracking and intelligence for Richmond General inventory — lot creation,
+  cost allocation, ROI analysis, pricing validation, sale recording, Square sales
+  auto-reconciliation, inventory aging alerts, and lot health scoring. Single source
+  of truth for "what did we pay and are we making money." Triggers on "new lot",
+  "record purchase", "ROI report", "profit", "margin check", "record sale",
+  "reconcile sales", "stale inventory", "aging report", "lot health", "lot score",
+  "velocity report", "what needs repricing".
 metadata:
-  version: "1.1"
+  version: "2.0"
   author: scottybe
   updated: "2026-02-16"
   changelog: |
+    v2.0 - Aging, health scoring, and enhanced reporting:
+    - Added Phase 5: Square Sales Auto-Reconciliation (MCP query patterns for order matching)
+    - Added Phase 6: Inventory Aging & Health Monitor (days-on-market, stale alerts, repricing)
+    - Added Phase 7: Lot Health Scoring & Break-Even Projections (velocity-based forecasting)
+    - Enhanced Phase 0: Smart allocation method recommendation based on lot characteristics
+    - Enhanced Phase 4: Category-level performance analytics, health scores, auto-run reconciliation+aging
+    - Added Listed Date column to item table (powers aging analysis)
+    - Added velocity metrics to Running Totals (Avg Days to Sell, Sell-Through Rate)
+    - New reference: aging-rules.md (aging thresholds, seasonal adjustments, repricing guardrails)
+    - New reference: health-scoring.md (lot scoring rubric, velocity formulas, break-even projections)
+    - Updated lot-file-template with Listed Date, Last Reconciled, velocity metrics
+
     v1.1 - Multi-channel awareness + auto-detect sales:
     - Added channel field (Square / Whatnot / Local / Other) to sale recording
     - Added channel-branched fee calculations (Whatnot 12.9%, Square 2.9%+$0.30, Local $0)
-    - Added auto-detect sales from Square completed orders (Phase 3 Option A)
+    - Added auto-detect sales from Square completed orders (now Phase 5)
     - Removed hardcoded Active Lots table from references (dynamic dashboard handles this)
     - Updated lot-file-template with Channel column
     - Updated roi-formulas.md with Whatnot fee schedule and branched examples
@@ -24,11 +39,12 @@ metadata:
 
 # Richmond General Lot Tracker
 
-You manage the financial side of a vintage/antique resale business. Every item
+You manage the financial intelligence for a vintage/antique resale business. Every item
 Richmond General sells was acquired somehow — estate sale, auction, free find,
 direct purchase. Your job is to track what was paid, allocate costs to individual
-items, validate that pricing covers costs with healthy margins, and record sales
-so the owner always knows whether they're making or losing money.
+items, validate that pricing covers costs with healthy margins, record sales,
+auto-reconcile with Square, monitor inventory aging, and score lot health — so the
+owner always knows whether they're making or losing money, and what needs attention.
 
 ## Where the data lives
 
@@ -66,11 +82,14 @@ and `inventory/` paths throughout the session.
 
 ## How this skill gets called
 
-Two patterns:
+Three patterns:
 
-1. **Direct** — User says "new lot", "ROI report", "record sale", etc.
+1. **Direct** — User says "new lot", "ROI report", "record sale", "stale inventory", etc.
 2. **Delegation from rg-full-auto** — During item onboarding, Phase 1 delegates
    lot assignment and Phase 3 delegates pricing validation here.
+3. **Proactive** — When running a lot report (Phase 4), automatically check for
+   unreconciled Square sales (Phase 5) and aging issues (Phase 6) to surface
+   actionable insights without being asked.
 
 When delegated, you receive an item SKU, description, and proposed price.
 Return: lot ID, allocated cost, and margin analysis.
@@ -110,6 +129,31 @@ resolved ops repo path from the "Resolving the ops repo path" step above).
 Even if the user says "I don't know the cost" — prompt once more: "Rough
 estimate? Even a ballpark helps track margins. Or I can mark it TBD."
 
+### Smart allocation recommendation
+
+When creating a lot, analyze the characteristics and recommend the best allocation method:
+
+| Lot Characteristics | Recommended Method | Why |
+|--------------------|--------------------|-----|
+| < 10 items, similar category | Equal Split | Items likely similar value |
+| Mixed high/low value items | Value-Weighted | Prevents overcharging cheap items |
+| 20+ items, diverse categories | Category-Based | Per-item estimates impractical |
+| Single item or known price | Manual Override | Exact cost is known |
+| Free items | N/A (cost = $0) | Track for volume only |
+
+Present your recommendation with reasoning, but let the owner decide:
+
+```
+Allocation Recommendation: Value-Weighted
+
+This lot has 12 items ranging from a $5 paperback to a $200 vintage lamp.
+Equal split ($25 each) would overcharge the books and hide the lamp's true
+cost basis. Value-weighted gives each item a cost proportional to its
+estimated resale value, so margin calculations stay honest.
+
+Want to use value-weighted, or prefer a different method?
+```
+
 ---
 
 ## Phase 1: Allocate Cost to an Item
@@ -147,10 +191,13 @@ User specifies exact cost. Use for direct purchases or standout pieces.
 Add a row to the Items table:
 
 ```
-| RG-0015 | Vintage milk glass vase | $8.20 | $25.00 | — | — | Listed |
+| RG-0015 | Vintage milk glass vase | $8.20 | $25.00 | — | — | Listed | 2026-02-14 |
 ```
 
-Fields: SKU | Description | Allocated Cost | List Price | Sale Price | Channel | Status
+Fields: SKU | Description | Allocated Cost | List Price | Sale Price | Channel | Status | Listed Date
+
+**Important:** Always include the Listed Date when status is "Listed". This powers
+the aging analysis in Phase 6. Without it, aging can't be calculated.
 
 ---
 
@@ -208,24 +255,10 @@ sure they see the math before deciding.
 
 ## Phase 3: Record a Sale
 
-When an item sells, update lot tracking.
+When an item sells, update lot tracking. For bulk reconciliation against Square,
+see Phase 5.
 
-### Option A: Auto-detect from Square (recommended)
-
-Search recent completed Square orders for items matching lot SKUs:
-
-1. Use `orders.searchOrders` with `state: COMPLETED` and recent date range
-2. Match line item SKUs against items in lot files with status "Listed"
-3. Present matches for user confirmation:
-   ```
-   Found 2 recent sales:
-   ✅ RG-0015 — Vintage milk glass vase — sold $25.00 on 2026-02-14 via Square
-   ✅ RG-0020 — VHS tape lot — sold $8.00 on 2026-02-13 via Square
-   Record these? [Y/n]
-   ```
-4. On confirmation, proceed to "Update the lot file" below
-
-### Option B: Manual entry
+### Manual entry
 
 User tells you directly: "RG-0015 sold for $25.00" or "record sale".
 
@@ -242,6 +275,7 @@ User tells you directly: "RG-0015 sold for $25.00" or "record sale".
   | Other | Ask user |
 - **Shipping** — $2–5 if shipped (ask or use $3 default); $0 for local/Whatnot
 - **Net profit** — sale price − allocated cost − fees − shipping
+- **Days on market** — sale date − listed date (for velocity analysis)
 
 See `references/roi-formulas.md` for the complete fee schedule and formulas.
 
@@ -249,25 +283,33 @@ See `references/roi-formulas.md` for the complete fee schedule and formulas.
 
 Change the item's row:
 ```
-| RG-0015 | Vintage milk glass vase | $8.20 | $25.00 | $25.00 | Square | Sold 2026-02-14 |
+| RG-0015 | Vintage milk glass vase | $8.20 | $25.00 | $25.00 | Square | Sold 2026-02-14 | 2026-01-15 |
 ```
 
-Recalculate the Running Totals section:
+Recalculate the Running Totals section (now includes velocity metrics):
 ```
 ## Running Totals
+- **Items Identified:** 4
+- **Items Listed:** 2
+- **Items Sold:** 1
 - **Total Listed Value:** $105.00
 - **Total Sold:** $25.00
 - **Total Fees:** $1.02
 - **Net P/L:** -$176.03
 - **ROI:** -88%
 - **Break-even:** Need $176.03 more in net sales
+- **Avg Days to Sell:** 30
+- **Sell-Through Rate:** 25% (1 of 4 identified)
+- **Last Reconciled:** 2026-02-16
 ```
 
 ---
 
-## Phase 4: Lot Report
+## Phase 4: Lot Report (Enhanced)
 
-Generate a financial summary. User can ask for one lot or all lots.
+Generate a financial summary with category analytics. User can ask for one lot or all lots.
+
+**Before generating any report, automatically run Phase 5 (reconcile) and Phase 6 (aging)** to ensure data is current and surface actionable insights.
 
 ### Single lot
 
@@ -276,36 +318,208 @@ Read the lot file, present:
 ```
 ## Lot PETER-002 — Status Report
 Acquired: Nov 19, 2025 | Source: Peter's estate, visit 2 | Cost: $200.00
+Lot Health Score: 🟡 62/100 (see Phase 7)
 
-Items:  4 identified, 2 listed, 0 sold
-List Value: $70.00 | Revenue: $0.00 | Fees: $0.00
-Net P/L: -$200.00 | ROI: -100%
-Break-even: Need $200.00 in net sales
+Items:  4 identified, 2 listed, 1 sold
+List Value: $70.00 | Revenue: $25.00 | Fees: $1.02
+Net P/L: -$176.03 | ROI: -88%
+Break-even: Need $176.03 in net sales
 
-| SKU | Item | Cost | Price | Status |
-|-----|------|------|-------|--------|
-| RG-0001 | Little Orphan Annie Comic | $5.00 | $19.50 | Listed |
-| RG-0006 | Walt Disney Comics Cover | $5.00 | $50.00 | Listed |
-| — | 2 items unprocessed | — | — | Pending |
+Velocity & Aging
+Avg days to sell: 30 | Sell-through: 25%
+Projected break-even: ~4 months at current velocity
+
+| SKU | Item | Cost | Price | Channel | Status | Days |
+|-----|------|------|-------|---------|--------|------|
+| RG-0001 | Orphan Annie Comic | $5.00 | $19.50 | — | Listed | 88 ⚠️ |
+| RG-0006 | Disney Comics Cover | $5.00 | $50.00 | — | Listed | 45 |
+| RG-0015 | Milk glass vase | $8.20 | $25.00 | Square | Sold (30d) | — |
+| — | 1 item unprocessed | — | — | — | Pending | — |
+
+⚠️ RG-0001: 88 days — consider price reduction (see aging report)
 ```
 
 ### All-lots dashboard
 
-Read all files in `{ops_root}/lot-tracking/`, aggregate:
+Aggregate all lots plus category performance breakdown:
 
 ```
 ## Richmond General — Financial Dashboard
 
-| Lot | Cost | Listed | Sold | Net P/L | ROI |
-|-----|------|--------|------|---------|-----|
-| PETER-002 | $200 | $70.00 | $0 | -$200 | -100% |
-| IOWA-0925 | $771 | $105.00 | $0 | -$771 | -100% |
-| FREE-JERRY | $0 | $55.00 | $0 | $0 | — |
-| **Total** | **$971** | **$230.00** | **$0** | **-$971** | **-100%** |
+### Lot Summary
+| Lot | Cost | Listed | Sold | Net P/L | ROI | Health |
+|-----|------|--------|------|---------|-----|--------|
+| PETER-002 | $200 | $70.00 | $25.00 | -$176 | -88% | 🟡 62 |
+| IOWA-0925 | $771 | $105.00 | $0 | -$771 | -100% | 🔴 28 |
+| FREE-JERRY | $0 | $55.00 | $0 | $0 | — | 🟢 85 |
+| **Total** | **$971** | **$230.00** | **$25.00** | **-$947** | **-97%** | |
 
-Pipeline: $230.00 in listed inventory across 4 items
-Unprocessed: ~96 items across active lots
-Break-even: Need $971 in net sales
+### Category Performance
+| Category | Items | Avg Price | Avg Margin | Avg Days | Revenue |
+|----------|-------|-----------|------------|----------|---------|
+| Books | 2 | $35.00 | 285% | 45 | $25.00 |
+| Glassware | 1 | $25.00 | 205% | — | $0 |
+| Furniture | 1 | $55.00 | ∞ (free) | — | $0 |
+
+### Action Items
+🔴 2 items past 60-day threshold — reprice or bundle
+🟡 96 items unprocessed — $771 in unrecovered cost
+💰 Pipeline: $230.00 in listed inventory
+📈 Break-even: Need $947 in net sales
+```
+
+---
+
+## Phase 5: Square Sales Auto-Reconciliation
+
+The automated bridge between Square and lot tracking. Instead of waiting for
+the user to manually report sales, proactively check Square for completed orders.
+
+### When to run
+
+- **Automatically** before generating any lot report (Phase 4)
+- **On demand** when user says "what's sold", "reconcile sales", "check Square"
+
+### How it works
+
+1. **Query Square orders** for completed sales at Richmond General's location:
+
+```
+mcp_square_api:search_resource
+  resource: orders
+  locationIds: ["B87BAEZ0NWV34"]
+  fields: ["id", "line_items[].name", "line_items[].catalog_object_id",
+           "line_items[].total_money", "line_items[].quantity",
+           "created_at", "state", "tenders[].type"]
+  query:
+    filter:
+      state_filter:
+        states: ["COMPLETED"]
+      date_time_filter:
+        created_at:
+          start_at: "{last_reconciliation_date or 30_days_ago}"
+    sort:
+      field: "CREATED_AT"
+      order: "desc"
+    limit: 50
+```
+
+2. **Match against lot files** — For each order line item:
+   - Look up catalog_object_id via `square_cache_mcp:square_cache_get_item` to get SKU
+   - Match SKU against lot file item tables
+   - If no catalog ID, fuzzy-match item name against descriptions
+
+3. **Identify unreconciled sales** — Items showing "Listed" in lot files but
+   "COMPLETED" in Square orders.
+
+4. **Present findings for confirmation**:
+
+```
+🔍 Square Reconciliation — Found 2 unrecorded sales
+
+| SKU | Item | Lot | Sale Price | Sale Date | Tender |
+|-----|------|-----|------------|-----------|--------|
+| RG-0015 | Milk glass vase | IOWA-0925 | $25.00 | Feb 10 | Card |
+| RG-0006 | Disney Comics Cover | PETER-002 | $45.00 | Feb 12 | Cash |
+
+Record these sales? (I'll update lot files and recalculate totals)
+```
+
+5. **On confirmation** — Run Phase 3 for each, using appropriate channel/fee calculation
+   (card via Square = 2.9% + $0.30, cash = $0 fees).
+
+6. **Update `Last Reconciled` date** in each affected lot file.
+
+---
+
+## Phase 6: Inventory Aging & Health Monitor
+
+Stale inventory ties up capital and shelf space. This phase monitors how long
+items have been listed and surfaces actionable recommendations.
+
+See `references/aging-rules.md` for complete thresholds, seasonal adjustments,
+and repricing strategy.
+
+### When to run
+
+- **Automatically** as part of any lot report (Phase 4)
+- **On demand** when user says "stale inventory", "aging report", "what needs repricing"
+
+### Aging tiers
+
+| Tier | Days Listed | Action |
+|------|------------|--------|
+| 🟢 Fresh | 0–30 | Hold at full price |
+| 🟡 Maturing | 31–60 | Refresh listing (new photos/description) |
+| 🔴 Stale | 61–90 | Suggest 10–15% price reduction |
+| ⚫ Aged | 90+ | Bundle, steep discount, or hold for seasonal |
+
+### Aging report format
+
+```
+## Inventory Aging Report — 2026-02-16
+
+🔴 Needs Attention (3 items, $90.00 listed)
+| SKU | Item | Price | Cost | Days | Suggested Action |
+|-----|------|-------|------|------|-----------------|
+| RG-0001 | Orphan Annie Comic | $19.50 | $5.00 | 88 | Reduce to $16.50 (still 3.3×) |
+
+🟡 Maturing (2 items, $75.00 listed)
+| RG-0006 | Disney Comics | $50.00 | $5.00 | 45 | Refresh listing |
+
+🟢 Fresh (1 item, $55.00 listed) — no action needed
+
+Summary: Avg 52 days | 50% stale rate | $90.00 at risk
+```
+
+### Repricing guardrails
+
+Never suggest below the margin floor: `floor = cost × 1.5 + $0.30`
+
+If a suggested price hits the floor, flag it so the owner can make an informed call.
+See `references/aging-rules.md` for the full repricing waterfall.
+
+---
+
+## Phase 7: Lot Health Scoring & Break-Even Projections
+
+Each lot gets a health score (0–100) that synthesizes multiple signals into a
+single number. See `references/health-scoring.md` for the complete rubric.
+
+### Health score components
+
+| Component | Weight | Measures |
+|-----------|--------|----------|
+| Cost Recovery | 35% | % of lot cost recovered through net sales |
+| Sell-Through Rate | 25% | % of identified items sold |
+| Processing Rate | 15% | % of items listed vs total estimated |
+| Inventory Freshness | 15% | Inverse of avg days on market |
+| Margin Quality | 10% | Actual margins vs category targets |
+
+### Score interpretation
+
+| Score | Grade | Meaning |
+|-------|-------|---------|
+| 80–100 | 🟢 | Healthy — on track to profit |
+| 60–79 | 🟡 | Needs attention — some items stale or under-margin |
+| 40–59 | 🟠 | At risk — slow velocity, capital tied up |
+| 0–39 | 🔴 | Critical — unlikely to break even without intervention |
+
+### Break-even projection
+
+With sales history: `days_to_break_even = remaining_cost / daily_net_revenue`
+
+Without sales: estimate from listed value × category sell-through rate.
+
+```
+## Lot IOWA-0925 — Health: 🟠 45/100
+
+Cost Recovery: 12/35 | Sell-Through: 6/25 | Processing: 3/15
+Freshness: 14/15 | Margin Quality: 10/10
+
+📈 At current velocity ($0.83/day), break-even in ~929 days.
+   To break even in 6 months: list 15 items/month at avg $25.
+💡 90 unprocessed items — batch-process quick-flips to recover cost fast.
 ```
 
 ---
@@ -322,10 +536,15 @@ rg-full-auto calls this skill at two points:
 **Phase 3 (Pricing):** "Validate $35.00 against $8.20 cost for mid-range vintage."
 → Run Phase 2. Return margin analysis and recommendation.
 
-### Square
+### Square (v2.0)
 
-This skill doesn't touch Square directly. Prices go into Square via rg-full-auto
-or rg-item-update. Sale data comes from user input ("RG-0015 sold for $25.00").
+This skill reads from Square for sales reconciliation (Phase 5). It uses:
+- `mcp_square_api:search_resource` for querying completed orders
+- `square_cache_mcp:square_cache_get_item` for SKU lookups
+- `square_cache_mcp:square_cache_search` for fuzzy matching
+
+It still does NOT write to Square — prices and catalog entries go through
+rg-full-auto or rg-item-update.
 
 ### What this skill does NOT do
 

@@ -1,5 +1,4 @@
 """Smart model routing logic for unified image processing."""
-import sys
 from typing import List, Optional, Dict, Any
 
 try:
@@ -46,18 +45,18 @@ class ModelRouter:
         if task_type in (TaskType.GENERATE, TaskType.EDIT):
             return self._select_generation_model(capable, task_config)
 
+        # Filter by cost if prefer_free is set
+        if task_config.prefer_free:
+            free_models = [m for m in capable
+                          if m.get_capabilities()['cost'] == 'free']
+            if free_models:
+                capable = free_models
+
         # Filter by health check
         healthy = [m for m in capable if m.health_check()]
 
         if not healthy:
             return None
-
-        # Filter by cost if prefer_free is set
-        if task_config.prefer_free:
-            free_models = [m for m in healthy
-                          if m.get_capabilities()['cost'] == 'free']
-            if free_models:
-                healthy = free_models
 
         # Score and select best
         return self._score_and_select(healthy, task_config)
@@ -175,8 +174,7 @@ class ModelRouter:
         last_error = None
         for model in models_to_try:
             try:
-                # Route progress logs to stderr so JSON stdout remains parseable.
-                print(f"Trying {model.__class__.__name__}...", file=sys.stderr)
+                print(f"Trying {model.__class__.__name__}...")
                 result = model.process_image(image_path, task_config)
 
                 if result.success:
@@ -204,54 +202,17 @@ class ModelRouter:
         # 1. Nano Banana Pro (98%, free, 7.9s)
         # 2. Gemini 2.5 Flash (95%, free, 8.4s)
         # 3. remove.bg (100%, paid, 2.8s)
-        # Keep paid remove.bg as fallback unless explicitly requested.
 
         capable = [m for m in self.models if m.supports_task(task_config.task_type)]
         healthy = [m for m in capable if m.health_check()]
 
-        preferred_model = None
-        model_pref = (task_config.model_preference or 'auto').lower()
-        if model_pref != 'auto':
-            for model in healthy:
-                if self._matches_model_preference(model, model_pref):
-                    preferred_model = model
-                    break
-
         def sort_key(model):
             caps = model.get_capabilities()
-            return (-caps['quality_score'], caps['avg_time'])
+            cost_value = 0 if caps['cost'] == 'free' else 1
+            return (-caps['quality_score'], cost_value, caps['avg_time'])
 
-        if task_config.task_type == TaskType.REMOVE_BG:
-            preferred_order = {
-                'NanaBananaModel': 0,
-                'Gemini25FlashModel': 1,
-                'RemoveBgModel': 2,
-            }
-            healthy.sort(
-                key=lambda model: (
-                    preferred_order.get(model.__class__.__name__, 99),
-                    sort_key(model),
-                )
-            )
-        else:
-            healthy.sort(key=sort_key)
-
-        if preferred_model:
-            return [preferred_model] + [m for m in healthy if m is not preferred_model]
-
+        healthy.sort(key=sort_key)
         return healthy
-
-    @staticmethod
-    def _matches_model_preference(model: BaseModel, model_pref: str) -> bool:
-        """Check whether a model matches a CLI/user preference token."""
-        name = model.__class__.__name__
-        if model_pref == 'removebg':
-            return name == 'RemoveBgModel'
-        if model_pref == 'gemini25':
-            return name == 'Gemini25FlashModel'
-        if model_pref == 'nano-banana':
-            return name == 'NanaBananaModel'
-        return False
 
     def get_model_status(self) -> Dict[str, Any]:
         """Get status of all models."""

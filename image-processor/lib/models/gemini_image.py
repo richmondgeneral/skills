@@ -30,7 +30,7 @@ class GeminiImageModel(BaseModel):
 
     # Model identifiers
     MODEL_FLASH = "gemini-2.5-flash-image"  # Nano Banana (fast)
-    MODEL_PRO = "gemini-3-pro-image-preview"  # Nano Banana Pro (quality)
+    MODEL_PRO = "gemini-3-pro-image"         # Nano Banana Pro (quality)
 
     # API configuration
     BASE_URL = "https://generativelanguage.googleapis.com/v1beta"

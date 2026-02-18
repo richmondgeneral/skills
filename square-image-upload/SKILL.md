@@ -2,10 +2,18 @@
 name: square-image-upload
 description: Upload and manage images in Square Catalog via API. Use when the user needs to upload product photos, replace existing catalog images, or attach images to Square items/variations. Triggers on "upload image to Square", "add photo to item", "replace product image", "Square catalog image", or any request to programmatically manage Square product images. This skill is the deterministic default for image uploads, even when some Square MCP connectors expose multipart methods.
 metadata:
-  version: "1.4"
+  version: "1.5"
   author: scottybe
-  updated: "2026-02-15"
+  updated: "2026-02-17"
+  runtime_tier: "LOCAL_STANDARD"
+  required_capabilities:
+    - filesystem_full_access
+    - network_access
   changelog: |
+    v1.5 - runtime contract alignment:
+    - Added runtime tier and capability metadata
+    - Added runtime policy guidance for privileged/local execution boundaries
+
     v1.4 - Bulk upload support:
     - Added `upload_batch.py` for directory/manifest-based multi-image uploads
     - Added `*-nobg` preference logic and hero-first primary ordering
@@ -19,6 +27,17 @@ metadata:
 # Square Image Upload
 
 Upload images to Square Catalog using the CreateCatalogImage and UpdateCatalogImage API endpoints.
+
+## Runtime Policy Contract
+
+This skill runs as `LOCAL_STANDARD` for local filesystem access + Square API writes.
+
+Policy references:
+
+- `/Users/scottybe/workspace/square/square-tools/runtime/capability_matrix.json`
+- `/Users/scottybe/workspace/square/square-tools/runtime/operation_policy.json`
+
+Related privileged image-export flows (`Photos.app`) are outside this skill and belong to `LOCAL_PRIVILEGED` tooling in `square-tools/bin/`.
 
 ## ✅ Status: WORKING
 

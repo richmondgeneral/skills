@@ -135,6 +135,29 @@ git pull
 
 The symlink at `~/.claude/skills/` ensures Claude Code sees changes immediately.
 
+## Dual-Target Skill Sync (Claude + Codex)
+
+Canonical source remains this repo:
+
+- `/Users/scottybe/workspace/richmondgeneral/skills`
+
+Sync both local destinations from canonical source:
+
+```bash
+./docs/sync-skills.sh
+```
+
+Dry run:
+
+```bash
+./docs/sync-skills.sh --dry-run
+```
+
+Targets:
+
+- `~/.claude/skills`
+- `~/.codex/skills`
+
 ## Related Repositories
 
 - **Items Site**: [richmondgeneral.github.io/items](https://richmondgeneral.github.io/items/) - Public gallery

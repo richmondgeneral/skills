@@ -2,9 +2,14 @@
 name: square-catalog-ops
 description: Govern Square catalog taxonomy and channel visibility with version-locked API checks. Use when merging categories, auditing cleanup state, validating site/channel assignment, or proving API-version compliance before/after catalog mutations. Triggers on "catalog cleanup", "merge categories", "audit categories", "site assignment", "compliance check", "Square-Version", or "hidden from all sites".
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: scottybe
-  updated: "2026-02-16"
+  updated: "2026-02-17"
+  runtime_tier: "LOCAL_STANDARD"
+  required_capabilities:
+    - filesystem_full_access
+    - mcp_local_tools
+    - network_access
 ---
 
 # Square Catalog Ops
@@ -14,6 +19,21 @@ Operational control skill for Square category governance.
 This skill wraps the reusable toolkit at:
 
 - `/Users/scottybe/workspace/square/square-tools/catalog-toolkit`
+
+## Runtime Policy Contract
+
+This skill is `LOCAL_STANDARD` because it performs catalog mutations and compliance checks against Square APIs.
+
+Policy references:
+
+- `/Users/scottybe/workspace/square/square-tools/runtime/capability_matrix.json`
+- `/Users/scottybe/workspace/square/square-tools/runtime/operation_policy.json`
+
+Use preflight before mutation steps:
+
+```bash
+/Users/scottybe/workspace/square/square-tools/bin/agent_preflight.sh --operation square_cache_sync --runtime "${SQUARE_RUNTIME_ID:-local_cli}"
+```
 
 ## Use This Skill For
 

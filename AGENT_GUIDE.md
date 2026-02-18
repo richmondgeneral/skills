@@ -25,7 +25,11 @@ Skills load differently depending on which Claude interface is in use:
 
 **Symlink:** `~/.claude/skills/` → `~/workspace/richmondgeneral/skills/`
 
+**Codex local skills path:** `~/.codex/skills/` (synced from canonical source via `docs/sync-skills.sh`)
+
 **Build command:** `./docs/build-skill.sh <skill-name>` or `--all` to package skills as `.skill` (ZIP) files for the Mac app.
+
+**Dual sync command:** `./docs/sync-skills.sh` (publishes canonical source to both `~/.claude/skills` and `~/.codex/skills`).
 
 ### Dual Environment Model
 The skills operate across a boundary between the AI's container and the User's Mac:

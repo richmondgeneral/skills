@@ -2,9 +2,13 @@
 name: square-webhook-monitor
 description: Operate Square webhook subscriptions and a local webhook monitor with signature validation. Use when creating/listing/testing Square webhooks, rotating signature keys, validating webhook integrity, or monitoring catalog/account events. Triggers on "Square webhook", "webhook subscription", "signature key", "catalog.version.updated", "webhook monitor", and "validate webhook signature".
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: scottybe
-  updated: "2026-02-16"
+  updated: "2026-02-17"
+  runtime_tier: "LOCAL_STANDARD"
+  required_capabilities:
+    - filesystem_full_access
+    - network_access
 ---
 
 # Square Webhook Monitor
@@ -14,6 +18,15 @@ Operational skill for webhook lifecycle + monitoring.
 Uses toolkit:
 
 - `/Users/scottybe/workspace/square/square-tools/catalog-toolkit`
+
+## Runtime Policy Contract
+
+This skill is `LOCAL_STANDARD` because it manages webhook subscriptions and runs a local monitor service.
+
+Policy references:
+
+- `/Users/scottybe/workspace/square/square-tools/runtime/capability_matrix.json`
+- `/Users/scottybe/workspace/square/square-tools/runtime/operation_policy.json`
 
 ## Use This Skill For
 

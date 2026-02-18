@@ -2,10 +2,17 @@
 name: square-cache
 description: Access MongoDB-cached Square catalog with change tracking and audit trails. Use when checking catalog status, searching items (faster than API), viewing change history, monitoring updates, or querying cached data. Triggers on "Square cache", "catalog changes", "what changed", "search cached items", "sync catalog", "item history", "cache status". Required for offline catalog access and automated change detection.
 metadata:
-  version: "1.3"
+  version: "1.4"
   author: scottybe
-  updated: "2026-02-16"
+  updated: "2026-02-17"
+  runtime_tier: "WEB_SAFE"
+  required_capabilities:
+    - mcp_local_tools
   changelog: |
+    v1.4 - runtime contract alignment:
+    - Added runtime tier and capability metadata
+    - Added runtime policy guidance references for WEB_SAFE vs LOCAL_STANDARD sync operations
+
     v1.3 - catalog ops + webhook monitor integration:
     - Added cleanup-audit workflow via `square-catalog-ops`
     - Added webhook-monitor triage workflow for near-real-time change detection
@@ -34,6 +41,24 @@ Local MongoDB cache of Square catalog items with comprehensive change tracking, 
 **Offline Access:** Query catalog data without hitting Square API limits.
 
 **Historical Data:** Track item evolution over time with complete change history.
+
+## Runtime Policy Contract
+
+This skill follows runtime policy files in:
+
+- `/Users/scottybe/workspace/square/square-tools/runtime/capability_matrix.json`
+- `/Users/scottybe/workspace/square/square-tools/runtime/operation_policy.json`
+
+Mode expectations:
+
+- `WEB_SAFE`: `status/search/changes/report/item`
+- `LOCAL_STANDARD`: `sync` (mutating operation)
+
+Preflight gate:
+
+```bash
+/Users/scottybe/workspace/square/square-tools/bin/agent_preflight.sh --operation square_cache_read --runtime "${SQUARE_RUNTIME_ID:-local_cli}"
+```
 
 ## Access Methods
 

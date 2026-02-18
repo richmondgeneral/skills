@@ -4,7 +4,7 @@ description: Maintain the local skills repository health and registry. Use for v
 metadata:
   version: "1.7"
   author: scottybe
-  updated: "2026-02-16"
+  updated: "2026-02-17"
   changelog: |
     v1.7 - Full registry refresh:
     - Updated rg-lot-tracker to 2.0 (aging, health scoring, enhanced reporting)
@@ -86,7 +86,7 @@ Find missing required frontmatter fields:
 rg -n "^name:|^description:|^metadata:|version:|author:|updated:" ~/.claude/skills/*/SKILL.md
 ```
 
-## Active Skills Snapshot (2026-02-16)
+## Active Skills Snapshot (2026-02-17)
 
 ### Richmond General Workflows
 
@@ -102,10 +102,11 @@ rg -n "^name:|^description:|^metadata:|version:|author:|updated:" ~/.claude/skil
 
 | Skill | Version | Updated |
 |-------|---------|---------|
-| `square-cache` | 1.3 | 2026-02-16 |
-| `square-catalog-ops` | 1.0 | 2026-02-16 |
-| `square-image-upload` | 1.4 | 2026-02-15 |
-| `square-webhook-monitor` | 1.0 | 2026-02-16 |
+| `square-cache` | 1.4 | 2026-02-17 |
+| `square-catalog-ops` | 1.1 | 2026-02-17 |
+| `square-chrome-control` | 1.0 | 2026-02-17 |
+| `square-image-upload` | 1.5 | 2026-02-17 |
+| `square-webhook-monitor` | 1.1 | 2026-02-17 |
 | `square-crm` | 1.1 | 2025-12-21 |
 
 ### Whatnot

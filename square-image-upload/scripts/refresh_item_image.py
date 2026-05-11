@@ -10,13 +10,22 @@ Workflow:
        b. Download to local backup
        c. Run clean.py
        d. Upload result back to Square (in-place PUT)
-  3. With --both: also produce a damage-fixed variant attached as a secondary
-     image (carousel order: preserved=primary, fixed=secondary)
+  3. With --both: produce preserved AND fixed variants. The "chosen" variant
+     (default: preserved; --prefer fixed to invert; --prefer ask to prompt)
+     replaces the Square primary in place. The other variant is saved as
+     a museum-style before/after companion in items/RG-XXXX/:
+       - chosen=preserved → companion saved as items/RG-XXXX/restored.jpg
+       - chosen=fixed     → companion saved as items/RG-XXXX/as-found.jpg
+
+     Richmond General is more museum than storefront — the GitHub Pages
+     item card can show both variants for transparent provenance, while
+     Square shows only the chosen one.
 
 Examples:
   refresh_item_image.py --item-id TJSHQTHOKYUDORWURROAQCNZ
   refresh_item_image.py --title "Lionel Pennsylvania GG-1" --inspect
-  refresh_item_image.py --item-id <ID> --both
+  refresh_item_image.py --item-id <ID> --both                  # preserved→Square, fixed→items/restored.jpg
+  refresh_item_image.py --item-id <ID> --both --prefer ask     # interactive choice
   refresh_item_image.py --item-id <ID> --all-images
   refresh_item_image.py --item-id <ID> --fix-damage --remove "the dust"
 
@@ -29,6 +38,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -277,7 +287,6 @@ def save_to_items_folder(sku: Optional[str], src: Path, filename: str) -> Option
     if not item_dir.is_dir():
         return None
     dest = item_dir / filename
-    import shutil
     shutil.copy2(src, dest)
     return dest
 

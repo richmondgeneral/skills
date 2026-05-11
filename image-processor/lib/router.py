@@ -174,7 +174,8 @@ class ModelRouter:
         last_error = None
         for model in models_to_try:
             try:
-                print(f"Trying {model.__class__.__name__}...")
+                import sys as _sys
+                print(f"Trying {model.__class__.__name__}...", file=_sys.stderr)
                 result = model.process_image(image_path, task_config)
 
                 if result.success:

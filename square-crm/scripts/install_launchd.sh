@@ -17,10 +17,15 @@ case "${1:-}" in
     install)
         echo "📦 Installing CRM sync launchd job..."
         
-        # Check prerequisites
-        if [ -z "${SQUARE_TOKEN:-}" ]; then
-            echo "⚠️  WARNING: SQUARE_TOKEN not set in current shell"
-            echo "    Make sure it's in ~/.zshrc for launchd to access"
+        # Check prerequisites — auto_sync.sh resolves token via Keychain → project .env,
+        # so launchd doesn't need shell-inherited env. Verify one of those sources exists.
+        if ! security find-generic-password -a "$USER" -s SQUARE_ACCESS_TOKEN -w >/dev/null 2>&1; then
+            PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+            if ! grep -q "^SQUARE_ACCESS_TOKEN=.\+" "$PROJECT_ROOT/.env" 2>/dev/null; then
+                echo "⚠️  WARNING: no Square token found in Keychain or $PROJECT_ROOT/.env"
+                echo "    Add to Keychain:  security add-generic-password -U -a \"\$USER\" -s SQUARE_ACCESS_TOKEN -w '<token>' -A"
+                echo "    Or fill in:       $PROJECT_ROOT/.env  (SQUARE_ACCESS_TOKEN=...)"
+            fi
         fi
         
         if ! pgrep -x mongod > /dev/null 2>&1; then

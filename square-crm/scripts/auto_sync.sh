@@ -10,10 +10,30 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
 LOG_FILE="$SKILL_DIR/logs/sync.log"
-CONTACTS_FILE="$HOME/skills/contacts-manager/references/contacts.md"
+CONTACTS_FILE="$PROJECT_ROOT/skills/contacts-manager/references/contacts.md"
 SQUARE_API="https://connect.squareup.com/v2"
-SQUARE_VERSION="2024-12-18"
+SQUARE_VERSION="2026-04-21"
+
+# Resolve Square token: existing env → macOS Keychain → project .env
+# (launchd/cron don't inherit shell env, so we fetch directly)
+resolve_square_token() {
+    if [ -n "${SQUARE_TOKEN:-}" ]; then return 0; fi
+    if [ -n "${SQUARE_ACCESS_TOKEN:-}" ]; then export SQUARE_TOKEN="$SQUARE_ACCESS_TOKEN"; return 0; fi
+    if command -v security >/dev/null 2>&1; then
+        local t
+        t="$(security find-generic-password -a "$USER" -s SQUARE_ACCESS_TOKEN -w 2>/dev/null || true)"
+        if [ -n "$t" ]; then export SQUARE_ACCESS_TOKEN="$t" SQUARE_TOKEN="$t"; return 0; fi
+    fi
+    if [ -f "$PROJECT_ROOT/.env" ]; then
+        local t
+        t=$(awk -F= '/^SQUARE_ACCESS_TOKEN=/{print $2; exit}' "$PROJECT_ROOT/.env")
+        if [ -n "$t" ]; then export SQUARE_ACCESS_TOKEN="$t" SQUARE_TOKEN="$t"; return 0; fi
+    fi
+    return 1
+}
+resolve_square_token || true
 
 mkdir -p "$(dirname "$LOG_FILE")"
 

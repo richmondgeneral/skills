@@ -9,19 +9,41 @@
 
 ## Categories
 
+> **Verified live 2026-05-11** via `catalog.searchObjects { object_types: ["CATEGORY"] }`.
+> If you find drift, re-query and update this table — process_new_item.py's
+> `ROOM_BY_TYPE` map relies on these IDs being correct.
+
+### RG Rooms (top-level, `is_top_level: true`)
+
+The hero tiles on `/shop` route to these. An item may have a TYPE that lives
+under one of these rooms (via `parent_category`), in which case ROOM_BY_TYPE
+auto-attaches the room. An item whose TYPE *is* itself one of these rooms
+(Apothecary Cabinet, Gallery, New Arrivals) needs no separate room category.
+
+| Room | ID | Notes |
+|------|-----|-------|
+| **The General Store** | `QLM2GZ643LOCYHB653YIDJWT` | Parent of Books & Paper, Furniture-not, Wellness, Gifts, Home, Pottery, Food & Pantry, Art & Craft Kits |
+| **The Vintage Market** | `TX6SBQLJDMZOCVXBUD3KT3CL` | Parent of Furniture, Collectibles, Vintage Media, Analog, Trésor Vintage Market |
+| **The Apothecary Cabinet** | `QIPW32HGKMU5BDPU3A7YZCM4` | Top-level room (NOT a sub-type — items get this as their primary category) |
+| **The Gallery** | `UMWTT7Q6UU4PXPUKU3DVNLFJ` | Parent of Artisan Lighting |
+| **New Arrivals** | `TGWDFETSQPR6BF67YJCTOLW6` | Storefront-managed; usually auto-populated, not assigned by us |
+
 ### RG Type Categories (choose ONE primary)
 
-| Category | ID | Use For |
-|----------|-----|---------|
-| **Books & Paper** | `CLZCJ62H4TTHDQ3ZBYMZQASQ` | Books, magazines, paper ephemera, cookbooks |
-| **Furniture** | `W3EYAJJPTNC46WSLNYI4WH7V` | Stools, trunks, tables, chairs, shelving |
-| **Pottery & Ceramics** | `APSTFSN4UXQI44HBFSDTSEX7` | Mugs, vases, plaques, figurines, Hummel |
-| **Collectibles** | `YQWBSOJDENMXDGUUQ3TGI3HF` | Games, toys, dolls, ornaments, vintage misc |
-| **Art & Craft Kits** | `F4JQYK4Z5MEBV5VFCDYHIAWT` | Watercolor kits, craft supplies, DIY art |
-| **Wellness & Apothecary** | `I5PMPWGTVR7IDBL4RUJWN3A4` | Teas, serums, tinctures, natural products, R&L brand |
-| **The Apothecary Cabinet** | `6E7UZYZFNZBGFRJFH272RVBE` | Sage bundles, ritual items, candles, display |
-| **Home & Gifts** | `AR3ZTA45KU4BH23AJ7LOLLRA` | Home decor, giftable items |
-| **Analog** | `N35REXL33FZWJNJV24IUQGPN` | Vinyl, pinball, film, analog tech |
+| Category | ID | Parent Room | Use For |
+|----------|-----|-------------|---------|
+| **Books & Paper** | `CLZCJ62H4TTHDQ3ZBYMZQASQ` | General Store | Books, magazines, paper ephemera, cookbooks |
+| **Furniture** | `W3EYAJJPTNC46WSLNYI4WH7V` | Vintage Market | Stools, trunks, tables, chairs, shelving |
+| **Pottery & Ceramics** | `APSTFSN4UXQI44HBFSDTSEX7` | General Store | Mugs, vases, plaques, figurines, Hummel |
+| **Collectibles** | `YQWBSOJDENMXDGUUQ3TGI3HF` | Vintage Market | Games, toys, dolls, ornaments, vintage misc |
+| **Art & Craft Kits** | `F4JQYK4Z5MEBV5VFCDYHIAWT` | General Store | Watercolor kits, craft supplies, DIY art |
+| **Wellness & Apothecary** | `I5PMPWGTVR7IDBL4RUJWN3A4` | General Store | Teas, serums, tinctures, natural products, R&L brand |
+| **Gifts** | `AR3ZTA45KU4BH23AJ7LOLLRA` | General Store | Home decor, giftable items (live name: "Gifts" — previously labeled "Home & Gifts") |
+| **Home** | `43IPDJV36K4AX55M4QFPYHHO` | General Store | General home goods that don't fit Gifts or Pottery |
+| **Food & Pantry** | `CYTCL6ES7TSG2XCUVHIDG5B2` | General Store | Snacks, beverages — parent of Chips & Crisps / Cookies & Sweets / Drinks / Asian Imports |
+| **Vintage Media** | `QPDGKT3BGR63MSZ6AQ6VI4ZP` | Vintage Market | LPs, cassettes, DVDs, magazines as decor |
+| **Analog** | `N35REXL33FZWJNJV24IUQGPN` | Vintage Market | Vinyl, pinball, film, analog tech |
+| **Trésor Vintage Market** | `XQY33UQNPA7IPZ4CBIYJX3VM` | Vintage Market | TVM-curated vintage (parent of Classic Beauty / Timeless Treasures / Expressly TVM / Whimsical Gifts) |
 
 ### Snack Categories
 

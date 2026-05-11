@@ -108,7 +108,7 @@ def _build_description(record: LabelRecord) -> str:
     if record.qr_code_url:
         lines.append(f"More details: {record.qr_code_url}")
 
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 def load_label_records(input_csv: str) -> List[LabelRecord]:
@@ -234,8 +234,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output",
-        default="/Users/scottybe/workspace/square/items/qa-artifacts/whatnot/whatnot-upload.csv",
-        help="Output Whatnot CSV path",
+        # Default matches SKILL.md Phase 8.1 (append target). Previously
+        # hardcoded to /Users/scottybe/... which won't exist on another
+        # machine and pointed at a stale qa-artifacts path.
+        default=str(Path.home() / "workspace" / "square" / "items"
+                    / "rg-inventory" / "whatnot-import.csv"),
+        help="Output Whatnot CSV path (default: ~/workspace/square/items/rg-inventory/whatnot-import.csv)",
     )
     parser.add_argument(
         "--category",

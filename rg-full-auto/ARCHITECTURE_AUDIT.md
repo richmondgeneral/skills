@@ -1,6 +1,13 @@
 # rg-full-auto Architecture Audit
 ## Comparison Against Claude Agent Skills Official Docs
 
+> **⚠️ ARCHIVED — written against v2.5, skill is now v3.7.** Version
+> references and "8-phase workflow" language throughout describe an older
+> shape. The current contract is 10 phases (0-9) — see SKILL.md and
+> CHANGELOG.md for the authoritative description. Kept for historical
+> context on the original compliance review, not for current architectural
+> guidance.
+
 **Date:** 2025-12-21 (updated 2026-02-15)
 **Reference:** https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview
 

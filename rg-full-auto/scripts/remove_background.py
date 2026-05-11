@@ -94,8 +94,19 @@ def main():
     except requests.exceptions.HTTPError as e:
         print(f"Error: API request failed: {e}", file=sys.stderr)
         if e.response is not None:
-            print(f"Status: {e.response.status_code}", file=sys.stderr)
-            print(f"Response: {e.response.text}", file=sys.stderr)
+            # Don't dump response.text — remove.bg's 402/403 bodies sometimes
+            # echo account-identifier information and rate-limit metadata that
+            # we'd rather not have land in a Claude transcript. Status code is
+            # enough to diagnose; the user can re-run with -v / their own
+            # curl if they need the full body.
+            status = e.response.status_code
+            hint = {
+                401: "Bad API key — check REMOVEBG_API_KEY.",
+                402: "remove.bg credits exhausted — top up at remove.bg.",
+                403: "API key rejected (forbidden) — verify the key and plan tier.",
+                429: "Rate limited — wait and retry.",
+            }.get(status, "Check the remove.bg dashboard for status.")
+            print(f"Status: {status} — {hint}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)

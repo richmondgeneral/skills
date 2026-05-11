@@ -4,20 +4,20 @@ Richmond General - New Item Processing Workflow
 
 Claude-supervised, agent-run workflow for processing items from photo to live listing.
 
-This script orchestrates the 8-phase workflow:
+This script orchestrates phases 0-3 of the 10-phase SKILL.md workflow:
 0. Image Processing (background removal, file prep)
 1. Appraisal & Research (visual analysis)
-2. Square Catalog Creation
+2. Square Catalog Creation (uses description_html with <p> tags per v3.2)
 3. Inventory Setup
-4. Image Upload to Square
-5. Payment Link Generation
-6. Label Generation
-7. Info Card & Publishing (GitHub Pages)
+
+Phases 4-9 (image upload, payment link, label, info card, Whatnot,
+Photos archive) are documented in SKILL.md and run via sibling skills /
+osascript steps; the script prints next-step hints at the end of run().
 
 Usage:
     # Interactive mode (Claude supervises each step)
     python process_new_item.py --image photo.jpeg --interactive
-    
+
     # Batch mode (future - unsupervised)
     python process_new_item.py --image photo.jpeg --auto
 
@@ -91,8 +91,13 @@ class RGItemProcessor:
         response = input(f"{message} (y/n): ").strip().lower()
         return response == 'y'
     
-    def phase1_research(self, image_path: str) -> Dict:
-        """Phase 1: Appraisal & Research (requires Claude visual analysis)."""
+    def phase1_research(self, image_path: str, default_sku: Optional[str] = None) -> Dict:
+        """Phase 1: Appraisal & Research (requires Claude visual analysis).
+
+        Pass `default_sku` when the caller has already allocated one (so the
+        prompt suggests the SKU we used for the working-image filename in
+        phase2_photography). If omitted, falls back to scanning local dirs.
+        """
         print("\n=== PHASE 1: APPRAISAL & RESEARCH ===")
         print("📸 Image loaded. Claude should analyze this image for:")
         print("  - Item identification")
@@ -102,17 +107,17 @@ class RGItemProcessor:
         print("  - Price recommendation")
         print("\n⚠️  This phase requires Claude's visual analysis capabilities.")
         print("    Continue workflow after Claude provides appraisal.\n")
-        
+
         # In interactive mode, collect appraisal data
         item_data = {
-            'sku': self.prompt("SKU", self.get_next_sku()),
+            'sku': self.prompt("SKU", default_sku or self.get_next_sku()),
             'title': self.prompt("Item title"),
             'era': self.prompt("Era (e.g., 1930s)"),
             'price': float(self.prompt("Price (dollars)", "19.99")),
             'condition': self.prompt("Condition (e.g., Very Good)"),
             'maker': self.prompt("Maker/Publisher"),
             'origin': self.prompt("Origin (e.g., USA)"),
-            'description': self.prompt("Description (HTML with <br> tags)"),
+            'description': self.prompt("Description (HTML with <p> tags)"),
             'seo_title': self.prompt("SEO Title"),
             'seo_description': self.prompt("SEO Description (150-160 chars)"),
             'permalink': self.prompt("Permalink slug"),
@@ -171,8 +176,100 @@ class RGItemProcessor:
             'Content-Type': 'application/json'
         }
 
+    # Map TYPE category -> ROOM (top-level parent) category. Verified against
+    # the live Square catalog (searchObjects/CATEGORY) on 2026-05-11. Adding an
+    # item to its room ensures it appears in the "Shop All <Room>" flat product
+    # grid below the storefront hero tiles (e.g., /shop/the-general-store/...
+    # and /shop/the-vintage-market/...). See May 2026 enrollment incident and
+    # references/square-catalog.md for the full hierarchy.
+    ROOM_BY_TYPE = {
+        # The General Store (QLM2GZ643LOCYHB653YIDJWT)
+        'I5PMPWGTVR7IDBL4RUJWN3A4': 'QLM2GZ643LOCYHB653YIDJWT',  # Wellness & Apothecary
+        'AR3ZTA45KU4BH23AJ7LOLLRA': 'QLM2GZ643LOCYHB653YIDJWT',  # Gifts
+        'CLZCJ62H4TTHDQ3ZBYMZQASQ': 'QLM2GZ643LOCYHB653YIDJWT',  # Books & Paper
+        'APSTFSN4UXQI44HBFSDTSEX7': 'QLM2GZ643LOCYHB653YIDJWT',  # Pottery & Ceramics
+        'CYTCL6ES7TSG2XCUVHIDG5B2': 'QLM2GZ643LOCYHB653YIDJWT',  # Food & Pantry
+        '43IPDJV36K4AX55M4QFPYHHO': 'QLM2GZ643LOCYHB653YIDJWT',  # Home
+        'F4JQYK4Z5MEBV5VFCDYHIAWT': 'QLM2GZ643LOCYHB653YIDJWT',  # Art & Craft Kits
+        # The Vintage Market (TX6SBQLJDMZOCVXBUD3KT3CL)
+        'W3EYAJJPTNC46WSLNYI4WH7V': 'TX6SBQLJDMZOCVXBUD3KT3CL',  # Furniture
+        'YQWBSOJDENMXDGUUQ3TGI3HF': 'TX6SBQLJDMZOCVXBUD3KT3CL',  # Collectibles
+        'QPDGKT3BGR63MSZ6AQ6VI4ZP': 'TX6SBQLJDMZOCVXBUD3KT3CL',  # Vintage Media
+        'N35REXL33FZWJNJV24IUQGPN': 'TX6SBQLJDMZOCVXBUD3KT3CL',  # Analog
+        'XQY33UQNPA7IPZ4CBIYJX3VM': 'TX6SBQLJDMZOCVXBUD3KT3CL',  # Trésor Vintage Market
+    }
+
+    # Categories that are themselves top-level rooms (is_top_level: true in
+    # Square). When an item's TYPE is one of these, no ROOM upcast is needed
+    # — the type IS the room — so we don't emit the "not in ROOM_BY_TYPE"
+    # warning. Verified live 2026-05-11.
+    TOP_LEVEL_ROOMS = {
+        'QLM2GZ643LOCYHB653YIDJWT',  # The General Store
+        'TX6SBQLJDMZOCVXBUD3KT3CL',  # The Vintage Market
+        'QIPW32HGKMU5BDPU3A7YZCM4',  # The Apothecary Cabinet
+        'UMWTT7Q6UU4PXPUKU3DVNLFJ',  # The Gallery
+        'TGWDFETSQPR6BF67YJCTOLW6',  # New Arrivals
+    }
+
     def _build_catalog_object(self, item_data: Dict, price_cents: int, sku: str) -> Dict:
-        """Build a catalog ITEM object shared by both create methods."""
+        """Build a catalog ITEM object shared by both create methods.
+
+        Per catalog-classifier v2.0+ (refactored Feb 2026), every item must carry:
+          - a TYPE category (Books & Paper, Pottery & Ceramics, Collectibles, etc.),
+            consumed by storefront nav surfaces and by reporting_category for analytics
+          - a TIER category (New Finds or Real Rarities), required so items appear in
+            tier-level nav surfaces and don't fall off the storefront's discovery index
+          - a ROOM category (The General Store or The Vintage Market), the top-level
+            parent under which the storefront hero tiles route. Auto-derived from
+            type_category_id via ROOM_BY_TYPE.
+
+        Items shipped without these end up invisible to one or more nav paths on
+        richmondgeneral.com — see RG-0004 / RG-0010 / Vintage Market enrollment
+        incidents (May 2026).
+
+        Callers should pass `type_category_id` in item_data (resolved upstream via
+        the catalog-classifier skill). If absent, we log a warning and ship with
+        only the tier so the item still gets onto the storefront, but the gap
+        should be patched at the caller.
+        """
+        tier_category_id = item_data.get(
+            'tier_category_id', self.categories['new_finds']
+        )
+        type_category_id = item_data.get('type_category_id')
+
+        if type_category_id:
+            categories = [
+                {"id": type_category_id},
+                {"id": tier_category_id},
+            ]
+            # Auto-derive ROOM from TYPE so items show on the "Shop All <Room>"
+            # flat product grid below the storefront hero tiles.
+            room_id = self.ROOM_BY_TYPE.get(type_category_id)
+            if room_id:
+                categories.append({"id": room_id})
+            elif type_category_id in self.TOP_LEVEL_ROOMS:
+                # The type IS already a top-level room (Apothecary Cabinet,
+                # Gallery, etc.). No upcast needed — the type already routes
+                # the item to its own Shop All grid.
+                pass
+            else:
+                print(
+                    f"⚠️  {sku}: type_category_id '{type_category_id}' not in "
+                    f"ROOM_BY_TYPE map — item will be reachable via its type "
+                    f"sub-category but won't show on the room-level Shop All grid. "
+                    f"Update ROOM_BY_TYPE in process_new_item.py."
+                )
+            # Per square-catalog.md spec, reporting_category is the TYPE.
+            reporting_category_id = type_category_id
+        else:
+            print(
+                f"⚠️  {sku}: no type_category_id provided — shipping with TIER only "
+                f"({tier_category_id}). Item may be hard to discover on the storefront. "
+                f"Patch the caller to resolve a TYPE via catalog-classifier."
+            )
+            categories = [{"id": tier_category_id}]
+            reporting_category_id = tier_category_id
+
         return {
             "type": "ITEM",
             "id": f"#{sku}",
@@ -180,11 +277,12 @@ class RGItemProcessor:
             "present_at_location_ids": [self.location_id],
             "item_data": {
                 "name": item_data['title'],
-                "description": item_data['description'],
-                "categories": [
-                    {"id": self.categories['new_finds']}
-                ],
-                "reporting_category": {"id": self.categories['new_finds']},
+                # description_html (with <p> tags) per v3.2 BREAKING change;
+                # the plain `description` field is deprecated and would render
+                # raw HTML tags on richmondgeneral.com.
+                "description_html": item_data['description'],
+                "categories": categories,
+                "reporting_category": {"id": reporting_category_id},
                 "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
                 "is_taxable": True,
                 "ecom_visibility": "VISIBLE",
@@ -354,25 +452,35 @@ class RGItemProcessor:
         print(f"✅ Inventory set to 1")
     
     def run(self, image_path: str):
-        """Run the complete workflow."""
+        """Run the complete workflow.
+
+        Ordering per SKILL.md: Phase 0 (background removal) runs FIRST so
+        the appraiser views the processed hero image in Phase 1 Step 1.0,
+        not the raw input. The previous research-before-photography ordering
+        forced Claude to appraise from the unprocessed shot and burned the
+        bg-removal API credit even when the user bailed at research.
+        """
         print("=" * 60)
         print("RICHMOND GENERAL - NEW ITEM WORKFLOW")
         print("=" * 60)
-        
-        # Phase 1: Research
-        item_data = self.phase1_research(image_path)
-        
-        if not self.confirm("\n✅ Continue to Phase 2 (Photography)?"):
+
+        # Phase 0 / 2 in script terms: photography (background removal first).
+        # We need a SKU for the working filename; fall back to the next-available
+        # local SKU if Claude hasn't supplied one upstream via square-cache.
+        sku = self.get_next_sku()
+        photo_data = self.phase2_photography(image_path, sku)
+
+        if not self.confirm("\n✅ Continue to Phase 1 (Appraisal & Research)?"):
             print("Workflow cancelled.")
             return
-        
-        # Phase 2: Photography
-        photo_data = self.phase2_photography(image_path, item_data['sku'])
-        
+
+        # Phase 1: appraisal/research with the cleaned hero in hand.
+        item_data = self.phase1_research(image_path, default_sku=sku)
+
         if not self.confirm("\n✅ Continue to Phase 3 (Square Catalog)?"):
             print("Workflow cancelled.")
             return
-        
+
         # Phase 3: Catalog Creation
         catalog_data = self.phase3_catalog(item_data)
         

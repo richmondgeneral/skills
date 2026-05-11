@@ -52,7 +52,7 @@ Pick one **type** (primary, sets `reporting_category`) + one **tier** (secondary
 | Art & Craft Kits | Watercolor kits, craft supplies |
 | Wellness & Apothecary | Teas, serums, natural products |
 | The Apothecary Cabinet | Sage, ritual items, candles |
-| Home & Gifts | Home decor, giftable items |
+| Gifts | Giftable items, home decor (also: Home for general-purpose home goods) |
 | Analog | Vinyl, pinball, analog tech |
 
 **Tiers:** The New Finds (default) or The Real Rarities (genuinely special).

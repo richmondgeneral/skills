@@ -35,6 +35,7 @@ both versions. --both and --all-images are mutually exclusive.
 Requires: SQUARE_ACCESS_TOKEN, GEMINI_API_KEY (Keychain or project .env).
 """
 import argparse
+import concurrent.futures
 import json
 import os
 import re
@@ -42,6 +43,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -55,6 +57,11 @@ except ImportError:
 
 SQUARE_API_BASE = "https://connect.squareup.com"
 DEFAULT_API_VERSION = "2026-04-21"
+
+# Rough per-call costs for Gemini image-edit (Nov 2025 published rates).
+# Used by the --max-cost pre-flight estimator; an estimate, not a billing source.
+COST_PER_CALL_FLASH = 0.57
+COST_PER_CALL_PRO = 2.13
 
 THIS = Path(__file__).resolve()
 PROJECT_ROOT = THIS.parents[3]
@@ -136,9 +143,12 @@ def resolve_item(token: str, api_version: str, item_id: Optional[str],
         if obj.get("type") != "ITEM":
             raise ValueError(f"Object {item_id} is type {obj.get('type')}, not ITEM")
         return obj
+    # limit=50 surfaces more collisions than the older default of 5 — a quiet
+    # wrong-target update is the worst category of bug here. Better to error
+    # with a long list than auto-pick one.
     url = f"{SQUARE_API_BASE}/v2/catalog/search-catalog-items"
     r = requests.post(url, headers=sq_headers(token, api_version),
-                      json={"text_filter": title, "limit": 5}, timeout=20)
+                      json={"text_filter": title, "limit": 50}, timeout=20)
     r.raise_for_status()
     items = r.json().get("items", [])
     if not items:
@@ -147,7 +157,8 @@ def resolve_item(token: str, api_version: str, item_id: Optional[str],
         names = "\n  ".join(f"{i['id']}  {i['item_data'].get('name', '?')}"
                             for i in items)
         raise ValueError(
-            f"Title {title!r} matches {len(items)} items; pass --item-id:\n  {names}"
+            f"Title {title!r} matches {len(items)} items; pass --item-id "
+            f"to disambiguate:\n  {names}"
         )
     return items[0]
 
@@ -230,16 +241,30 @@ def detect_mime(path: Path) -> str:
             ".webp": "image/webp"}.get(ext, "application/octet-stream")
 
 
+def parse_dimensions(text: str) -> Optional[str]:
+    """Pick the largest 'WxH' substring from `file` output.
+
+    `file` reports several NxM-shaped fields for JFIF JPEGs: the density
+    ('density 1x1') comes BEFORE the real pixel dimensions ('1500x2000'),
+    so a naive first-match regex returns '1x1'. We collect every match and
+    pick the largest by area, which reliably skips density and any thumbnail
+    fields that may appear."""
+    if not text:
+        return None
+    matches = re.findall(r"(\d+)\s*x\s*(\d+)", text)
+    if not matches:
+        return None
+    w, h = max(((int(a), int(b)) for a, b in matches), key=lambda wh: wh[0] * wh[1])
+    return f"{w}x{h}"
+
+
 def image_dimensions(path: Path) -> Optional[str]:
     """Return '<W>x<H>' string via `file`, or None."""
     try:
         r = subprocess.run(["file", str(path)], capture_output=True, text=True, timeout=5)
-        m = re.search(r"(\d+)\s*x\s*(\d+)", r.stdout)
-        if m:
-            return f"{m.group(1)}x{m.group(2)}"
+        return parse_dimensions(r.stdout)
     except (FileNotFoundError, subprocess.SubprocessError):
-        pass
-    return None
+        return None
 
 
 def guess_ext(content_type: str, url: str) -> str:
@@ -292,7 +317,19 @@ def save_to_items_folder(sku: Optional[str], src: Path, filename: str) -> Option
 
 
 def ask_variant_choice() -> str:
-    """Interactive prompt — returns 'preserved' or 'fixed'."""
+    """Interactive prompt — returns 'preserved' or 'fixed'.
+
+    Errors out (rather than hanging on input()) if stdin isn't a TTY. This
+    matters for launchd, cron, and any context where the script is piped to
+    or run non-interactively — without the guard, a `--prefer ask` invocation
+    would block forever waiting for keyboard input that will never come.
+    """
+    if not sys.stdin.isatty():
+        sys.exit(
+            "Error: --prefer ask requires an interactive terminal "
+            "(stdin is not a TTY). Use --prefer preserved or --prefer fixed "
+            "explicitly when running non-interactively (launchd/cron/pipes)."
+        )
     print("\nWhich variant should be the Square primary?")
     print("  preserved — shows damage (honest condition; recommended for books, antiques)")
     print("  fixed     — damage repaired (better for items where condition is incidental)")
@@ -397,7 +434,10 @@ def fetch_source(token: str, api_version: str, image_id: str,
 
     head = requests.head(img_url, allow_redirects=True, timeout=15)
     ext = guess_ext(head.headers.get("content-type", ""), img_url)
-    sq_path = tmpdir / f"{sku or image_id}-from-square{ext}"
+    # Disambiguate by image_id so parallel workers under --all-images don't
+    # collide on a single shared SKU-based path. Same item, multiple images,
+    # three workers writing to /tmp/RG-0042-from-square.jpg would race.
+    sq_path = tmpdir / f"{sku or 'item'}-{image_id}-from-square{ext}"
     download_image(img_url, sq_path)
     sq_dim = image_dimensions(sq_path)
 
@@ -428,7 +468,8 @@ def refresh_one_image(token: str, api_version: str, item_id: str, image_id: str,
     print(f"  source : {source_label}")
     print(f"  backup : {source_path}")
 
-    out_base = tmpdir / f"{sku or image_id}-cleaned.jpg"
+    # Image-id-scoped name prevents parallel-worker collisions; see fetch_source.
+    out_base = tmpdir / f"{sku or 'item'}-{image_id}-cleaned.jpg"
     t0 = time.time()
     result = run_clean(source_path, out_base,
                        fix_damage=args.fix_damage, both=args.both, pro=args.pro,
@@ -508,6 +549,8 @@ def main():
 
     parser.add_argument("--all-images", action="store_true",
                         help="Process every attached image (default: primary only)")
+    parser.add_argument("--concurrency", type=int, default=3,
+                        help="Parallel workers for --all-images (default 3, capped at 8)")
     parser.add_argument("--fix-damage", action="store_true",
                         help="Repair visible damage (default: preserve it)")
     parser.add_argument("--both", action="store_true",
@@ -520,6 +563,10 @@ def main():
     parser.add_argument("--pro", action="store_true",
                         help="Use gemini-3-pro-image-preview (~$2.13/call vs ~$0.57)")
     parser.add_argument("--remove", help="Freeform additional direction for the prompt")
+    parser.add_argument("--max-cost", type=float, default=None, metavar="USD",
+                        help="Abort if the estimated Gemini cost for this run exceeds USD. "
+                             "Estimate = (Flash $0.57 or Pro $2.13) × image_count × (2 if --both else 1). "
+                             "No default — set this when running ad-hoc batches.")
     parser.add_argument("--inspect", action="store_true",
                         help="Report item + image state without modifying anything")
     parser.add_argument("--api-version", default=DEFAULT_API_VERSION)
@@ -556,12 +603,57 @@ def main():
     targets = image_ids if args.all_images else [image_ids[0]]
     print(f"  Targets: {len(targets)} image(s) {'(all)' if args.all_images else '(primary only)'}")
 
+    # Pre-flight cost estimate. Lets ad-hoc batch loops (e.g. `for id in ...;
+    # do refresh_item_image.py --item-id $id; done`) catch a runaway before
+    # racking up a four-figure Gemini bill. Per-item only — full batch
+    # protection would need a shared counter across invocations.
+    per_call = COST_PER_CALL_PRO if args.pro else COST_PER_CALL_FLASH
+    calls = len(targets) * (2 if args.both else 1)
+    estimated = per_call * calls
+    print(f"  Cost  : ~${estimated:.2f}  ({calls} call(s) × ${per_call:.2f}, "
+          f"{'pro' if args.pro else 'flash'})")
+    if args.max_cost is not None and estimated > args.max_cost:
+        sys.exit(
+            f"Error: estimated cost ${estimated:.2f} exceeds --max-cost "
+            f"${args.max_cost:.2f}. Use --max-cost to raise the ceiling, "
+            f"or process fewer images."
+        )
+
     tmpdir = Path(tempfile.gettempdir())
-    summaries = []
-    for img_id in targets:
-        s = refresh_one_image(token, args.api_version, item_id, img_id,
-                              sku, args, tmpdir)
-        summaries.append(s)
+    summaries: List[dict] = []
+    failures: List[dict] = []
+
+    if args.all_images and len(targets) > 1:
+        workers = min(max(1, args.concurrency), 8, len(targets))
+        print_lock = threading.Lock()
+        total = len(targets)
+        done_count = 0
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+            future_to_id = {
+                executor.submit(refresh_one_image, token, args.api_version,
+                                item_id, img_id, sku, args, tmpdir): img_id
+                for img_id in targets
+            }
+            for future in concurrent.futures.as_completed(future_to_id):
+                img_id = future_to_id[future]
+                try:
+                    s = future.result()
+                    summaries.append(s)
+                    with print_lock:
+                        done_count += 1
+                        print(f"[{done_count}/{total}] image {img_id} done in "
+                              f"{s['elapsed_s']}s  (source={s['source']})")
+                except Exception as e:
+                    failures.append({"image_id": img_id, "error": str(e)})
+                    with print_lock:
+                        done_count += 1
+                        print(f"[{done_count}/{total}] image {img_id} FAILED: {e}",
+                              file=sys.stderr)
+    else:
+        for img_id in targets:
+            s = refresh_one_image(token, args.api_version, item_id, img_id,
+                                  sku, args, tmpdir)
+            summaries.append(s)
 
     print("\nDone.")
     for s in summaries:
@@ -570,6 +662,12 @@ def main():
             print(f"      cleaned: {p}")
         if "fixed_image_id" in s:
             print(f"      fixed variant attached as: {s['fixed_image_id']}")
+
+    if failures:
+        print(f"\n{len(failures)} image(s) FAILED:", file=sys.stderr)
+        for f in failures:
+            print(f"  ✗ {f['image_id']}: {f['error']}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -543,6 +543,21 @@ class PhotosLibrary:
             conn.close()
 
 
+def _as_applescript_quoted(s: str) -> str:
+    """Escape a Python string for safe embedding inside an AppleScript double-
+    quoted string literal. Without this, a value containing `"` terminates the
+    literal early and the remainder is parsed as AppleScript code — i.e. a
+    classic injection (e.g. uuid=`x"; do shell script "rm -rf ~"; --`).
+
+    AppleScript string-literal escapes inside `"..."`:
+      \\  → \\\\
+      "   → \\"
+    Newlines are kept inside the literal — that's still safe, since we're
+    only embedding it as a string value, not as code.
+    """
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
 class PhotosLibraryAppleScript:
     """
     Access Photos.app via AppleScript/osascript.
@@ -679,7 +694,7 @@ class PhotosLibraryAppleScript:
         search_term = pattern.replace('%', '').replace('*', '')
         script = f'''
         tell application "Photos"
-            set matchedItems to (media items whose filename contains "{search_term}")
+            set matchedItems to (media items whose filename contains "{_as_applescript_quoted(search_term)}")
             set maxItems to {limit}
             if (count of matchedItems) < maxItems then set maxItems to count of matchedItems
             set output to ""
@@ -706,7 +721,7 @@ class PhotosLibraryAppleScript:
         script = f'''
         tell application "Photos"
             try
-                set p to media item id "{uuid}"
+                set p to media item id "{_as_applescript_quoted(uuid)}"
                 set pid to id of p
                 set pname to filename of p
                 set pwidth to width of p
@@ -744,8 +759,8 @@ class PhotosLibraryAppleScript:
 
         script = f'''
         tell application "Photos"
-            set p to media item id "{uuid}"
-            set destFolder to POSIX file "{dest_folder}" as alias
+            set p to media item id "{_as_applescript_quoted(uuid)}"
+            set destFolder to POSIX file "{_as_applescript_quoted(dest_folder)}" as alias
             export {{p}} to destFolder
         end tell
         '''

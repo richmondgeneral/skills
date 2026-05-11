@@ -61,9 +61,9 @@ fi
 
 log "INFO" "Starting CRM sync${DRY_RUN:+ (dry-run)}"
 
-# Parse contacts
-PARSE_OUTPUT=$(python3 "$SCRIPT_DIR/parse_contacts.py" 2>&1)
-PARSE_EXIT=$?
+# Parse contacts (capture exit code without tripping `set -e`)
+PARSE_EXIT=0
+PARSE_OUTPUT=$(CONTACTS_FILE="$CONTACTS_FILE" python3 "$SCRIPT_DIR/parse_contacts.py" 2>&1) || PARSE_EXIT=$?
 
 if [ $PARSE_EXIT -ne 0 ]; then
     log "ERROR" "parse_contacts.py failed: $PARSE_OUTPUT"

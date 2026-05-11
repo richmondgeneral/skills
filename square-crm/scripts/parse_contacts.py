@@ -3,8 +3,10 @@
 Parse contacts.md and output JSON of customers ready for Square sync.
 Claude uses this output to make Square API calls via MCP.
 
-DEPENDENCY: Requires ~/.claude/skills/contacts-manager/references/contacts.md
-            with "## Detailed Profiles - Richmond General Customers" section.
+DEPENDENCY: Requires the contacts-manager skill's contacts.md with a
+            "## Detailed Profiles - Richmond General Customers" section.
+            Resolved as: $CONTACTS_FILE env var, else project-relative path
+            (../../contacts-manager/references/contacts.md from this script).
 
 Usage:
   python3 parse_contacts.py                    # All customers
@@ -18,8 +20,12 @@ import re
 import sys
 import os
 
-# Path to contacts file - update if contacts-manager skill moves
-CONTACTS_FILE = os.path.expanduser('~/.claude/skills/contacts-manager/references/contacts.md')
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_SKILLS_DIR = os.path.abspath(os.path.join(_SCRIPT_DIR, '..', '..'))
+CONTACTS_FILE = os.environ.get(
+    'CONTACTS_FILE',
+    os.path.join(_SKILLS_DIR, 'contacts-manager', 'references', 'contacts.md'),
+)
 
 # Square Customer Group IDs for Richmond General
 # These were created Dec 2025 and map to relationship types

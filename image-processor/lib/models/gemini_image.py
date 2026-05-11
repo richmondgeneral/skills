@@ -29,8 +29,11 @@ class GeminiImageModel(BaseModel):
     """
 
     # Model identifiers
-    MODEL_FLASH = "gemini-2.5-flash-image"  # Nano Banana (fast)
-    MODEL_PRO = "gemini-3-pro-image"         # Nano Banana Pro (quality)
+    # gemini-3.1-flash-image-preview: 4K output, Flash tier (faster/cheaper than 3-pro), preview status.
+    # gemini-3-pro-image-preview: 4K output, "thinking mode" for complex edits, preview status.
+    # gemini-2.5-flash-image: 1K output cap (deprecated for this skill — too lossy on product photos).
+    MODEL_FLASH = "gemini-3.1-flash-image-preview"
+    MODEL_PRO = "gemini-3-pro-image-preview"
 
     # API configuration
     BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
@@ -47,7 +50,14 @@ class GeminiImageModel(BaseModel):
 
     def __init__(self, api_key: str = None, default_model: str = None):
         super().__init__(api_key or os.getenv('GEMINI_API_KEY'))
-        self.default_model = default_model or self.MODEL_FLASH
+        # Resolution order: explicit arg > GEMINI_IMAGE_MODEL env > MODEL_FLASH default.
+        # The env-var hook lets clean.py's --pro flag swap to MODEL_PRO without
+        # threading a constructor argument through the router.
+        self.default_model = (
+            default_model
+            or os.getenv('GEMINI_IMAGE_MODEL')
+            or self.MODEL_FLASH
+        )
 
     def get_capabilities(self) -> Dict[str, Any]:
         """Return Gemini image generation/editing capabilities."""
@@ -166,21 +176,34 @@ class GeminiImageModel(BaseModel):
 
     def _select_model(self, prompt: str, reference_images: List[str] = None,
                       quality_hint: str = "auto") -> str:
-        """Select appropriate model based on task complexity."""
+        """Select appropriate model based on task complexity.
+
+        Resolution order:
+          1. GEMINI_IMAGE_MODEL env var (explicit override, never auto-escalates)
+          2. quality_hint == "fast"     -> MODEL_FLASH
+          3. quality_hint in ("pro","premium") -> MODEL_PRO
+          4. Auto-heuristics on the prompt content (kept narrow — only
+             upgrades when the caller's prompt or refs clearly need pro tier).
+        """
+        env_override = os.getenv('GEMINI_IMAGE_MODEL')
+        if env_override:
+            return env_override
+
         if quality_hint == "fast":
             return self.MODEL_FLASH
         elif quality_hint in ("pro", "premium"):
             return self.MODEL_PRO
 
-        # Auto-selection heuristics
+        # Auto-selection heuristics. NOTE: these scan caller-supplied prompt
+        # text for trigger words. Be conservative — every match here is a 4×
+        # cost upgrade (Pro vs Flash). The previous "professional" /
+        # "detailed" matches were too eager and silently escalated catalog-
+        # cleanup prompts. Set GEMINI_IMAGE_MODEL to pin the choice.
         num_refs = len(reference_images) if reference_images else 0
-
         use_pro = (
             num_refs >= 8 or
-            "4k" in prompt.lower() or
-            "high quality" in prompt.lower() or
-            "professional" in prompt.lower() or
-            ("detailed" in prompt.lower() and len(prompt) > 200)
+            "render at 4k" in prompt.lower() or
+            "use the pro model" in prompt.lower()
         )
 
         return self.MODEL_PRO if use_pro else self.MODEL_FLASH

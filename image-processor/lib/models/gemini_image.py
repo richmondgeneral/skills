@@ -20,7 +20,8 @@ class GeminiAPIError(Exception):
 
 
 def _post_with_retry(url: str, payload: dict, timeout: int,
-                     max_retries: int = 5, base_delay: float = 2.0) -> requests.Response:
+                     max_retries: int = 5, base_delay: float = 2.0,
+                     headers: Optional[Dict[str, str]] = None) -> requests.Response:
     """POST with exponential backoff + jitter on 429/5xx.
 
     Gemini's free tier is ~2 RPM; Tier 1 is ~60 RPM. Under --all-images with
@@ -32,7 +33,7 @@ def _post_with_retry(url: str, payload: dict, timeout: int,
     """
     last_resp = None
     for attempt in range(max_retries + 1):
-        resp = requests.post(url, json=payload, timeout=timeout)
+        resp = requests.post(url, json=payload, timeout=timeout, headers=headers)
         last_resp = resp
         if resp.status_code < 400:
             return resp
@@ -263,10 +264,12 @@ class GeminiImageModel(BaseModel):
                     }
                 })
 
-        url = f"{self.BASE_URL}/models/{model}:generateContent?key={self.api_key}"
+        # Auth via header, not URL query, to keep the key out of access logs.
+        url = f"{self.BASE_URL}/models/{model}:generateContent"
+        headers = {"x-goog-api-key": self.api_key}
         payload = {"contents": [{"parts": parts}]}
 
-        response = _post_with_retry(url, payload, timeout=self.TIMEOUT)
+        response = _post_with_retry(url, payload, timeout=self.TIMEOUT, headers=headers)
 
         data = response.json()
         image_bytes = self._extract_image_from_response(data)
@@ -312,10 +315,12 @@ class GeminiImageModel(BaseModel):
         # Instruction text
         parts.append({"text": instruction})
 
-        url = f"{self.BASE_URL}/models/{model}:generateContent?key={self.api_key}"
+        # Auth via header, not URL query, to keep the key out of access logs.
+        url = f"{self.BASE_URL}/models/{model}:generateContent"
+        headers = {"x-goog-api-key": self.api_key}
         payload = {"contents": [{"parts": parts}]}
 
-        response = _post_with_retry(url, payload, timeout=self.TIMEOUT)
+        response = _post_with_retry(url, payload, timeout=self.TIMEOUT, headers=headers)
 
         data = response.json()
         image_bytes = self._extract_image_from_response(data)

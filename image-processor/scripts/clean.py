@@ -32,6 +32,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 from PIL import Image  # noqa: E402
 
 from models import TaskConfig  # noqa: E402
+from models.base import safe_save_image  # noqa: E402
 from router import create_default_router  # noqa: E402
 
 
@@ -47,6 +48,11 @@ def maybe_downscale(input_path: Path, max_long_edge: int = DEFAULT_MAX_LONG_EDGE
     Gemini downsamples to ~2048px internally anyway, so pre-shrinking trims
     upload time and input tokens without changing output quality. A value of
     0 disables downscaling entirely.
+
+    Preserves ICC profile (and EXIF where the destination supports it) via
+    safe_save_image — important because catalog photos shot on iPhone often
+    embed Display P3, and stripping it shifts the color downstream models
+    receive.
     """
     if max_long_edge <= 0:
         return input_path
@@ -54,18 +60,14 @@ def maybe_downscale(input_path: Path, max_long_edge: int = DEFAULT_MAX_LONG_EDGE
         w, h = im.size
         if max(w, h) <= max_long_edge:
             return input_path
+        source_info = dict(im.info)  # capture ICC/EXIF before resize
         scale = max_long_edge / max(w, h)
         new_w = round(w * scale)
         new_h = round(h * scale)
         resized = im.resize((new_w, new_h), Image.LANCZOS)
         ext = input_path.suffix or '.png'
         tmp = Path(tempfile.gettempdir()) / f"{input_path.stem}-ds{max_long_edge}{ext}"
-        save_kwargs = {}
-        if ext.lower() in ('.jpg', '.jpeg'):
-            save_kwargs['quality'] = 95
-            if resized.mode in ('RGBA', 'P'):
-                resized = resized.convert('RGB')
-        resized.save(tmp, **save_kwargs)
+        safe_save_image(resized, tmp, source_info=source_info)
         return tmp
 
 
@@ -78,8 +80,10 @@ def downscale_output_in_place(path: Path, max_long_edge: int) -> str | None:
     """Resize `path` in-place if its long edge exceeds `max_long_edge`.
 
     Returns the new "<w>x<h>" string when a resize happened, or None.
-    Only coerces RGBA/P → RGB for JPEG targets — PNG/WebP keep their alpha,
-    which is the whole point of writing them as PNG/WebP in the first place.
+    Delegates the write to safe_save_image, which preserves ICC/EXIF where
+    the target format supports them and only coerces RGBA→RGB when the
+    target format (JPEG/BMP) cannot carry alpha. PNG/WebP outputs keep their
+    transparency.
     """
     if max_long_edge <= 0:
         return None
@@ -87,18 +91,12 @@ def downscale_output_in_place(path: Path, max_long_edge: int) -> str | None:
         w, h = im.size
         if max(w, h) <= max_long_edge:
             return None
+        source_info = dict(im.info)
         scale = max_long_edge / max(w, h)
         new_w = round(w * scale)
         new_h = round(h * scale)
-        is_jpeg_target = path.suffix.lower() in (".jpg", ".jpeg")
-        # Alpha-strip is correct for JPEG (no alpha channel) but destroys
-        # transparency on PNG/WebP outputs — that was the silent fidelity bug
-        # this helper was extracted to fix.
-        if is_jpeg_target and im.mode in ("RGBA", "P"):
-            im = im.convert("RGB")
         resized = im.resize((new_w, new_h), Image.LANCZOS)
-    save_kwargs = {"quality": 95} if is_jpeg_target else {}
-    resized.save(path, **save_kwargs)
+    safe_save_image(resized, path, source_info=source_info)
     return f"{new_w}x{new_h}"
 
 

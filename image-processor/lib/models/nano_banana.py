@@ -9,9 +9,11 @@ from PIL import Image, ImageDraw
 from typing import Dict, Any
 
 try:
-    from .base import BaseModel, ProcessingResult, TaskConfig, TaskType, redact_api_key
+    from .base import (BaseModel, ProcessingResult, TaskConfig, TaskType,
+                       redact_api_key, get_mime_type, safe_save_image)
 except ImportError:
-    from base import BaseModel, ProcessingResult, TaskConfig, TaskType, redact_api_key
+    from base import (BaseModel, ProcessingResult, TaskConfig, TaskType,
+                      redact_api_key, get_mime_type, safe_save_image)
 
 
 class NanaBananaModel(BaseModel):
@@ -113,7 +115,8 @@ Make the bounding box as tight as possible around the subject."""
             "contents": [{
                 "parts": [
                     {"text": prompt},
-                    {"inline_data": {"mime_type": "image/jpeg", "data": image_data}}
+                    {"inline_data": {"mime_type": get_mime_type(image_path),
+                                     "data": image_data}}
                 ]
             }],
             "generationConfig": {
@@ -140,8 +143,10 @@ Make the bounding box as tight as possible around the subject."""
         raise Exception("No response from API")
 
     def _apply_mask(self, image_path: str, output_path: str, bounds: Dict[str, int]):
-        """Apply mask to remove background."""
+        """Apply mask to remove background. Preserves ICC, respects target
+        format from output_path extension instead of always saving PNG."""
         img = Image.open(image_path)
+        source_info = dict(img.info)  # capture ICC/EXIF before we mutate img
         width, height = img.size
 
         mask = Image.new('L', (width, height), 0)
@@ -156,8 +161,7 @@ Make the bounding box as tight as possible around the subject."""
         img = img.convert('RGBA')
         img.putalpha(mask)
 
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        img.save(output_path, 'PNG')
+        safe_save_image(img, output_path, source_info=source_info)
 
     def _analyze_image(self, image_path: str, task_config: TaskConfig, start_time: float) -> ProcessingResult:
         """Analyze image content."""

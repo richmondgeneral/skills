@@ -7,6 +7,98 @@ from pathlib import Path
 from enum import Enum
 import time
 
+try:
+    from PIL import Image  # noqa: F401  (used by safe_save_image type hints)
+except ImportError:
+    Image = None  # type: ignore[assignment]
+
+# Extension → MIME map. Conservative: covers every format Square accepts and
+# every format Gemini understands for inline_data uploads. Unknown extensions
+# fall back to image/jpeg (the most-tolerated value across API endpoints).
+_MIME_TYPES = {
+    ".jpg":  "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png":  "image/png",
+    ".gif":  "image/gif",
+    ".webp": "image/webp",
+    ".bmp":  "image/bmp",
+    ".tif":  "image/tiff",
+    ".tiff": "image/tiff",
+}
+
+
+def get_mime_type(path) -> str:
+    """Return the image/* MIME type for `path` based on its extension.
+
+    The providers used to hardcode "image/jpeg" for every inline_data upload,
+    which (per QA) likely confused Gemini's subject-detection on PNG/WebP
+    inputs and produced the crude rectangular masks that suspicious_rect_mask
+    recovery exists to compensate for.
+    """
+    return _MIME_TYPES.get(Path(str(path)).suffix.lower(), "image/jpeg")
+
+
+# Pillow format names indexed by the extensions we emit. Used by
+# safe_save_image to AVOID inferring format-from-extension at the PIL layer
+# (since that's what caused the demotion-to-JPEG bug class in the first place).
+_FORMAT_FROM_EXT = {
+    ".jpg":  "JPEG",
+    ".jpeg": "JPEG",
+    ".png":  "PNG",
+    ".webp": "WEBP",
+    ".gif":  "GIF",
+    ".bmp":  "BMP",
+    ".tif":  "TIFF",
+    ".tiff": "TIFF",
+}
+
+# Formats that can carry an embedded ICC profile.
+_ICC_CAPABLE = {"JPEG", "PNG", "WEBP", "TIFF"}
+# Formats that can carry EXIF.
+_EXIF_CAPABLE = {"JPEG", "WEBP", "TIFF"}
+# Formats with no alpha channel.
+_NO_ALPHA = {"JPEG", "BMP"}
+
+
+def safe_save_image(img, dst, source_info: Optional[Dict[str, Any]] = None,
+                    output_format: Optional[str] = None) -> str:
+    """Save a PIL image to `dst`, preserving ICC/EXIF when the target format
+    supports it and only coercing mode (RGBA→RGB) when the format demands it.
+
+    Returns the resolved Pillow format name (e.g. "PNG", "JPEG").
+
+    Order of precedence for format:
+      1. Explicit `output_format` argument (already a Pillow name)
+      2. `dst` suffix mapped via _FORMAT_FROM_EXT
+      3. Fallback "JPEG"
+    """
+    dst = Path(dst)
+    if output_format:
+        fmt = output_format.upper()
+    else:
+        fmt = _FORMAT_FROM_EXT.get(dst.suffix.lower(), "JPEG")
+
+    save_kwargs: Dict[str, Any] = {}
+
+    if source_info:
+        icc = source_info.get("icc_profile")
+        if icc and fmt in _ICC_CAPABLE:
+            save_kwargs["icc_profile"] = icc
+        exif = source_info.get("exif")
+        if exif and fmt in _EXIF_CAPABLE:
+            save_kwargs["exif"] = exif
+
+    # JPEG/BMP can't carry alpha; coerce only for those targets.
+    if fmt in _NO_ALPHA and img.mode in ("RGBA", "LA", "P"):
+        img = img.convert("RGB")
+
+    if fmt == "JPEG":
+        save_kwargs.setdefault("quality", 95)
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    img.save(dst, format=fmt, **save_kwargs)
+    return fmt
+
 
 # Google API key shape: "AIza" + 35 chars of base64url-ish material = 39 total.
 # Match the family so we can scrub it from any text we surface to users —

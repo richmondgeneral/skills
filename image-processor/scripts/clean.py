@@ -37,7 +37,8 @@ from router import create_default_router  # noqa: E402
 
 PROMPTS_FILE = Path(__file__).resolve().parent.parent / 'lib' / 'cleanup_prompts.md'
 MODEL_PRO = "gemini-3-pro-image-preview"
-DEFAULT_MAX_LONG_EDGE = 2048
+DEFAULT_MAX_LONG_EDGE = 2048           # pre-Gemini input size cap
+DEFAULT_MAX_LONG_EDGE_OUTPUT = 1800    # post-Gemini output size cap; Square storefront displays max ~1500px
 
 
 def maybe_downscale(input_path: Path, max_long_edge: int = DEFAULT_MAX_LONG_EDGE) -> Path:
@@ -179,6 +180,14 @@ def main():
                              f'affecting output quality.')
     parser.add_argument('--no-downscale', action='store_true',
                         help='Alias for --max-long-edge 0')
+    parser.add_argument('--max-long-edge-output', type=int, default=DEFAULT_MAX_LONG_EDGE_OUTPUT,
+                        metavar='N',
+                        help=f'Downscale Gemini output so long edge ≤ N (default: '
+                             f'{DEFAULT_MAX_LONG_EDGE_OUTPUT}; 0 disables). Symmetric to '
+                             f'the input-side knob — Flash 3.1 can emit up to 4K but '
+                             f'Square displays at most ~1500px, so we trim before upload.')
+    parser.add_argument('--no-downscale-output', action='store_true',
+                        help='Alias for --max-long-edge-output 0')
     parser.add_argument('--json', action='store_true', help='Emit JSON result')
     parser.add_argument('--verbose', '-v', action='store_true')
     args = parser.parse_args()
@@ -234,6 +243,7 @@ def main():
         if args.extra:
             print(f"Extra: {args.extra}", file=sys.stderr)
 
+    max_long_edge_output = 0 if args.no_downscale_output else args.max_long_edge_output
     results = []
     for tag, out_path, fix in runs:
         instruction = build_prompt(sections, fix_damage=fix, extra=args.extra or "")
@@ -242,6 +252,30 @@ def main():
         r = run_one(effective_input, out_path, instruction, args.quality, args.verbose)
         r['variant'] = tag
         r['downscaled_to'] = downscaled_to
+        r['output_downscaled_to'] = None
+        if r['success'] and max_long_edge_output > 0:
+            written = Path(r['output_path'])
+            try:
+                gem_w, gem_h = _read_size(written)
+                if max(gem_w, gem_h) > max_long_edge_output:
+                    # Resize in place; symmetric to the input-side maybe_downscale.
+                    scale = max_long_edge_output / max(gem_w, gem_h)
+                    new_w = round(gem_w * scale)
+                    new_h = round(gem_h * scale)
+                    with Image.open(written) as im:
+                        if im.mode in ('RGBA', 'P'):
+                            im = im.convert('RGB')
+                        resized = im.resize((new_w, new_h), Image.LANCZOS)
+                    save_kwargs = {'quality': 95} if written.suffix.lower() in ('.jpg', '.jpeg') else {}
+                    resized.save(written, **save_kwargs)
+                    r['output_downscaled_to'] = f"{new_w}x{new_h}"
+                    if args.verbose:
+                        print(f"  output downscaled {gem_w}x{gem_h} → {new_w}x{new_h}",
+                              file=sys.stderr)
+            except Exception as e:
+                # Don't fail the cleanup just because the post-resize hit a snag.
+                print(f"  warn: output downscale failed ({e}); leaving original output",
+                      file=sys.stderr)
         results.append(r)
         if not r['success']:
             break  # don't run --both's second pass if first failed

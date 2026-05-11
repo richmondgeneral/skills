@@ -1,6 +1,8 @@
 """Gemini Image model for generation and editing."""
 import os
 import base64
+import random
+import sys
 import time
 import requests
 from pathlib import Path
@@ -15,6 +17,44 @@ except ImportError:
 class GeminiAPIError(Exception):
     """Base exception for Gemini API errors."""
     pass
+
+
+def _post_with_retry(url: str, payload: dict, timeout: int,
+                     max_retries: int = 5, base_delay: float = 2.0) -> requests.Response:
+    """POST with exponential backoff + jitter on 429/5xx.
+
+    Gemini's free tier is ~2 RPM; Tier 1 is ~60 RPM. Under --all-images with
+    concurrency > 1 we can punch through these and earn a 429. Sleeping and
+    retrying is much less painful than failing the whole batch.
+
+    Backoff schedule: roughly 2s, 4s, 8s, 16s, 32s plus 0–1s jitter.
+    Honors a Retry-After header when present (Gemini does send these).
+    """
+    last_resp = None
+    for attempt in range(max_retries + 1):
+        resp = requests.post(url, json=payload, timeout=timeout)
+        last_resp = resp
+        if resp.status_code < 400:
+            return resp
+        # Retryable: rate-limit or transient server-side
+        if resp.status_code in (429,) or 500 <= resp.status_code < 600:
+            if attempt == max_retries:
+                break
+            retry_after = resp.headers.get('Retry-After')
+            try:
+                wait = float(retry_after) if retry_after else base_delay * (2 ** attempt)
+            except ValueError:
+                wait = base_delay * (2 ** attempt)
+            wait += random.uniform(0, 1.0)  # jitter
+            print(f"  [retry] Gemini {resp.status_code}; sleeping {wait:.1f}s "
+                  f"(attempt {attempt + 1}/{max_retries})", file=sys.stderr)
+            time.sleep(wait)
+            continue
+        # Non-retryable 4xx
+        resp.raise_for_status()
+    # Exhausted retries — surface the last response's error
+    last_resp.raise_for_status()
+    return last_resp  # unreachable, satisfies type checker
 
 
 class GeminiImageModel(BaseModel):
@@ -176,14 +216,21 @@ class GeminiImageModel(BaseModel):
 
     def _select_model(self, prompt: str, reference_images: List[str] = None,
                       quality_hint: str = "auto") -> str:
-        """Select appropriate model based on task complexity.
+        """Select Gemini image model.
 
-        Resolution order:
-          1. GEMINI_IMAGE_MODEL env var (explicit override, never auto-escalates)
-          2. quality_hint == "fast"     -> MODEL_FLASH
-          3. quality_hint in ("pro","premium") -> MODEL_PRO
-          4. Auto-heuristics on the prompt content (kept narrow — only
-             upgrades when the caller's prompt or refs clearly need pro tier).
+        Resolution order (no prompt-content scanning — explicit only):
+          1. GEMINI_IMAGE_MODEL env var (set by clean.py --pro etc.)
+          2. quality_hint == "fast"            -> MODEL_FLASH
+          3. quality_hint in ("pro", "premium")-> MODEL_PRO
+          4. num_refs >= 8 -> MODEL_PRO (legitimate structural complexity signal,
+             not caller-supplied text)
+          5. Default -> MODEL_FLASH
+
+        We deliberately do NOT scan the prompt for words like "professional",
+        "detailed", "4k". That made cost depend on phrasing and produced
+        4x-cost surprises when a caller's prompt happened to include a
+        trigger word. If you want Pro, ask for it explicitly via --pro,
+        GEMINI_IMAGE_MODEL, or quality_hint='pro'.
         """
         env_override = os.getenv('GEMINI_IMAGE_MODEL')
         if env_override:
@@ -191,22 +238,14 @@ class GeminiImageModel(BaseModel):
 
         if quality_hint == "fast":
             return self.MODEL_FLASH
-        elif quality_hint in ("pro", "premium"):
+        if quality_hint in ("pro", "premium"):
             return self.MODEL_PRO
 
-        # Auto-selection heuristics. NOTE: these scan caller-supplied prompt
-        # text for trigger words. Be conservative — every match here is a 4×
-        # cost upgrade (Pro vs Flash). The previous "professional" /
-        # "detailed" matches were too eager and silently escalated catalog-
-        # cleanup prompts. Set GEMINI_IMAGE_MODEL to pin the choice.
         num_refs = len(reference_images) if reference_images else 0
-        use_pro = (
-            num_refs >= 8 or
-            "render at 4k" in prompt.lower() or
-            "use the pro model" in prompt.lower()
-        )
+        if num_refs >= 8:
+            return self.MODEL_PRO
 
-        return self.MODEL_PRO if use_pro else self.MODEL_FLASH
+        return self.MODEL_FLASH
 
     def _generate_image(self, prompt: str, model: str,
                         reference_images: List[str] = None) -> tuple:
@@ -227,8 +266,7 @@ class GeminiImageModel(BaseModel):
         url = f"{self.BASE_URL}/models/{model}:generateContent?key={self.api_key}"
         payload = {"contents": [{"parts": parts}]}
 
-        response = requests.post(url, json=payload, timeout=self.TIMEOUT)
-        response.raise_for_status()
+        response = _post_with_retry(url, payload, timeout=self.TIMEOUT)
 
         data = response.json()
         image_bytes = self._extract_image_from_response(data)
@@ -277,8 +315,7 @@ class GeminiImageModel(BaseModel):
         url = f"{self.BASE_URL}/models/{model}:generateContent?key={self.api_key}"
         payload = {"contents": [{"parts": parts}]}
 
-        response = requests.post(url, json=payload, timeout=self.TIMEOUT)
-        response.raise_for_status()
+        response = _post_with_retry(url, payload, timeout=self.TIMEOUT)
 
         data = response.json()
         image_bytes = self._extract_image_from_response(data)

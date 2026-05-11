@@ -11,7 +11,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(dirname "$SCRIPT_DIR")"
 PROJECT_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
-LOG_FILE="$SKILL_DIR/logs/sync.log"
+LOG_FILE="$HOME/Library/Logs/RichmondGeneral/sync.log"
 CONTACTS_FILE="$PROJECT_ROOT/skills/contacts-manager/references/contacts.md"
 SQUARE_API="https://connect.squareup.com/v2"
 SQUARE_VERSION="2026-04-21"

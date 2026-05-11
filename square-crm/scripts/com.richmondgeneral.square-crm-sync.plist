@@ -28,10 +28,10 @@
     </dict>
     
     <key>StandardOutPath</key>
-    <string>/Users/scottybe/workspace/richmondgeneral/skills/square-crm/logs/launchd.out.log</string>
+    <string>/Users/scottybe/Library/Logs/RichmondGeneral/launchd.out.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/scottybe/workspace/richmondgeneral/skills/square-crm/logs/launchd.err.log</string>
+    <string>/Users/scottybe/Library/Logs/RichmondGeneral/launchd.err.log</string>
     
     <key>RunAtLoad</key>
     <false/>

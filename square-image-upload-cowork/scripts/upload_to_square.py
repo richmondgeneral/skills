@@ -82,6 +82,22 @@ def log(msg: str) -> None:
 # Auth resolution: env var → workspace .env (in that order)
 # -----------------------------------------------------------------------------
 
+def parse_env_value(raw: str) -> str:
+    """Strip whitespace, matching outer quotes, and unquoted inline `#`
+    comments from a .env value. Quoted values are taken verbatim — a `#`
+    inside `"..."` or `'...'` is part of the token, not a comment marker.
+    Without this, a perfectly normal `KEY=token # prod` produces a malformed
+    `token # prod` and fails auth silently.
+    """
+    val = raw.strip()
+    if len(val) >= 2 and val[0] == val[-1] and val[0] in ("'", '"'):
+        return val[1:-1]
+    # Unquoted: everything from the first `#` onward is a comment.
+    if "#" in val:
+        val = val.split("#", 1)[0].strip()
+    return val
+
+
 def parse_dotenv(path: str) -> dict:
     """Minimal .env parser — handles KEY=VALUE, ignores comments and blank lines.
     Doesn't do variable expansion; we don't need that here.
@@ -97,14 +113,7 @@ def parse_dotenv(path: str) -> dict:
                     continue
                 key, _, value = line.partition("=")
                 key = key.strip()
-                value = value.strip()
-                # Strip wrapping quotes if present
-                if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
-                    value = value[1:-1]
-                # Inline comment after value (only if value isn't quoted-out — simple rule)
-                if "#" in value:
-                    value = value.split("#", 1)[0].strip()
-                out[key] = value
+                out[key] = parse_env_value(value)
     except FileNotFoundError:
         log(f".env not found at {path}")
     except OSError as e:

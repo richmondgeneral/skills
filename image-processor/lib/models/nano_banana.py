@@ -9,9 +9,9 @@ from PIL import Image, ImageDraw
 from typing import Dict, Any
 
 try:
-    from .base import BaseModel, ProcessingResult, TaskConfig, TaskType
+    from .base import BaseModel, ProcessingResult, TaskConfig, TaskType, redact_api_key
 except ImportError:
-    from base import BaseModel, ProcessingResult, TaskConfig, TaskType
+    from base import BaseModel, ProcessingResult, TaskConfig, TaskType, redact_api_key
 
 
 class NanaBananaModel(BaseModel):
@@ -94,7 +94,11 @@ class NanaBananaModel(BaseModel):
         with open(image_path, 'rb') as f:
             image_data = base64.b64encode(f.read()).decode('utf-8')
 
-        url = f"{self.base_url}/models/{self.endpoint}:generateContent?key={self.api_key}"
+        # Auth via header, not URL query: keeps the key out of proxy access
+        # logs, macOS Unified Log, requests debug output, and anything else
+        # that captures URLs but not headers.
+        url = f"{self.base_url}/models/{self.endpoint}:generateContent"
+        headers = {"x-goog-api-key": self.api_key}
 
         prompt = """Analyze this image and detect the main subject for background removal.
 
@@ -118,10 +122,15 @@ Make the bounding box as tight as possible around the subject."""
             }
         }
 
-        response = requests.post(url, json=payload, timeout=30)
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
 
         if response.status_code != 200:
-            raise Exception(f"API error: {response.status_code} - {response.text}")
+            # Redact in case Google's error body echoes the rejected key —
+            # this string ends up in ProcessingResult.error which the CLI
+            # serializes to stdout in --json mode.
+            raise Exception(
+                f"API error: {response.status_code} - "
+                f"{redact_api_key(response.text)}")
 
         result = response.json()
         if 'candidates' in result and len(result['candidates']) > 0:

@@ -93,10 +93,26 @@ def resolve_secret(*service_names: str) -> Optional[str]:
         for line in env_file.read_text().splitlines():
             for name in service_names:
                 if line.startswith(f"{name}="):
-                    val = line.split("=", 1)[1].strip()
+                    val = parse_env_value(line.split("=", 1)[1])
                     if val:
                         return val
     return None
+
+
+def parse_env_value(raw: str) -> str:
+    """Strip whitespace, matching outer quotes, and unquoted inline `#`
+    comments from a .env value. Quoted values are taken verbatim — a `#`
+    inside `"..."` or `'...'` is part of the token, not a comment marker.
+    Without this, a perfectly normal `KEY=token # prod` produces a malformed
+    `token # prod` and fails auth silently.
+    """
+    val = raw.strip()
+    if len(val) >= 2 and val[0] == val[-1] and val[0] in ("'", '"'):
+        return val[1:-1]
+    # Unquoted: everything from the first `#` onward is a comment.
+    if "#" in val:
+        val = val.split("#", 1)[0].strip()
+    return val
 
 
 def get_token() -> str:

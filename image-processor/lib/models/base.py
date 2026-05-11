@@ -1,10 +1,27 @@
 """Base model abstraction for unified image processing."""
+import re
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 from pathlib import Path
 from enum import Enum
 import time
+
+
+# Google API key shape: "AIza" + 35 chars of base64url-ish material = 39 total.
+# Match the family so we can scrub it from any text we surface to users —
+# error messages especially, since Gemini 401/403 bodies sometimes echo the
+# rejected credential. We're conservative here: anything that LOOKS like a
+# key gets replaced, even if it turns out to be a coincidental run of chars.
+_API_KEY_PATTERN = re.compile(r"AIza[A-Za-z0-9_\-]{35}")
+
+
+def redact_api_key(s: str) -> str:
+    """Replace any Google API-key-shaped substring with `<redacted-api-key>`.
+    Use on any text (esp. response bodies) before surfacing it to the user."""
+    if not s:
+        return s
+    return _API_KEY_PATTERN.sub("<redacted-api-key>", s)
 
 
 class TaskType(Enum):

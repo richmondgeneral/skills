@@ -12,6 +12,7 @@ SKILL_DIRS = [
     "image-processor/lib",
     "image-processor/scripts",
     "square-image-upload/scripts",
+    "square-image-upload-cowork/scripts",
     "square-cache/scripts",
     "square-crm/scripts",
     "rg-full-auto/scripts",

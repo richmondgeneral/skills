@@ -31,6 +31,7 @@ import argparse
 import base64
 import concurrent.futures
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -117,10 +118,17 @@ def _gemini_call(image_bytes: bytes, mime: str, api_key: str,
             "response_mime_type": "application/json",
         },
     }
-    r = requests.post(f"{GEMINI_URL}?key={api_key}", json=payload,
-                      timeout=timeout)
+    # Auth via header, not URL query: keeps the key out of proxy access logs,
+    # macOS Unified Log, and `requests` debug output. The Gemini REST API
+    # accepts the key in either place — the header form is the safe default.
+    r = requests.post(GEMINI_URL, json=payload, timeout=timeout,
+                      headers={"x-goog-api-key": api_key})
     if r.status_code != 200:
-        raise RuntimeError(f"Gemini error {r.status_code}: {r.text[:300]}")
+        # Truncate first, then redact — if a key happens to straddle the 300-
+        # char boundary we'd otherwise leak its second half.
+        body = r.text[:300]
+        body = re.sub(r"AIza[A-Za-z0-9_\-]{35}", "<redacted-api-key>", body)
+        raise RuntimeError(f"Gemini error {r.status_code}: {body}")
     body = r.json()
     try:
         text = body["candidates"][0]["content"]["parts"][0]["text"]

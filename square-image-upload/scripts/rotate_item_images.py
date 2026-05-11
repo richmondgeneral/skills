@@ -4,20 +4,26 @@ Auto-detect and correct rotation on Square catalog item images.
 
 Workflow per image:
   1. Download the current Square copy
-  2. Ask Gemini 2.5 Flash which CW rotation (0/90/180/270) makes it right-side up
-  3. If non-zero: rotate locally with PIL, PUT back to Square in place
+  2. Apply any EXIF orientation tag (handles phone-camera rotation automatically)
+  3. Score ALL four candidate orientations with Gemini 2.5 Flash ("is this upright?"),
+     pick the highest-scoring one
+  4. If the winner is non-zero AND high-confidence: rotate locally with PIL,
+     PUT back to Square in place
+
+Why score-all-four instead of one ask-the-model call: vision models reliably tell
+whether a given image is upright, but are flakier at predicting which rotation
+fixes it (text running sideways trips them up — they sometimes pick the wrong
+direction). Scoring all four candidates trades 4x the inference cost (~$0.004/image
+on Flash, still nothing) for deterministic results.
 
 This is meant to be run BEFORE refresh_item_image.py — fix orientation first,
 then run the expensive cleanup on the corrected image.
-
-Detection is ~$0.001/image (Flash, text-only output). Rotation itself is free
-(local PIL). The only Square side effect is the in-place PUT, which preserves
-the image's name, caption, and attachment to the item.
 
 Examples:
   rotate_item_images.py --item-id <ID> --all-images --inspect    # detect only
   rotate_item_images.py --item-id <ID> --all-images              # detect + rotate
   rotate_item_images.py --title "Foo" --all-images --concurrency 4
+  rotate_item_images.py --item-id <ID> --all-images --min-confidence 0.85
 
 Requires: SQUARE_ACCESS_TOKEN, GEMINI_API_KEY.
 """
@@ -40,10 +46,12 @@ except ImportError:
     sys.exit(1)
 
 try:
-    from PIL import Image
+    from PIL import Image, ImageOps
 except ImportError:
     print("Error: Pillow required (`pip install Pillow`)", file=sys.stderr)
     sys.exit(1)
+
+import io
 
 # Reuse all the Square/secret/CLI helpers from refresh_item_image.py.
 from refresh_item_image import (
@@ -64,40 +72,43 @@ GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_URL = (f"https://generativelanguage.googleapis.com/v1beta/"
               f"models/{GEMINI_MODEL}:generateContent")
 
-ROTATION_PROMPT = """Determine the clockwise rotation needed to make this image display right-side up.
+UPRIGHT_PROMPT = """You are inspecting an image to judge if it is displayed RIGHT-SIDE UP.
 
-Use these cues:
-- Text should read left-to-right, top-to-bottom
-- For photos of physical objects: gravity points down
-- For illustrations: subject should be oriented as intended for viewing
+Cues for "upright":
+- Any text reads left-to-right, top-to-bottom (the most reliable cue when present)
+- Photographed physical objects: gravity points down — shadows fall below objects, liquids settle at the bottom
+- Photographed pages of a book or label: the binding/spine of the book is the left or right edge, not the top or bottom
+- Illustrations: subject is oriented as a viewer would naturally look at it
+
+If you see any TEXT in the image, the text orientation is decisive. Ignore the
+physical-object cues when text is present and legible — text orientation wins.
 
 Return JSON exactly in this format:
-{"rotation_cw_degrees": N, "confidence": F, "reasoning": "brief explanation"}
+{"is_upright": true|false, "confidence": F, "reasoning": "brief explanation, mention text orientation if any"}
 
-Where:
-- N is one of: 0, 90, 180, 270 (clockwise degrees to APPLY to correct the image)
-- F is a confidence score 0.0–1.0
-- 0 means the image is already correctly oriented
+Where F is a confidence score 0.0-1.0. Be honest about uncertainty: if you're
+unsure, say so with a lower confidence — don't claim 0.9 unless you really are
+that sure.
 """
 
 
-def detect_rotation_via_gemini(image_path: Path, api_key: str,
-                               timeout: int = 30) -> dict:
-    """Ask Gemini what CW rotation corrects the image. Returns parsed JSON."""
-    with open(image_path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode("utf-8")
-
-    mime = "image/jpeg"
-    suffix = image_path.suffix.lower()
+def _mime_for(path: Path) -> str:
+    suffix = path.suffix.lower()
     if suffix == ".png":
-        mime = "image/png"
-    elif suffix == ".webp":
-        mime = "image/webp"
+        return "image/png"
+    if suffix == ".webp":
+        return "image/webp"
+    return "image/jpeg"
 
+
+def _gemini_call(image_bytes: bytes, mime: str, api_key: str,
+                 timeout: int = 30) -> dict:
+    """Send a single image to Gemini with the UPRIGHT_PROMPT; return parsed JSON."""
+    b64 = base64.b64encode(image_bytes).decode("utf-8")
     payload = {
         "contents": [{
             "parts": [
-                {"text": ROTATION_PROMPT},
+                {"text": UPRIGHT_PROMPT},
                 {"inline_data": {"mime_type": mime, "data": b64}},
             ]
         }],
@@ -116,37 +127,142 @@ def detect_rotation_via_gemini(image_path: Path, api_key: str,
     except (KeyError, IndexError) as e:
         raise RuntimeError(f"unexpected Gemini response: {body}") from e
     parsed = json.loads(text)
-
-    deg = parsed.get("rotation_cw_degrees")
-    if deg not in (0, 90, 180, 270):
-        raise RuntimeError(f"Gemini returned invalid rotation: {deg!r}")
+    if "is_upright" not in parsed:
+        raise RuntimeError(f"Gemini missing is_upright: {parsed}")
     return parsed
 
 
-def rotate_to_correct(src: Path, dst: Path, cw_degrees: int) -> None:
-    """Rotate src clockwise by cw_degrees (must be 0/90/180/270) → dst.
-    Uses PIL.Image.rotate with a negative angle (PIL is CCW-positive)."""
+def _candidate_bytes(img: Image.Image, cw_degrees: int, fmt: str) -> bytes:
+    """Render `img` rotated CW by `cw_degrees` and return encoded bytes."""
     if cw_degrees == 0:
-        if src != dst:
-            dst.write_bytes(src.read_bytes())
-        return
-    if cw_degrees not in (90, 180, 270):
+        candidate = img
+    else:
+        candidate = img.rotate(-cw_degrees, expand=True)
+    buf = io.BytesIO()
+    save_kwargs = {}
+    out_fmt = (fmt or "JPEG").upper()
+    if out_fmt in ("JPEG", "JPG") and candidate.mode in ("RGBA", "P"):
+        candidate = candidate.convert("RGB")
+    candidate.save(buf, format=out_fmt, **save_kwargs)
+    return buf.getvalue()
+
+
+def detect_rotation_via_gemini(image_path: Path, api_key: str,
+                               timeout: int = 30,
+                               max_workers: int = 4) -> dict:
+    """Score all four candidate orientations and return the best one.
+
+    Returns dict with keys: rotation_cw_degrees, confidence, reasoning, scores
+    (scores is a list of per-candidate Gemini judgements, useful for debugging).
+    """
+    base = Image.open(image_path)
+    # Handle EXIF orientation tags up-front (saves a 90/180/270 ask).
+    base = ImageOps.exif_transpose(base)
+    fmt = (base.format or "JPEG").upper()
+    mime = _mime_for(image_path)
+
+    def score(cw: int) -> dict:
+        body = _gemini_call(_candidate_bytes(base, cw, fmt), mime, api_key,
+                            timeout=timeout)
+        return {
+            "cw_degrees": cw,
+            "is_upright": bool(body.get("is_upright")),
+            "confidence": float(body.get("confidence") or 0.0),
+            "reasoning": body.get("reasoning", ""),
+        }
+
+    candidates = [0, 90, 180, 270]
+    scores: List[dict] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+        for s in ex.map(score, candidates):
+            scores.append(s)
+    # Tie-break preference: when ties happen on `confidence`, prefer NOT rotating
+    # (0 degrees) over a coin-flip. Real rotations need to clearly beat "leave alone".
+    scores.sort(key=lambda s: (not s["is_upright"], -s["confidence"],
+                               s["cw_degrees"] != 0, s["cw_degrees"]))
+    winner = scores[0]
+
+    # If the top vote is is_upright=False (no orientation looked upright), bail
+    # - that signals the image is genuinely ambiguous (e.g. textureless macro).
+    if not winner["is_upright"]:
+        return {
+            "rotation_cw_degrees": 0,
+            "confidence": 0.0,
+            "reasoning": ("no orientation scored as upright; leaving alone. "
+                          f"Top: cw={winner['cw_degrees']} conf={winner['confidence']:.2f}"),
+            "scores": scores,
+        }
+
+    # Ambiguity penalty: when Gemini marks MORE than one orientation as "upright"
+    # at high confidence, that's a model disagreement with itself. Penalize the
+    # winner's confidence by 1/n_upright so the min_confidence threshold can
+    # catch and skip these cases. (E.g. the model claiming both 90 and 180 are
+    # upright with conf=1.0 -> effective conf = 0.5.)
+    n_upright = sum(1 for s in scores if s["is_upright"])
+    effective_conf = winner["confidence"] / max(n_upright, 1)
+
+    return {
+        "rotation_cw_degrees": winner["cw_degrees"],
+        "confidence": effective_conf,
+        "raw_confidence": winner["confidence"],
+        "n_upright_candidates": n_upright,
+        "reasoning": winner["reasoning"],
+        "scores": scores,
+    }
+
+
+def rotate_to_correct(src: Path, dst: Path, cw_degrees: int) -> None:
+    """Rotate src clockwise by cw_degrees (must be 0/90/180/270) - dst.
+    Uses PIL.Image.rotate with a negative angle (PIL is CCW-positive).
+
+    Applies EXIF orientation up-front via ImageOps.exif_transpose so the
+    written file has no orientation tag that could re-rotate it downstream.
+    """
+    if cw_degrees not in (0, 90, 180, 270):
         raise ValueError(f"cw_degrees must be one of 0/90/180/270, got {cw_degrees}")
 
     img = Image.open(src)
-    # Preserve any EXIF (in case Square or downstream tools look at it).
-    exif = img.info.get("exif")
-    rotated = img.rotate(-cw_degrees, expand=True)
-    save_kwargs = {}
-    if exif:
-        save_kwargs["exif"] = exif
+    # Bake any EXIF orientation into the pixels, then strip the tag.
+    img = ImageOps.exif_transpose(img)
+
+    rotated = img if cw_degrees == 0 else img.rotate(-cw_degrees, expand=True)
 
     out_fmt = (img.format or "JPEG").upper()
     # JPEG can't carry alpha; coerce if PIL gave us RGBA.
     if out_fmt in ("JPEG", "JPG") and rotated.mode in ("RGBA", "P"):
         rotated = rotated.convert("RGB")
 
-    rotated.save(dst, format=out_fmt, **save_kwargs)
+    # Do NOT propagate the original EXIF - we've already baked orientation into
+    # the pixels; passing the old EXIF would cause double-rotation in viewers
+    # that honor the tag.
+    rotated.save(dst, format=out_fmt)
+
+
+def _verb_for(s: dict, args) -> str:
+    """Render the parenthesized status verb for a per-image summary line."""
+    if s.get("applied"):
+        return "applied"
+    if s.get("skipped_reason"):
+        return f"skipped — {s['skipped_reason']}"
+    if s["rotation_cw"] and args.inspect:
+        return "would rotate"
+    if s["rotation_cw"]:
+        return "rotation suggested but not applied"
+    return "no rotation needed"
+
+
+def _print_verbose(s: dict, indent: str = "    ") -> None:
+    """Print the per-candidate Gemini scores plus the chosen reasoning."""
+    if s.get("reasoning"):
+        print(f"{indent}reason: {s['reasoning']}")
+    scores = s.get("scores") or []
+    if scores:
+        # Original order in scores is sorted-best-first; re-sort by cw for the
+        # debug view so it's easy to scan.
+        by_cw = sorted(scores, key=lambda x: x["cw_degrees"])
+        bits = [f"{x['cw_degrees']:>3}°: upright={x['is_upright']} "
+                f"conf={x['confidence']:.2f}" for x in by_cw]
+        print(f"{indent}all candidates: " + " | ".join(bits))
 
 
 def backup_original(sku: Optional[str], src_path: Path, image_id: str) -> Optional[Path]:
@@ -196,7 +312,17 @@ def rotate_one_image(token: str, api_version: str, image_id: str,
         "applied": False,
     }
 
+    min_conf = float(getattr(args, "min_confidence", 0.75) or 0.0)
+    summary["min_confidence"] = min_conf
+
     if args.inspect or cw == 0:
+        return summary
+
+    if conf < min_conf:
+        summary["skipped_reason"] = (
+            f"confidence {conf:.2f} below --min-confidence {min_conf:.2f}; "
+            "re-run with --inspect --verbose to see all four candidate scores"
+        )
         return summary
 
     backup_path = backup_original(sku, src_path, image_id)
@@ -227,6 +353,9 @@ def main():
                         help="Parallel workers for --all-images (default 3, capped at 8)")
     parser.add_argument("--inspect", action="store_true",
                         help="Detect rotation but don't modify Square")
+    parser.add_argument("--min-confidence", type=float, default=0.75,
+                        help="Skip applying rotation when winning candidate's "
+                             "confidence is below this threshold (default 0.75)")
     parser.add_argument("--api-version", default=DEFAULT_API_VERSION)
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
@@ -271,14 +400,12 @@ def main():
                     summaries.append(s)
                     with print_lock:
                         done += 1
-                        verb = "applied" if s["applied"] else (
-                            "would rotate" if (s["rotation_cw"] and args.inspect)
-                            else "no rotation needed")
+                        verb = _verb_for(s, args)
                         print(f"[{done}/{total}] {img_id}: "
-                              f"cw={s['rotation_cw']}° conf={s['confidence']:.2f} "
+                              f"cw={s['rotation_cw']} conf={s['confidence']:.2f} "
                               f"({verb})  detect={s['detect_s']}s")
-                        if args.verbose and s["reasoning"]:
-                            print(f"        reason: {s['reasoning']}")
+                        if args.verbose:
+                            _print_verbose(s, indent="        ")
                 except Exception as e:
                     failures.append({"image_id": img_id, "error": str(e)})
                     with print_lock:
@@ -291,13 +418,11 @@ def main():
                 s = rotate_one_image(token, args.api_version, img_id, sku,
                                      args, tmpdir)
                 summaries.append(s)
-                verb = "applied" if s["applied"] else (
-                    "would rotate" if (s["rotation_cw"] and args.inspect)
-                    else "no rotation needed")
-                print(f"  {img_id}: cw={s['rotation_cw']}° "
+                verb = _verb_for(s, args)
+                print(f"  {img_id}: cw={s['rotation_cw']} "
                       f"conf={s['confidence']:.2f} ({verb})")
-                if args.verbose and s["reasoning"]:
-                    print(f"      reason: {s['reasoning']}")
+                if args.verbose:
+                    _print_verbose(s, indent="      ")
             except Exception as e:
                 failures.append({"image_id": img_id, "error": str(e)})
                 print(f"  {img_id} FAILED: {e}", file=sys.stderr)

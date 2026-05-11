@@ -166,7 +166,7 @@ class RGItemProcessor:
     def _square_headers(self) -> Dict[str, str]:
         """Shared headers for Square API calls."""
         return {
-            'Square-Version': '2025-10-16',
+            'Square-Version': '2026-04-21',
             'Authorization': f'Bearer {self.square_token}',
             'Content-Type': 'application/json'
         }

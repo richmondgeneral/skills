@@ -156,9 +156,11 @@ def detect_rotation_via_gemini(image_path: Path, api_key: str,
     (scores is a list of per-candidate Gemini judgements, useful for debugging).
     """
     base = Image.open(image_path)
+    # Capture source format BEFORE exif_transpose — the transposed copy has
+    # .format = None, so reading it later silently demotes PNG/WebP to JPEG.
+    fmt = (base.format or "JPEG").upper()
     # Handle EXIF orientation tags up-front (saves a 90/180/270 ask).
     base = ImageOps.exif_transpose(base)
-    fmt = (base.format or "JPEG").upper()
     mime = _mime_for(image_path)
 
     def score(cw: int) -> dict:
@@ -222,12 +224,14 @@ def rotate_to_correct(src: Path, dst: Path, cw_degrees: int) -> None:
         raise ValueError(f"cw_degrees must be one of 0/90/180/270, got {cw_degrees}")
 
     img = Image.open(src)
+    # Capture source format BEFORE exif_transpose — the transposed copy has
+    # .format = None, so reading it later silently demotes PNG/WebP to JPEG.
+    out_fmt = (img.format or "JPEG").upper()
     # Bake any EXIF orientation into the pixels, then strip the tag.
     img = ImageOps.exif_transpose(img)
 
     rotated = img if cw_degrees == 0 else img.rotate(-cw_degrees, expand=True)
 
-    out_fmt = (img.format or "JPEG").upper()
     # JPEG can't carry alpha; coerce if PIL gave us RGBA.
     if out_fmt in ("JPEG", "JPG") and rotated.mode in ("RGBA", "P"):
         rotated = rotated.convert("RGB")

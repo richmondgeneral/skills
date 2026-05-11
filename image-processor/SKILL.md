@@ -2,10 +2,39 @@
 name: image-processor
 description: Unified image processing with background removal, generation, editing, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "photos library", "get from photos", or when rg-full-auto needs image processing.
 metadata:
-  version: "1.3"
+  version: "1.4"
   author: scottybe
-  updated: "2026-02-15"
+  updated: "2026-05-11"
   changelog: |
+    v1.4 - Catalog-cleanup CLI, model upgrade, reliability:
+    - Added `clean.py` — catalog-image cleanup driver. One universal prompt
+      produces a clean storefront-ready photo from any source. Replaces the
+      old per-task preset scheme (`remove-price-tag`, `remove-sticker`, etc.).
+    - Prompt sections live in `lib/cleanup_prompts.md` (`base`,
+      `damage-preserve`, `damage-fix`). Cowork-side consumers can read the
+      same file to keep phrasing consistent across providers.
+    - Damage handling: preserved by default for honest provenance/appraisal.
+      `--fix-damage` for restoration. `--both` for the museum preserved+fixed
+      pair. `--remove "freeform"` for one-off custom direction.
+    - Model upgrade: default endpoint bumped to `gemini-3.1-flash-image-preview`
+      (4K output capable, was `gemini-2.5-flash-image` at 1K). `--pro` flag
+      forces `gemini-3-pro-image-preview` for hard cases (~$2.13/call vs
+      ~$0.57/call for Flash). Old preset-detection auto-escalation removed:
+      model choice is now driven only by `GEMINI_IMAGE_MODEL` env, the
+      explicit `quality_hint`, and `num_refs >= 8` (no more prompt-content
+      heuristic — that produced silent 4× cost surprises).
+    - `_post_with_retry()` in `gemini_image.py` — exponential backoff (2s →
+      32s) + jitter on Gemini 429/5xx, honors `Retry-After`. Makes
+      `--all-images` parallel mode survive rate limits.
+    - Pre-Gemini input downscale to ≤ 2048px long edge (configurable via
+      `--max-long-edge`, `--no-downscale` to disable). Gemini downsamples
+      internally anyway; pre-shrinking cuts upload time ~5× on hi-res sources.
+    - Post-Gemini output downscale to ≤ 1800px long edge (configurable via
+      `--max-long-edge-output`). Square storefront displays at most ~1500px,
+      so we trim before upload to save storage + bandwidth.
+    - `router.py` print-to-stderr fix (was polluting stdout JSON output of
+      callers like `refresh_item_image.py`).
+
     v1.3 - Group background-removal workflow:
     - Added `process_group.py` for batch background removal in item folders
     - Added skip logic for QR/label assets and already-transparent images
@@ -60,6 +89,34 @@ python scripts/edit.py --input subject.jpg --instruction "place in scene" --refe
 python scripts/edit.py --input subject.jpg --odd-placement "the dashboard of a spaceship" --output odd-scene.png --quality pro
 ```
 
+### Catalog Cleanup (v1.4 — single universal prompt)
+
+```bash
+# Preserve damage (honest condition photo — default):
+python scripts/clean.py -i photo.jpg -o cleaned.jpg
+
+# Repair damage (restoration look):
+python scripts/clean.py -i photo.jpg -o cleaned.jpg --fix-damage
+
+# Produce both variants for museum before/after pairing:
+python scripts/clean.py -i photo.jpg -o cleaned.jpg --both
+# → cleaned-preserved.jpg + cleaned-fixed.jpg
+
+# Use the heavier Gemini 3 Pro model (~$2.13 vs ~$0.57):
+python scripts/clean.py -i photo.jpg -o cleaned.jpg --pro
+
+# Freeform additional direction layered onto the universal prompt:
+python scripts/clean.py -i photo.jpg -o cleaned.jpg --remove "the dust on the rim"
+
+# Disable pre-Gemini downscale (keep full input resolution):
+python scripts/clean.py -i photo.jpg -o cleaned.jpg --no-downscale
+
+# Disable post-Gemini output downscale (keep Gemini's full output):
+python scripts/clean.py -i photo.jpg -o cleaned.jpg --no-downscale-output
+```
+
+For an end-to-end "fix this item on Square" flow, use [refresh_item_image.py](../square-image-upload/scripts/refresh_item_image.py) in the `square-image-upload` skill — it wraps `clean.py` + Square download/upload in one step.
+
 ### Photos.app Access
 
 ```bash
@@ -101,12 +158,15 @@ Gemini 2.5 Flash (95%, free)
 remove.bg (premium, paid)
 ```
 
-### Generation Model Selection
+### Generation/Edit Model Selection
 
-Auto-selects Nano Banana vs Nano Banana Pro based on:
-- Number of reference images (8+ = Pro)
-- Keywords: "4k", "high quality", "professional"
-- Prompt length and detail
+Auto-selects Flash vs Pro by:
+- `GEMINI_IMAGE_MODEL` env var (explicit override; set by `clean.py --pro`)
+- `quality_hint` task config field (`fast` → Flash, `pro`/`premium` → Pro)
+- Number of reference images (8+ → Pro — legitimate structural complexity signal)
+- Otherwise → Flash
+
+Note: prompt-content scanning was removed in v1.4. Earlier versions escalated to Pro when prompts contained "4k", "high quality", "professional", etc. — that produced surprising 4× cost jumps when callers happened to include those words. Use `--pro` (or set `GEMINI_IMAGE_MODEL`) when you want Pro.
 
 ## CLI Reference
 
@@ -254,12 +314,29 @@ python scripts/process.py /tmp/input.jpg --output /tmp/nobg.png
 
 ## API Keys
 
-Set in `~/.env` (sourced by `~/.zshrc`):
+Resolution order (used by all scripts in this skill, including `clean.py` when
+called via `refresh_item_image.py`):
+
+1. Process env (set by parent process)
+2. **macOS Keychain** — `security find-generic-password -a "$USER" -s GEMINI_API_KEY -w`
+3. Project `.env` at workspace root
+
+The `~/.zshrc` auto-exports `GEMINI_API_KEY` and `NANO_BANANA_API_KEY` from
+Keychain on every interactive shell, so most uses don't need to think about it.
+
+Keys used:
 
 ```bash
-export GEMINI_API_KEY="your-key"        # Gemini 2.5 Flash + image gen/edit
-export NANO_BANANA_API_KEY="your-key"   # Nano Banana Pro (Gemini 3)
-export REMOVE_BG_API_KEY="your-key"     # remove.bg (optional, paid; REMOVEBG_API_KEY also accepted)
+GEMINI_API_KEY        # Gemini 2.5 Flash + 3.1 Flash + 3 Pro (image gen/edit)
+NANO_BANANA_API_KEY   # Alias — same Gemini endpoint, separate var name for back-compat
+REMOVE_BG_API_KEY     # remove.bg (optional, paid; REMOVEBG_API_KEY also accepted)
+```
+
+Set or rotate in Keychain (token never appears in shell history):
+
+```bash
+security add-generic-password -U -a "$USER" -s GEMINI_API_KEY -w '<key>' -A \
+    -j "Richmond General Gemini API key"
 ```
 
 ## Python API
@@ -355,3 +432,20 @@ uv run --project ~/.claude/skills python \
 **Generation timeout:**
 - Try `--quality fast` for quicker results
 - Reduce reference image count
+
+## Running the tests
+
+Unit tests live in the parent `skills/` repo under `testing/unit/`. Relevant files for this skill:
+
+- `test_image_router.py` — model selection logic, fallback chain
+- `test_image_clean_downscale.py` — `clean.py` pre-Gemini downscale
+
+Run them:
+
+```bash
+cd ~/workspace/richmondgeneral/skills
+python3 -m pytest testing/unit/test_image_router.py \
+                  testing/unit/test_image_clean_downscale.py -v
+```
+
+Or run the full skills test suite: `python3 -m pytest testing/unit/ -v`.

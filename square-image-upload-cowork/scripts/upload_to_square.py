@@ -47,7 +47,20 @@ from typing import Optional, Tuple
 # Constants
 # -----------------------------------------------------------------------------
 
-DEFAULT_ENV_PATH = "/Users/scottybe/workspace/richmondgeneral/.env"
+# Discover the workspace .env relative to this script's location, falling back
+# to the historical absolute path so existing operator muscle memory still
+# works. Layout: <workspace>/skills/<skill-name>/scripts/upload_to_square.py
+# → parents[3] is the workspace root.
+_SCRIPT_PATH = Path(__file__).resolve()
+_SCRIPT_RELATIVE_ENV = _SCRIPT_PATH.parents[3] / ".env"
+_LEGACY_ABSOLUTE_ENV = Path("/Users/scottybe/workspace/richmondgeneral/.env")
+DEFAULT_ENV_PATH = str(
+    _SCRIPT_RELATIVE_ENV if _SCRIPT_RELATIVE_ENV.exists()
+    else _LEGACY_ABSOLUTE_ENV
+)
+# Operators can override with --env-file or with the RG_ENV_FILE env var.
+DEFAULT_ENV_PATH = os.environ.get("RG_ENV_FILE", DEFAULT_ENV_PATH)
+
 DEFAULT_SQUARE_VERSION = "2026-04-21"
 SQUARE_BASE = "https://connect.squareup.com"
 TOKEN_KEYS = ("SQUARE_ACCESS_TOKEN", "SQUARE_TOKEN")  # primary, legacy fallback

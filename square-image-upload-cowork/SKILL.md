@@ -9,10 +9,31 @@ Push a product image to Square Catalog from a Cowork session, with optional Clou
 
 **Why this exists separately from the Mac `square-image-upload` skill:** the Mac version assumes `osascript`, the user's `~/.claude/skills` symlink tree, and a Mac-side Python venv. None of those work from Cowork. This skill runs against the Square MCP + Cloudinary MCP + the workspace mount only.
 
+## Intentional subset — capability gap vs. the Mac path
+
+As of 2026-05-11 this skill is a **deliberate subset** of the Mac `square-image-upload` skill. The two paths are not interchangeable. The Mac path has been substantially extended; the Cowork path has not (Cloudinary stays as the cleanup engine here, by design — keeps the sandbox dependency-free, but it can't do the same work).
+
+| Capability | This (Cowork) | Mac `square-image-upload` |
+|---|---|---|
+| Image-cleanup engine | Cloudinary URL transforms (`e_background_removal`, `e_gen_remove`) | Gemini 3.1 Flash / Gemini 3 Pro via `image-processor` skill |
+| Damage preservation toggle | No (Cloudinary doesn't expose it) | Yes — `--fix-damage`, `--both`, museum companion pattern |
+| Auto-source from local hi-res `items/RG-XXXX/original.png` | No (no local repo access guaranteed) | Yes |
+| Parallel multi-image refresh | No | Yes — `--all-images` with thread pool |
+| Pre- / post-Gemini downscale | N/A | Yes (input ≤2048, output ≤1800 long edge) |
+| Rotation pre-pass | No | Yes — `rotate_item_images.py` |
+| Cost guard rail | No | Yes — `--max-cost` pre-flight estimator |
+| `.env` / Keychain auth chain | `.env` only (no Keychain in sandbox) | Keychain → env → `.env` |
+
+**When to use which:**
+- *In a Cowork chat session, want a quick one-off bg-removal or price-tag inpaint* → use this skill.
+- *On Mac, want the full catalog refresh pipeline (preserve damage, museum before/after, multi-image batch)* → use `square-image-upload` + `refresh_item_image.py`.
+
+If you need a Mac-path capability from inside Cowork, the right move is to ask the user to run the equivalent Mac command (via Claude Code on their machine), not to try to replicate the pipeline here.
+
 ## Quick reference
 
 - **Square location:** `B87BAEZ0NWV34` (Richmond General)
-- **Workspace .env:** `/Users/scottybe/workspace/richmondgeneral/.env` — script reads `SQUARE_ACCESS_TOKEN` (or legacy `SQUARE_TOKEN`) from here when the env var isn't already set
+- **Workspace .env:** auto-discovered relative to the script (`<workspace>/skills/.../upload_to_square.py` → `<workspace>/.env`); falls back to `/Users/scottybe/workspace/richmondgeneral/.env` for back-compat. Override with `--env-file` or `RG_ENV_FILE` env var. Reads `SQUARE_ACCESS_TOKEN` (or legacy `SQUARE_TOKEN`)
 - **Square-Version header:** `2026-04-21` (current pinned version)
 - **Upload script:** `scripts/upload_to_square.py` (stdlib-only Python — no `requests` dependency)
 - **Cloudinary:** accessed via the `mcp__09c02195-…__*` MCP tools, not direct API

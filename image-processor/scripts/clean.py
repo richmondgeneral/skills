@@ -74,6 +74,34 @@ def _read_size(path: Path) -> tuple[int, int]:
         return im.size
 
 
+def downscale_output_in_place(path: Path, max_long_edge: int) -> str | None:
+    """Resize `path` in-place if its long edge exceeds `max_long_edge`.
+
+    Returns the new "<w>x<h>" string when a resize happened, or None.
+    Only coerces RGBA/P → RGB for JPEG targets — PNG/WebP keep their alpha,
+    which is the whole point of writing them as PNG/WebP in the first place.
+    """
+    if max_long_edge <= 0:
+        return None
+    with Image.open(path) as im:
+        w, h = im.size
+        if max(w, h) <= max_long_edge:
+            return None
+        scale = max_long_edge / max(w, h)
+        new_w = round(w * scale)
+        new_h = round(h * scale)
+        is_jpeg_target = path.suffix.lower() in (".jpg", ".jpeg")
+        # Alpha-strip is correct for JPEG (no alpha channel) but destroys
+        # transparency on PNG/WebP outputs — that was the silent fidelity bug
+        # this helper was extracted to fix.
+        if is_jpeg_target and im.mode in ("RGBA", "P"):
+            im = im.convert("RGB")
+        resized = im.resize((new_w, new_h), Image.LANCZOS)
+    save_kwargs = {"quality": 95} if is_jpeg_target else {}
+    resized.save(path, **save_kwargs)
+    return f"{new_w}x{new_h}"
+
+
 def load_sections():
     """Parse cleanup_prompts.md into {section_name: body}.
 
@@ -257,20 +285,11 @@ def main():
             written = Path(r['output_path'])
             try:
                 gem_w, gem_h = _read_size(written)
-                if max(gem_w, gem_h) > max_long_edge_output:
-                    # Resize in place; symmetric to the input-side maybe_downscale.
-                    scale = max_long_edge_output / max(gem_w, gem_h)
-                    new_w = round(gem_w * scale)
-                    new_h = round(gem_h * scale)
-                    with Image.open(written) as im:
-                        if im.mode in ('RGBA', 'P'):
-                            im = im.convert('RGB')
-                        resized = im.resize((new_w, new_h), Image.LANCZOS)
-                    save_kwargs = {'quality': 95} if written.suffix.lower() in ('.jpg', '.jpeg') else {}
-                    resized.save(written, **save_kwargs)
-                    r['output_downscaled_to'] = f"{new_w}x{new_h}"
+                new_dims = downscale_output_in_place(written, max_long_edge_output)
+                if new_dims is not None:
+                    r['output_downscaled_to'] = new_dims
                     if args.verbose:
-                        print(f"  output downscaled {gem_w}x{gem_h} → {new_w}x{new_h}",
+                        print(f"  output downscaled {gem_w}x{gem_h} → {new_dims}",
                               file=sys.stderr)
             except Exception as e:
                 # Don't fail the cleanup just because the post-resize hit a snag.

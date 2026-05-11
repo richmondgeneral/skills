@@ -458,6 +458,24 @@ def fetch_source(token: str, api_version: str, image_id: str,
     return sq_path, f"Square ({sq_dim})", img_data
 
 
+_PRESERVE_SOURCE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
+
+
+def cleaned_output_path(tmpdir: Path, sku: Optional[str], image_id: str,
+                        source_path: Path) -> Path:
+    """Build the temp output path for clean.py, preserving the source format.
+
+    clean.py infers output format from the file extension we hand it, so
+    hardcoding `.jpg` here silently re-encodes PNG/WebP sources as lossy JPEG.
+    Pick the source's extension when it's something Square accepts and clean.py
+    handles; fall back to `.jpg` for anything unfamiliar.
+    """
+    src_ext = source_path.suffix.lower()
+    if src_ext not in _PRESERVE_SOURCE_EXTS:
+        src_ext = ".jpg"
+    return tmpdir / f"{sku or 'item'}-{image_id}-cleaned{src_ext}"
+
+
 def refresh_one_image(token: str, api_version: str, item_id: str, image_id: str,
                       sku: Optional[str], args, tmpdir: Path) -> dict:
     """Clean + upload (in-place) for one image_id. Returns summary dict."""
@@ -469,7 +487,7 @@ def refresh_one_image(token: str, api_version: str, item_id: str, image_id: str,
     print(f"  backup : {source_path}")
 
     # Image-id-scoped name prevents parallel-worker collisions; see fetch_source.
-    out_base = tmpdir / f"{sku or 'item'}-{image_id}-cleaned.jpg"
+    out_base = cleaned_output_path(tmpdir, sku, image_id, source_path)
     t0 = time.time()
     result = run_clean(source_path, out_base,
                        fix_damage=args.fix_damage, both=args.both, pro=args.pro,

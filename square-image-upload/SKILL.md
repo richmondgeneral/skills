@@ -68,7 +68,7 @@ If MCP image upload behavior differs across clients, fall back to this skill's s
 
 1. Python 3.7+ with `requests` library
 2. Square access token with `ITEMS_WRITE` permission
-3. Set environment variable: `export SQUARE_ACCESS_TOKEN=your_token`
+3. Square token wired up: Keychain entry `SQUARE_ACCESS_TOKEN` exists (auto-exported by `~/.zshrc`); falls back to project `.env`. See [project root `.env.example`](../../.env.example) for setup.
 
 ### Upload New Image to Item
 

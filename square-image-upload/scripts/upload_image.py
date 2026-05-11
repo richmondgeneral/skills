@@ -38,7 +38,7 @@ except ImportError:
 
 
 SQUARE_API_BASE = "https://connect.squareup.com"
-DEFAULT_API_VERSION = "2025-10-16"
+DEFAULT_API_VERSION = "2026-04-21"
 
 
 def get_mime_type(file_path: str) -> str:

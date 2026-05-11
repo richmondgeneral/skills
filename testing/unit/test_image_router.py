@@ -74,6 +74,18 @@ def test_router_fallback_to_paid_if_needed():
     # Should skip the unhealthy free model and pick the paid one
     assert selected.name == "Paid"
 
+def test_router_returns_none_when_all_unhealthy():
+    # Both models unhealthy — no fallback possible
+    paid_model = MockModel("Paid", [TaskType.REMOVE_BG], quality=0.99, cost='paid', health=False)
+    free_model = MockModel("Free", [TaskType.REMOVE_BG], quality=0.95, cost='free', health=False)
+
+    router = ModelRouter([paid_model, free_model], prefer_free=True)
+
+    config = TaskConfig(TaskType.REMOVE_BG)
+    selected = router.select_model(config)
+
+    assert selected is None
+
 def test_generation_model_selection():
     # Generation request should route to generation-capable model
     gen_model = MockModel("Gen", [TaskType.GENERATE], quality=0.9)

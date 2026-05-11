@@ -45,14 +45,15 @@ class ModelRouter:
         if task_type in (TaskType.GENERATE, TaskType.EDIT):
             return self._select_generation_model(capable, task_config)
 
-        # Filter by cost if prefer_free is set
+        # Prefer free, but fall back to paid if no free model is healthy
         if task_config.prefer_free:
-            free_models = [m for m in capable
-                          if m.get_capabilities()['cost'] == 'free']
-            if free_models:
-                capable = free_models
+            free_healthy = [m for m in capable
+                            if m.get_capabilities()['cost'] == 'free'
+                            and m.health_check()]
+            if free_healthy:
+                return self._score_and_select(free_healthy, task_config)
 
-        # Filter by health check
+        # Filter by health check across all capable models
         healthy = [m for m in capable if m.health_check()]
 
         if not healthy:

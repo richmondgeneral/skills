@@ -23,10 +23,13 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
+
+from PIL import Image  # noqa: E402
 
 from models import TaskConfig  # noqa: E402
 from router import create_default_router  # noqa: E402
@@ -34,6 +37,40 @@ from router import create_default_router  # noqa: E402
 
 PROMPTS_FILE = Path(__file__).resolve().parent.parent / 'lib' / 'cleanup_prompts.md'
 MODEL_PRO = "gemini-3-pro-image-preview"
+DEFAULT_MAX_LONG_EDGE = 2048
+
+
+def maybe_downscale(input_path: Path, max_long_edge: int = DEFAULT_MAX_LONG_EDGE) -> Path:
+    """Downscale source to max_long_edge if larger; return new (or original) path.
+
+    Gemini downsamples to ~2048px internally anyway, so pre-shrinking trims
+    upload time and input tokens without changing output quality. A value of
+    0 disables downscaling entirely.
+    """
+    if max_long_edge <= 0:
+        return input_path
+    with Image.open(input_path) as im:
+        w, h = im.size
+        if max(w, h) <= max_long_edge:
+            return input_path
+        scale = max_long_edge / max(w, h)
+        new_w = round(w * scale)
+        new_h = round(h * scale)
+        resized = im.resize((new_w, new_h), Image.LANCZOS)
+        ext = input_path.suffix or '.png'
+        tmp = Path(tempfile.gettempdir()) / f"{input_path.stem}-ds{max_long_edge}{ext}"
+        save_kwargs = {}
+        if ext.lower() in ('.jpg', '.jpeg'):
+            save_kwargs['quality'] = 95
+            if resized.mode in ('RGBA', 'P'):
+                resized = resized.convert('RGB')
+        resized.save(tmp, **save_kwargs)
+        return tmp
+
+
+def _read_size(path: Path) -> tuple[int, int]:
+    with Image.open(path) as im:
+        return im.size
 
 
 def load_sections():
@@ -134,6 +171,14 @@ def main():
                         help='Freeform additional direction appended to the prompt')
     parser.add_argument('--quality', '-q', default='auto',
                         choices=['auto', 'fast', 'pro'])
+    parser.add_argument('--max-long-edge', type=int, default=DEFAULT_MAX_LONG_EDGE,
+                        metavar='N',
+                        help=f'Downscale input so long edge ≤ N before sending to Gemini '
+                             f'(default: {DEFAULT_MAX_LONG_EDGE}; 0 disables). Gemini downsamples '
+                             f'to ~2048 internally, so pre-shrinking cuts upload time without '
+                             f'affecting output quality.')
+    parser.add_argument('--no-downscale', action='store_true',
+                        help='Alias for --max-long-edge 0')
     parser.add_argument('--json', action='store_true', help='Emit JSON result')
     parser.add_argument('--verbose', '-v', action='store_true')
     args = parser.parse_args()
@@ -149,6 +194,19 @@ def main():
     if args.pro:
         os.environ['GEMINI_IMAGE_MODEL'] = MODEL_PRO
 
+    max_long_edge = 0 if args.no_downscale else args.max_long_edge
+    source_path = Path(args.input)
+    orig_w, orig_h = _read_size(source_path)
+    effective_input = maybe_downscale(source_path, max_long_edge=max_long_edge)
+    if effective_input != source_path:
+        ds_w, ds_h = _read_size(effective_input)
+        downscaled_to = f"{ds_w}x{ds_h}"
+        pct = round((ds_w * ds_h - orig_w * orig_h) / (orig_w * orig_h) * 100)
+    else:
+        ds_w = ds_h = None
+        downscaled_to = None
+        pct = 0
+
     output_path = Path(args.output)
     runs = []
 
@@ -162,6 +220,13 @@ def main():
 
     if args.verbose:
         print(f"Input: {args.input}", file=sys.stderr)
+        if downscaled_to:
+            print(f"Scale: downscaled {orig_w}x{orig_h} → {ds_w}x{ds_h} ({pct}%)",
+                  file=sys.stderr)
+        elif max_long_edge > 0:
+            print(f"Scale: source ≤ {max_long_edge}px, no downscale", file=sys.stderr)
+        else:
+            print("Scale: downscaling disabled", file=sys.stderr)
         print(f"Mode:  {'both' if args.both else ('fix-damage' if args.fix_damage else 'preserve-damage')}",
               file=sys.stderr)
         print(f"Model: {'pro (gemini-3-pro-image-preview)' if args.pro else 'flash (gemini-3.1-flash-image-preview)'}",
@@ -174,8 +239,9 @@ def main():
         instruction = build_prompt(sections, fix_damage=fix, extra=args.extra or "")
         if args.verbose:
             print(f"\n[{tag}] processing...", file=sys.stderr)
-        r = run_one(Path(args.input), out_path, instruction, args.quality, args.verbose)
+        r = run_one(effective_input, out_path, instruction, args.quality, args.verbose)
         r['variant'] = tag
+        r['downscaled_to'] = downscaled_to
         results.append(r)
         if not r['success']:
             break  # don't run --both's second pass if first failed

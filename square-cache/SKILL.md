@@ -92,7 +92,7 @@ See MCP server setup: `~/workspace/square/square-tools/mcp-server/README.md`
 
 1. MongoDB running: `brew services start mongodb-community@8.0`
 2. Python 3.7+ with pymongo, requests
-3. Set environment variable: `export SQUARE_ACCESS_TOKEN=your_token` (or legacy `SQUARE_TOKEN`)
+3. Square token wired up: Keychain entry `SQUARE_ACCESS_TOKEN` exists (auto-exported by `~/.zshrc`); falls back to project `.env`. See [project root `.env.example`](../../.env.example) for setup.
 4. Initial sync: `~/workspace/square/square-tools/bin/square_cache.sh sync`
 5. (Optional) Configure MCP server for Warp Agent Mode
 
@@ -415,7 +415,7 @@ mongosh square_cache --eval "db.sync_log.find({error: {\$exists: true}}).sort({t
 echo $SQUARE_ACCESS_TOKEN
 
 # Test Square API connectivity
-curl -H "Square-Version: 2024-09-18" \
+curl -H "Square-Version: 2026-04-21" \
      -H "Authorization: Bearer $SQUARE_ACCESS_TOKEN" \
      "https://connect.squareup.com/v2/catalog/list?types=ITEM&limit=1"
 ```
@@ -440,18 +440,26 @@ If cache doesn't match Square dashboard:
 
 ## Environment Variables
 
+`SQUARE_ACCESS_TOKEN` (and legacy alias `SQUARE_TOKEN`) are resolved automatically:
+1. Shell env — `~/.zshrc` exports both from macOS Keychain entry `SQUARE_ACCESS_TOKEN` (account `$USER`).
+2. Project `.env` at the repo root — fallback for launchd/cron/scripts that don't inherit shell env.
+
+Other knobs (read by `square-tools/config.sh` and the cache scripts):
+
 ```bash
-# Required
-export SQUARE_ACCESS_TOKEN="your_square_access_token"
-
-# Optional legacy alias
-export SQUARE_TOKEN="$SQUARE_ACCESS_TOKEN"
-
-# Optional (defaults in square-tools/config.sh)
-export SQUARE_ENVIRONMENT="production"  # or 'sandbox'
+# Defaults; override per-shell if you need a different setup
+export SQUARE_ENVIRONMENT="production"   # or 'sandbox' — also in project .env
 export MONGO_URI="mongodb://localhost:27017/"
 export MONGO_DATABASE="square_cache"
-export SQUARE_LOG_LEVEL="INFO"
+export SQUARE_LOG_LEVEL="INFO"           # also in project .env
+```
+
+To rotate the token:
+
+```bash
+security add-generic-password -U -a "$USER" -s SQUARE_ACCESS_TOKEN -w '<new-token>' -A \
+    -j "Richmond General Square API production token"
+# then update project .env to mirror the new value
 ```
 
 ## Performance Tips

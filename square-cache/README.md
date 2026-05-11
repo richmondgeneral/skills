@@ -5,8 +5,8 @@ Claude beta skill for accessing MongoDB-cached Square catalog with comprehensive
 ## Quick Start
 
 ```bash
-# Token
-export SQUARE_ACCESS_TOKEN=your_token
+# Token is auto-exported by ~/.zshrc from macOS Keychain.
+# (Fallback: project .env. See ../../.env.example for setup.)
 
 # Check cache status
 ~/workspace/square/square-tools/bin/square_cache.sh status

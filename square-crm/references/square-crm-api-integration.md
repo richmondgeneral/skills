@@ -4,7 +4,7 @@ This document outlines API integration patterns specific to the square-crm skill
 
 ## API Version
 
-**Target Version**: 2025-10-16  
+**Target Version**: 2026-04-21  
 **Minimum Version**: 2025-01-23 (due to deprecated Customer.cards field)
 
 ## Required Permissions (OAuth Scopes)
@@ -228,7 +228,7 @@ POST /v2/customers HTTP/1.1
 Host: connect.squareup.com
 Authorization: Bearer {ACCESS_TOKEN}
 Content-Type: application/json
-Square-Version: 2025-10-16
+Square-Version: 2026-04-21
 Idempotency-Key: {UNIQUE_KEY}
 
 {...request body...}

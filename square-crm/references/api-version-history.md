@@ -1,22 +1,32 @@
 # Square API Version History
 
-**Current Tracking**: December 19, 2025
+**Current Tracking**: May 11, 2026
 
-## Latest Version: 2025-10-16
+## Latest Version: 2026-04-21
 
-Released October 16, 2025
+Released April 21, 2026
 
 **Key Updates:**
-- Channels API updates
-- Transfer Orders API updates
+- Reporting API
 
-**SDK Support:**
-- Java SDK: Latest
-- Node.js SDK: 2025-08-20 (see note below)
-- Python SDK: Latest
-- PHP SDK: 43.2.0.20251016
+**SDK Support:** check the per-SDK release pages below (SDK versions move on
+their own cadence; see "SDK Version Lag" at the bottom).
 
 ## Recent Versions
+
+### 2026-01-22
+- Bank Accounts API updates
+- Catalog API updates
+- Mobile Authorization API updates
+- Reader SDK updates
+- OAuth API updates
+- Orders API updates
+- Payments API updates
+- Terminal API updates
+
+### 2025-10-16
+- Channels API updates
+- Transfer Orders API updates
 
 ### 2025-09-24
 - New DeviceType enum (HANDHELD) for Square Handheld
@@ -111,7 +121,7 @@ Square typically releases new SDK versions monthly alongside API versions, but S
 
 To override the version for a specific request, include the `Square-Version` header:
 ```
-Square-Version: 2025-10-16
+Square-Version: 2026-04-21
 ```
 
 ## Migration Guidance
@@ -126,4 +136,9 @@ When upgrading to a new API version:
 
 ## Note: SDK Version Lag
 
-The Node.js SDK currently supports 2025-08-20 while the latest API version is 2025-10-16. This is normal—SDKs are released on their own schedule. The SDK still provides full access to APIs; you can override the API version using the `Square-Version` header.
+SDKs are released on their own schedule and can lag behind the latest API
+version (as of December 2025, the Node.js SDK supported 2025-08-20 while the
+API was at 2025-10-16). This is normal — check the SDK release pages above
+for current state. The SDK still provides full access to APIs regardless;
+you can override the API version using the `Square-Version` header on each
+request.

@@ -665,7 +665,7 @@ cat ~/.claude/skills/square-crm/working/conflict_review_*.md
 ## Key Contacts
 
 - **Square Dashboard**: https://dashboard.squareup.com
-- **Square API Docs**: https://developer.squareup.com/reference/square/v2025-10-16
+- **Square API Docs**: https://developer.squareup.com/reference/square/v2026-04-21
 - **contacts.md**: `~/.claude/skills/contacts-manager/references/contacts.md`
 - **Sync working directory**: `~/.claude/skills/square-crm/working/`
 

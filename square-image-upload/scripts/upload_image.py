@@ -20,7 +20,7 @@ Usage:
 
 Environment:
     SQUARE_ACCESS_TOKEN - Required. Your Square API access token.
-    SQUARE_API_VERSION - Optional. Defaults to 2025-10-16
+    SQUARE_API_VERSION - Optional. Defaults to 2026-04-21
 """
 
 import argparse

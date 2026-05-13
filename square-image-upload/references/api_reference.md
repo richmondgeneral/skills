@@ -132,7 +132,7 @@ The order of `image_ids` determines display order; first ID is the primary image
 
 All requests require:
 - `Authorization: Bearer {ACCESS_TOKEN}`
-- `Square-Version: 2025-10-16` (or current version)
+- `Square-Version: 2026-04-21` (or current version — see project `.env` / SKILL.md changelog)
 
 ## Error Handling
 

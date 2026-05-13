@@ -1,7 +1,7 @@
 # Square API Foundational Documentation
 
-**Latest API Version**: 2025-10-16  
-**Documentation Last Updated**: December 19, 2025  
+**Latest API Version**: 2026-04-21  
+**Documentation Last Updated**: May 11, 2026  
 **Source**: https://developer.squareup.com
 
 ## API Overview
@@ -21,7 +21,7 @@
 ### Version Headers
 All API requests must include the Square-Version header:
 ```
-Square-Version: 2025-10-16
+Square-Version: 2026-04-21
 ```
 
 ## Authentication
@@ -76,7 +76,7 @@ Authorization: Bearer {ACCESS_TOKEN}
 ```
 Content-Type: application/json
 Authorization: Bearer {ACCESS_TOKEN}
-Square-Version: 2025-10-16
+Square-Version: 2026-04-21
 ```
 
 ### Idempotency
@@ -134,7 +134,7 @@ For POST operations that create resources, include an `idempotency_key`:
 ```bash
 curl https://connect.squareup.com/v2/customers \
   -X POST \
-  -H 'Square-Version: 2025-10-16' \
+  -H 'Square-Version: 2026-04-21' \
   -H 'Authorization: Bearer ACCESS_TOKEN' \
   -H 'Content-Type: application/json' \
   -d '{

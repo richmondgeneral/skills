@@ -84,7 +84,7 @@ If MCP image upload behavior differs across clients, fall back to this skill's s
 
 ### Prerequisites
 
-1. Python 3.7+ with `requests`, `Pillow` (PIL) — Pillow is used by `rotate_item_images.py`
+1. [`uv`](https://docs.astral.sh/uv/) — manages Python runtime and dependencies (`requests`, `Pillow`) automatically
 2. Square access token with `ITEMS_WRITE` permission
 3. Square token wired up: Keychain entry `SQUARE_ACCESS_TOKEN` exists (auto-exported by `~/.zshrc`); falls back to project `.env`. See [project root `.env.example`](../../.env.example) for setup.
 4. For `refresh_item_image.py`: also `GEMINI_API_KEY` (same Keychain → env → `.env` resolution chain) since it shells out to `clean.py`.
@@ -95,32 +95,32 @@ If MCP image upload behavior differs across clients, fall back to this skill's s
 
 ```bash
 # Just look at what's currently attached, no modifications:
-python3 scripts/refresh_item_image.py --item-id TJSHQTHOKYUDORWURROAQCNZ --inspect
+uv run --with requests scripts/refresh_item_image.py --item-id TJSHQTHOKYUDORWURROAQCNZ --inspect
 
 # Resolve by title fragment (errors if it matches >1 item):
-python3 scripts/refresh_item_image.py --title "Lionel Pennsylvania GG-1"
+uv run --with requests scripts/refresh_item_image.py --title "Lionel Pennsylvania GG-1"
 
 # Damage-preservation default (honest condition photo, single image):
-python3 scripts/refresh_item_image.py --item-id <ID>
+uv run --with requests scripts/refresh_item_image.py --item-id <ID>
 
 # Damage-fix mode (restoration look for items where condition is incidental):
-python3 scripts/refresh_item_image.py --item-id <ID> --fix-damage
+uv run --with requests scripts/refresh_item_image.py --item-id <ID> --fix-damage
 
 # Museum companion: produce both variants. Preserved → Square primary;
 # fixed → items/RG-XXXX/restored.jpg (for the GitHub Pages before/after view).
-python3 scripts/refresh_item_image.py --item-id <ID> --both
+uv run --with requests scripts/refresh_item_image.py --item-id <ID> --both
 
 # Process every attached image, with parallelism (default 3 workers, cap 8):
-python3 scripts/refresh_item_image.py --item-id <ID> --all-images --concurrency 4
+uv run --with requests scripts/refresh_item_image.py --item-id <ID> --all-images --concurrency 4
 
 # Budget guard — abort pre-flight if estimated cost exceeds the cap:
-python3 scripts/refresh_item_image.py --item-id <ID> --all-images --max-cost 5.00
+uv run --with requests scripts/refresh_item_image.py --item-id <ID> --all-images --max-cost 5.00
 
 # Use the higher-quality Gemini 3 Pro model (~$2.13/call vs ~$0.57/call):
-python3 scripts/refresh_item_image.py --item-id <ID> --pro
+uv run --with requests scripts/refresh_item_image.py --item-id <ID> --pro
 
 # Freeform extra direction layered on the universal prompt:
-python3 scripts/refresh_item_image.py --item-id <ID> --remove "the dust on the rim"
+uv run --with requests scripts/refresh_item_image.py --item-id <ID> --remove "the dust on the rim"
 ```
 
 `--both` and `--all-images` are **mutually exclusive** (multiplies cost without
@@ -133,19 +133,19 @@ Run before `refresh_item_image.py` to cheaply fix orientation (no AI cleanup cos
 
 ```bash
 # Auto-detect rotation for an item's primary image:
-python3 scripts/rotate_item_images.py --item-id <ID>
+uv run --with requests,Pillow scripts/rotate_item_images.py --item-id <ID>
 
 # All images on the item:
-python3 scripts/rotate_item_images.py --item-id <ID> --all-images
+uv run --with requests,Pillow scripts/rotate_item_images.py --item-id <ID> --all-images
 
 # Dry-run — show what would rotate without modifying Square:
-python3 scripts/rotate_item_images.py --item-id <ID> --dry-run
+uv run --with requests,Pillow scripts/rotate_item_images.py --item-id <ID> --dry-run
 ```
 
 ### Upload New Image to Item
 
 ```bash
-python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
+uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/scripts/upload_image.py \
   --image /path/to/photo.jpg \
   --item-id CATALOG_ITEM_ID \
   --name "Product Photo" \
@@ -155,7 +155,7 @@ python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
 ### Replace Existing Image
 
 ```bash
-python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
+uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/scripts/upload_image.py \
   --image /path/to/new_photo.jpg \
   --image-id EXISTING_IMAGE_ID
 ```
@@ -163,7 +163,7 @@ python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
 ### Upload to Item Variation
 
 ```bash
-python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
+uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/scripts/upload_image.py \
   --image /path/to/photo.jpg \
   --variation-id VARIATION_ID
 ```
@@ -171,8 +171,8 @@ python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
 ### Bulk Upload All Item Photos (Hero + Details)
 
 ```bash
-python3 ~/.claude/skills/square-image-upload/scripts/upload_batch.py \
-  --directory /Users/scottybe/workspace/square/items/RG-0015 \
+uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/scripts/upload_batch.py \
+  --directory /Users/scottybe/workspace/square/items/RG-XXXX \
   --item-id CATALOG_ITEM_ID \
   --include \"*.png\" --include \"*.jpg\" --include \"*.jpeg\" \
   --json
@@ -181,7 +181,7 @@ python3 ~/.claude/skills/square-image-upload/scripts/upload_batch.py \
 ### Bulk Upload via Manifest CSV
 
 ```bash
-python3 ~/.claude/skills/square-image-upload/scripts/upload_batch.py \
+uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/scripts/upload_batch.py \
   --manifest /path/to/upload-manifest.csv \
   --json
 ```
@@ -246,7 +246,7 @@ In Phase 2, after background removal:
 
 ```bash
 # Via osascript (runs on Mac with env vars)
-do shell script "source ~/.env && python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
+do shell script "source ~/.env && uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/scripts/upload_image.py \
   --image /Users/scottybe/workspace/square/items/RG-XXXX/hero.png \
   --item-id CATALOG_ITEM_ID \
   --name 'RG-XXXX Hero' \
@@ -285,7 +285,7 @@ JPEG, PNG, GIF, WebP, BMP, TIFF (max 15MB)
 
 **413 Too Large**: Image exceeds 15MB limit - compress before upload
 
-**requests not found**: Install with `pip install requests`
+**requests not found**: If running outside of `uv run --with requests`, install manually with `pip install requests`
 
 ## Running the tests
 
@@ -299,9 +299,9 @@ Run them:
 
 ```bash
 cd ~/workspace/richmondgeneral/skills
-python3 -m pytest testing/unit/test_refresh_item_image_parallel.py \
+uv run --with requests,Pillow,pytest -m pytest testing/unit/test_refresh_item_image_parallel.py \
                   testing/unit/test_rotate_item_images.py \
                   testing/unit/test_square_upload_batch.py -v
 ```
 
-Or run the full skills test suite: `python3 -m pytest testing/unit/ -v`.
+Or run the full skills test suite: `uv run --with requests,Pillow,pytest -m pytest testing/unit/ -v`.

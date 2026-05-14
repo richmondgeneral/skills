@@ -29,6 +29,19 @@ Complete 10-phase workflow for onboarding new vintage/antique items from acquisi
 
 **Two environments:** Claude's container (text files via Filesystem tools) and User's Mac (binary operations via osascript). Use osascript for all file operations on user's Mac to avoid path case sensitivity issues.
 
+## v6.0 Infrastructure (dormant in v3.7 behavior)
+
+PR #1 of the v6.0 ship landed three new modules. **None are active in the default flow** — v3.7 interactive behavior is unchanged. They exist so PR #2 can wire them up:
+
+| Module | Purpose |
+|---|---|
+| `scripts/item_state.py` | Per-item state machine. Will persist `.state.json` in each item folder once PR #2 activates it. |
+| `scripts/onboarding_queue.py` | Centralized queue dashboard. Will write `ops/inventory/onboarding-queue.json` once activated. |
+| `scripts/audit_log.py` | Append-only JSONL writer for `decisions.jsonl`, `corrections.jsonl`, `review_log.jsonl`. Used by v6.0's "agent decides, user reviews" autonomy flow. |
+
+Design: `docs/plans/2026-05-13-v6-super-full-auto-design.md`
+v5.0 portability (deferred): `docs/plans/2026-05-13-v5-portability-deferred.md`
+
 ## Quick Reference
 
 | Key | Value |

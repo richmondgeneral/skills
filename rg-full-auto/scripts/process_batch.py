@@ -60,6 +60,16 @@ Anything else (missing keys, or an unhandled exception) marks the phase FAILED.
 """
 
 
+def _check_sku_in_square_cache(sku: str) -> Optional[str]:
+    """Module-level helper so tests can monkeypatch easily.
+
+    Returns the existing Square item_id if the SKU exists, else None.
+    Default implementation is a placeholder — for v6.0 PR #3, it always
+    returns None ('not in cache'). The real implementation will use the
+    square-cache MCP server in v6.1."""
+    return None
+
+
 def _default_next_sku(items_dir: str) -> str:
     """Allocate the next RG-XXXX SKU by scanning the items dir."""
     max_n = 0
@@ -256,6 +266,9 @@ class BatchOrchestrator:
         """
         handlers: Dict[str, Callable[[ItemState, str], Dict[str, Any]]] = {
             "phase_0": self._phase_0_image,
+            "phase_1": self._phase_1_appraisal,
+            "phase_2": self._phase_2_catalog,
+            "phase_3": self._phase_3_inventory,
         }
         if phase in handlers:
             return handlers[phase](state, item_dir)
@@ -321,6 +334,67 @@ class BatchOrchestrator:
             rationale="Default remove.bg path; preserves transparency.",
         )
         return {"outputs": {"hero_path": hero_path}}
+
+    def _phase_1_appraisal(self, state: ItemState, item_dir: str) -> Dict[str, Any]:
+        """Phase 1: Appraisal & Research.
+
+        Claude (the calling agent) analyzes the image visually and populates
+        state.phases['phase_1'].outputs with title/era/condition/price/shippable
+        BEFORE this method runs. We just capture them in the audit log."""
+        outputs = state.phases["phase_1"].outputs
+        for field_name, decision_type in [
+            ("price", "price"),
+            ("condition", "condition"),
+            ("shippable", "shipping_eligible"),
+        ]:
+            if field_name in outputs:
+                state.log_decision(
+                    phase="phase_1",
+                    decision_type=decision_type,
+                    choice=outputs[field_name],
+                    rationale=outputs.get(f"{field_name}_rationale", ""),
+                )
+        return {"outputs": outputs}
+
+    def _phase_2_catalog(self, state: ItemState, item_dir: str) -> Dict[str, Any]:
+        """Phase 2: Square catalog pre-create.
+
+        Verifies the SKU isn't already in Square. Logs the catalog plan.
+        The actual Square create call happens via Claude using the Square MCP
+        (preserves v3.7 behavior). This method just gates and records."""
+        existing = _check_sku_in_square_cache(state.sku)
+        if existing:
+            return {
+                "blocked": True,
+                "question": PendingQuestion(
+                    question_id=f"q-phase_2-{state.sku}-collision",
+                    phase="phase_2",
+                    question=f"{state.sku} already exists in Square catalog. Overwrite?",
+                    context=f"Existing item_id: {existing}",
+                    options=["overwrite", "skip", "renumber"],
+                ),
+            }
+        state.log_decision(
+            phase="phase_2",
+            decision_type="catalog_plan",
+            choice={
+                "sku": state.sku,
+                "title": state.phases["phase_1"].outputs.get("title"),
+                "price": state.phases["phase_1"].outputs.get("price"),
+            },
+            rationale="Pre-create plan captured before MCP create call.",
+        )
+        return {"outputs": {"ready_for_create": True}}
+
+    def _phase_3_inventory(self, state: ItemState, item_dir: str) -> Dict[str, Any]:
+        """Phase 3: Inventory — set to 1 (default unique-item quantity)."""
+        state.log_decision(
+            phase="phase_3",
+            decision_type="inventory",
+            choice=1,
+            rationale="Default unique-item quantity.",
+        )
+        return {"outputs": {"quantity": 1}}
 
     # ── Output ──
 

@@ -273,3 +273,85 @@ def test_phase_0_blocks_when_remove_background_unavailable(tmp_path, monkeypatch
                                 queue_path=str(tmp_path / "q.json"))
     result = orch._phase_0_image(state, str(items_dir / sku))
     assert result.get("blocked") is True
+
+
+def test_phase_1_records_appraisal_decisions(tmp_path):
+    """phase_1 records the appraisal decisions (price, condition, shippable) as audit entries."""
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    (items_dir / "RG-9999").mkdir()
+    state = ItemState(sku="RG-9999", items_dir=str(items_dir))
+    state.start_phase("phase_0"); state.complete_phase("phase_0", outputs={"hero_path": "/x"})
+    state.start_phase("phase_1")
+    # The caller (Claude) passes appraisal data via state.phases["phase_1"].outputs
+    state.phases["phase_1"].outputs.update({
+        "title": "1979 Manual",
+        "era": "1979",
+        "condition": "Very Good",
+        "price": 18.50,
+        "shippable": True,
+    })
+
+    import process_batch as pb
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_1_appraisal(state, str(items_dir / "RG-9999"))
+    assert "outputs" in result
+    assert len(state.decisions) >= 3  # price, condition, shippable at minimum
+    types = {d["type"] for d in state.decisions}
+    assert "price" in types
+    assert "condition" in types
+
+
+def test_phase_2_logs_catalog_plan_when_sku_free(tmp_path, monkeypatch):
+    """phase_2 verifies the SKU isn't already in Square, then logs the catalog plan."""
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    (items_dir / "RG-9999").mkdir()
+    state = ItemState(sku="RG-9999", items_dir=str(items_dir))
+    state.phases["phase_1"].outputs.update({"title": "T", "price": 10.0})
+
+    import process_batch as pb
+    # Monkeypatch the cache lookup helper
+    monkeypatch.setattr(pb, "_check_sku_in_square_cache", lambda sku: None)
+
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_2_catalog(state, str(items_dir / "RG-9999"))
+    assert "outputs" in result
+    assert result["outputs"].get("ready_for_create") is True
+    # Should have logged the catalog plan
+    plan_types = {d["type"] for d in state.decisions}
+    assert "catalog_plan" in plan_types
+
+
+def test_phase_2_blocks_on_sku_collision(tmp_path, monkeypatch):
+    """If the SKU already exists in Square cache, phase_2 returns blocked."""
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    (items_dir / "RG-9999").mkdir()
+    state = ItemState(sku="RG-9999", items_dir=str(items_dir))
+
+    import process_batch as pb
+    monkeypatch.setattr(pb, "_check_sku_in_square_cache", lambda sku: "EXISTING_ITEM_ID")
+
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_2_catalog(state, str(items_dir / "RG-9999"))
+    assert result.get("blocked") is True
+    assert isinstance(result.get("question"), PendingQuestion)
+    assert "RG-9999" in result["question"].question
+    # Question should offer overwrite/skip/renumber options
+    assert "overwrite" in result["question"].options
+
+
+def test_phase_3_records_inventory_decision(tmp_path):
+    """phase_3 logs an inventory=1 decision and returns ready."""
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    (items_dir / "RG-9999").mkdir()
+    state = ItemState(sku="RG-9999", items_dir=str(items_dir))
+
+    import process_batch as pb
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_3_inventory(state, str(items_dir / "RG-9999"))
+    assert result["outputs"]["quantity"] == 1
+    types = {d["type"] for d in state.decisions}
+    assert "inventory" in types

@@ -92,12 +92,16 @@ class AuditLog:
         decision_type: str,
         agent_choice: Any,
         corrected_to: Any,
-        correction_source: str,        # "manual" | "auto-diff"
+        correction_source: str,
         reason: str,
         reviewer: str,
-    ) -> None:
+        correction_id: Optional[str] = None,
+    ) -> str:
+        """Append one correction; returns the correction_id."""
+        correction_id = correction_id or f"cor-{uuid.uuid4().hex[:8]}"
         record = {
             "ts": self._now(),
+            "correction_id": correction_id,
             "sku": sku,
             "decision_id": decision_id,
             "decision_type": decision_type,
@@ -108,6 +112,7 @@ class AuditLog:
             "reviewer": reviewer,
         }
         self._append(self.corrections_path, record)
+        return correction_id
 
     def log_review_event(
         self,
@@ -129,3 +134,25 @@ class AuditLog:
         if outcome is not None:
             record["outcome"] = outcome
         self._append(self.review_log_path, record)
+
+    def iter_records(self, stream: str):
+        """Iterate records from one of the three streams, lazily.
+
+        stream ∈ {"decisions", "corrections", "review_log"}.
+        Returns an empty iterator if the stream file doesn't exist yet."""
+        paths = {
+            "decisions": self.decisions_path,
+            "corrections": self.corrections_path,
+            "review_log": self.review_log_path,
+        }
+        if stream not in paths:
+            raise ValueError(f"Unknown stream: {stream}. Use one of {list(paths)}")
+        path = paths[stream]
+        if not path.exists():
+            return
+        with path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                yield json.loads(line)

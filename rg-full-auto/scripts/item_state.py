@@ -58,3 +58,85 @@ class PhaseData:
         d = dict(d)
         d["status"] = PhaseStatus(d.get("status", "pending"))
         return cls(**d)
+
+
+# Canonical 10-phase sequence. Phase numbers align with SKILL.md §Phase 0..9.
+PHASES = [f"phase_{i}" for i in range(10)]
+
+
+@dataclass
+class ItemState:
+    """Per-item state container; persists to <items_dir>/<sku>/.state.json."""
+    sku: str
+    items_dir: str = "/Users/scottybe/workspace/square/items"
+    status: ItemStatus = ItemStatus.QUEUED
+    source_image: Optional[str] = None
+    created_at: str = ""
+    updated_at: str = ""
+    created_in: str = "mac_cli"   # mac_cli | linux_cli | cowork | cloud
+    phases: Dict[str, PhaseData] = field(default_factory=dict)
+    decisions: List[Dict[str, Any]] = field(default_factory=list)
+    questions: List[Dict[str, Any]] = field(default_factory=list)
+    review: Dict[str, Any] = field(default_factory=lambda: {
+        "agent_finished_at": None,
+        "human_reviewed_at": None,
+        "elapsed_review_s": None,
+        "outcome": None,
+    })
+
+    def __post_init__(self):
+        if not self.phases:
+            self.phases = {p: PhaseData() for p in PHASES}
+        now = datetime.now(timezone.utc).isoformat()
+        if not self.created_at:
+            self.created_at = now
+        self.updated_at = now
+
+    @property
+    def state_file(self) -> Path:
+        return Path(self.items_dir) / self.sku / ".state.json"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "sku": self.sku,
+            "status": self.status.value,
+            "source_image": self.source_image,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "created_in": self.created_in,
+            "phases": {k: v.to_dict() for k, v in self.phases.items()},
+            "decisions": self.decisions,
+            "questions": self.questions,
+            "review": self.review,
+        }
+
+    def save(self) -> None:
+        """Write .state.json. Parent dir must exist."""
+        self.updated_at = datetime.now(timezone.utc).isoformat()
+        self.state_file.write_text(
+            json.dumps(self.to_dict(), indent=2),
+            encoding="utf-8",
+        )
+
+    @classmethod
+    def load(cls, sku: str, items_dir: str = "/Users/scottybe/workspace/square/items") -> Optional["ItemState"]:
+        """Load .state.json from disk. Returns None if no state file
+        (legacy item that predates v6.0)."""
+        path = Path(items_dir) / sku / ".state.json"
+        if not path.exists():
+            return None
+        d = json.loads(path.read_text(encoding="utf-8"))
+        phases = {k: PhaseData.from_dict(v) for k, v in d.get("phases", {}).items()}
+        return cls(
+            sku=d["sku"],
+            items_dir=items_dir,
+            status=ItemStatus(d.get("status", "queued")),
+            source_image=d.get("source_image"),
+            created_at=d.get("created_at", ""),
+            updated_at=d.get("updated_at", ""),
+            created_in=d.get("created_in", "mac_cli"),
+            phases=phases,
+            decisions=d.get("decisions", []),
+            questions=d.get("questions", []),
+            review=d.get("review", {}),
+        )

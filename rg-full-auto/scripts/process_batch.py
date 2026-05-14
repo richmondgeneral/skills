@@ -42,6 +42,16 @@ from onboarding_queue import DEFAULT_QUEUE_PATH, OnboardingQueue, QueueEntry
 DEFAULT_ITEMS_DIR = "/Users/scottybe/workspace/square/items"
 
 PhaseRunner = Callable[[ItemState, str, str], Dict[str, Any]]
+"""Phase runner contract. The callable returns exactly one of these shapes:
+
+    {"outputs": {...}}                                    — phase completed
+    {"blocked": True, "question": PendingQuestion}        — phase parked
+    {"blocked": True, "question_text": "..."}             — phase parked (shorthand)
+    {"skipped": True, "reason": "..."}                    — phase intentionally skipped
+
+Precedence on conflict: blocked > skipped > completed.
+Anything else (missing keys, or an unhandled exception) marks the phase FAILED.
+"""
 
 
 def _default_next_sku(items_dir: str) -> str:
@@ -69,7 +79,6 @@ class BatchOrchestrator:
         audit_log: Optional[AuditLog] = None,
     ):
         self.items_dir = Path(items_dir)
-        self.items_dir.mkdir(parents=True, exist_ok=True)
         self.queue_path = queue_path
         self.queue = OnboardingQueue(queue_path=queue_path)
         self.phase_runner: PhaseRunner = phase_runner or self._default_phase_runner
@@ -91,6 +100,9 @@ class BatchOrchestrator:
                 continue
             sku = self.next_sku()
             item_dir = self.items_dir / sku
+            if (item_dir / ".state.json").exists():
+                print(f"  [SKIP] {sku}: state file already exists, refusing to clobber")
+                continue
             item_dir.mkdir(parents=True, exist_ok=True)
             state = ItemState(
                 sku=sku,
@@ -110,7 +122,7 @@ class BatchOrchestrator:
         """Iterate active items, advance each as far as possible. Returns a summary."""
         active = self.queue.get_active()
         if not active:
-            return {"status": "idle", "processed": 0, "completed": 0,
+            return {"processed": 0, "completed": 0,
                     "blocked": 0, "failed": 0, "items": {}}
 
         results: Dict[str, Any] = {
@@ -137,17 +149,31 @@ class BatchOrchestrator:
         return results
 
     def resume(self) -> Dict[str, Any]:
-        """Unblock items whose questions have been answered, then process_all."""
+        """Unblock phases whose questions have been answered, then process_all.
+
+        Per-phase semantics: a phase reopens only when every question parked
+        under that phase has a non-empty answer. Answering one question
+        does NOT reopen phases whose questions are still unanswered.
+        """
         for entry in self.queue.get_blocked():
             state = ItemState.load(entry.sku, items_dir=str(self.items_dir))
             if state is None:
                 continue
-            unanswered = [q for q in state.questions if not q.get("answer")]
-            if not unanswered:
-                # Re-open the blocked phase so next_runnable_phase will pick it up.
-                for phase_id, p in state.phases.items():
-                    if p.status == PhaseStatus.BLOCKED:
-                        p.status = PhaseStatus.PENDING
+            # Group questions by their phase, track per-phase "all answered".
+            answered_by_phase: Dict[str, bool] = {}
+            for q in state.questions:
+                ph = q.get("phase")
+                if ph is None:
+                    continue
+                answered = bool(q.get("answer"))
+                # If the phase already has any unanswered question, stay False.
+                answered_by_phase[ph] = answered_by_phase.get(ph, True) and answered
+            any_reopened = False
+            for phase_id, p in state.phases.items():
+                if p.status == PhaseStatus.BLOCKED and answered_by_phase.get(phase_id, False):
+                    p.status = PhaseStatus.PENDING
+                    any_reopened = True
+            if any_reopened:
                 state._recalculate_status()
                 state.save()
                 self.queue.upsert(QueueEntry.from_item_state(state))
@@ -197,10 +223,15 @@ class BatchOrchestrator:
                 state.skip_phase(phase, reason=result.get("reason", ""))
                 state.save()
                 phases_run.append({"phase": phase, "result": "skipped"})
-            else:
-                state.complete_phase(phase, outputs=result.get("outputs", {}))
+            elif "outputs" in result:
+                state.complete_phase(phase, outputs=result["outputs"])
                 state.save()
                 phases_run.append({"phase": phase, "result": "completed"})
+            else:
+                err = f"runner returned unrecognized result: {result!r}"
+                state.fail_phase(phase, error=err)
+                state.save()
+                phases_run.append({"phase": phase, "result": "failed", "error": err})
         return {
             "final_status": state.status.value,
             "phases_run": phases_run,

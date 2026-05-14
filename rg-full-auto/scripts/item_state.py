@@ -36,3 +36,25 @@ class ItemStatus(str, Enum):
     BLOCKED = "blocked"       # At least one phase needs user input
     COMPLETED = "completed"
     FAILED = "failed"         # Unrecoverable failure
+
+
+@dataclass
+class PhaseData:
+    """One phase's status + outputs for a single item."""
+    status: PhaseStatus = PhaseStatus.PENDING
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    duration_s: Optional[float] = None
+    outputs: Dict[str, Any] = field(default_factory=dict)
+    error: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = asdict(self)
+        d["status"] = self.status.value
+        return d
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "PhaseData":
+        d = dict(d)
+        d["status"] = PhaseStatus(d.get("status", "pending"))
+        return cls(**d)

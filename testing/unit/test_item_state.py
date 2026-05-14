@@ -20,3 +20,24 @@ def test_item_status_values():
     assert ItemStatus.BLOCKED.value == "blocked"
     assert ItemStatus.COMPLETED.value == "completed"
     assert ItemStatus.FAILED.value == "failed"
+
+
+from item_state import PhaseData
+
+
+def test_phase_data_default():
+    """PhaseData starts in PENDING with empty outputs."""
+    p = PhaseData()
+    assert p.status == PhaseStatus.PENDING
+    assert p.started_at is None
+    assert p.completed_at is None
+    assert p.outputs == {}
+    assert p.error is None
+
+
+def test_phase_data_to_dict():
+    """PhaseData serializes to JSON-safe dict."""
+    p = PhaseData(status=PhaseStatus.COMPLETED, outputs={"k": "v"})
+    d = p.to_dict()
+    assert d["status"] == "completed"
+    assert d["outputs"] == {"k": "v"}

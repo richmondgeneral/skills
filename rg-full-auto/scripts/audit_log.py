@@ -24,6 +24,7 @@ CLI subcommands (planned but not all built in PR #1):
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import uuid
@@ -242,8 +243,6 @@ def main() -> int:
         return 2
     return 1
 
-
-import argparse  # imported lazily so library use doesn't pay the cost
 
 if __name__ == "__main__":
     sys.exit(main())

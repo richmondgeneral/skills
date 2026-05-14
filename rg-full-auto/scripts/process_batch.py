@@ -76,7 +76,7 @@ class BatchOrchestrator:
         self.next_sku = next_sku or (lambda: _default_next_sku(str(self.items_dir)))
         self.audit_log = audit_log or AuditLog()
 
-    # -- Intake --
+    # ── Intake ──
 
     def ingest_photos(self, photo_paths: List[str]) -> List[ItemState]:
         """Allocate one item per valid image, init state, register in queue."""
@@ -104,7 +104,7 @@ class BatchOrchestrator:
         self.queue.save()
         return states
 
-    # -- Main loop --
+    # ── Main loop ──
 
     def process_all(self) -> Dict[str, Any]:
         """Iterate active items, advance each as far as possible. Returns a summary."""
@@ -120,7 +120,7 @@ class BatchOrchestrator:
         for entry in active:
             state = ItemState.load(entry.sku, items_dir=str(self.items_dir))
             if state is None:
-                print(f"  [{entry.sku}] no state on disk - skipping")
+                print(f"  [{entry.sku}] no state on disk — skipping")
                 continue
             item_result = self._advance_item(state)
             results["items"][state.sku] = item_result
@@ -162,7 +162,7 @@ class BatchOrchestrator:
             "total": len(self.queue.entries),
         }
 
-    # -- Per-item advancement --
+    # ── Per-item advancement ──
 
     def _advance_item(self, state: ItemState) -> Dict[str, Any]:
         """Drive an item through its phases until blocked or done."""
@@ -207,7 +207,7 @@ class BatchOrchestrator:
             "progress": state.progress_summary(),
         }
 
-    # -- Phase execution stub (replaced in PR #3) --
+    # ── Phase execution stub (replaced in PR #3) ──
 
     def _default_phase_runner(
         self, state: ItemState, phase: str, item_dir: str
@@ -229,14 +229,14 @@ class BatchOrchestrator:
             ),
         }
 
-    # -- Output --
+    # ── Output ──
 
     def _print_summary(self, results: Dict[str, Any]) -> None:
         print(f"\n=== Summary ===")
         for key in ("processed", "completed", "blocked", "failed"):
             print(f"  {key}: {results[key]}")
         if results["blocked"]:
-            print("\nBlocked items have pending questions - run with --resume after answering.")
+            print("\nBlocked items have pending questions — run with --resume after answering.")
 
 
 def _build_parser() -> argparse.ArgumentParser:

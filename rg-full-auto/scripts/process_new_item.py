@@ -520,33 +520,36 @@ def _run_autonomous(image_path: str, items_dir: Optional[str] = None) -> int:
     return 0 if summary["failed"] == 0 else 1
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
-        description='Process new Richmond General items through complete workflow',
+        description=(
+            "rg-full-auto v6.0 item processor. Default is autonomous "
+            "(agent decides everything, user reviews after). Use --interactive "
+            "for the legacy v3.7 supervised flow."
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
+        epilog=__doc__,
     )
-
     parser.add_argument(
-        '--image', '-i',
+        "--image", "-i",
         required=True,
-        help='Path to item photo'
+        help="Path to item photo",
     )
     parser.add_argument(
-        '--interactive',
-        action='store_true',
-        default=True,
-        help='Interactive mode with user supervision (default)'
-    )
-    parser.add_argument(
-        '--auto',
-        action='store_true',
-        help='Automatic mode (unsupervised - future)'
+        "--interactive",
+        action="store_true",
+        help="Use the legacy v3.7 interactive flow (asks for each decision). "
+             "Default behavior is autonomous.",
     )
     parser.add_argument(
         "--autonomous",
         action="store_true",
-        help="v6.0 opt-in: run through BatchOrchestrator instead of interactive flow",
+        help="(Now the default; kept for backward compatibility with PR #2 invocations.)",
+    )
+    parser.add_argument(
+        "--auto",
+        action="store_true",
+        help="(Legacy v3.7 unsupervised flag; only relevant with --interactive.)",
     )
     parser.add_argument(
         "--items-dir",
@@ -556,10 +559,11 @@ def main():
 
     args = parser.parse_args()
 
-    if args.autonomous:
+    # Default path: autonomous via BatchOrchestrator
+    if not args.interactive:
         return _run_autonomous(args.image, items_dir=args.items_dir)
 
-    # Existing v3.7 interactive path
+    # Opt-out: legacy v3.7 interactive flow
     try:
         processor = RGItemProcessor(interactive=not args.auto)
         processor.run(args.image)

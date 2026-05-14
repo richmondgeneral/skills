@@ -1,5 +1,35 @@
 # rg-full-auto Changelog
 
+## v6.0 — 2026-05-14
+
+**Major release.** Autonomous batch mode becomes the default; the v3.7 interactive flow is preserved behind `--interactive`.
+
+### Added
+- `scripts/item_state.py` — per-item state machine with `.state.json` persistence, phase lifecycle (start/complete/fail/block/skip), `PendingQuestion` parking model, `next_runnable_phase` with `PHASE_DEPENDENCIES` graph
+- `scripts/onboarding_queue.py` — centralized queue dashboard
+- `scripts/audit_log.py` — append-only JSONL writer for `decisions.jsonl`, `corrections.jsonl`, `review_log.jsonl`, plus a CLI reader (`report`, `review-stats`)
+- `scripts/process_batch.py` — multi-item batch orchestrator (`BatchOrchestrator`) with per-phase queue sync and audit-log mirroring
+- All 10 phase handlers wired (phase_0 calls remove_background; phases 1–9 capture decisions and gate state transitions)
+- Audit streams populated automatically: every `state.log_decision()` mirrors to `decisions.jsonl`
+- New integration tests: autonomous e2e with mock runner, v6.0 catalog collision, regression diff vs v3.7
+
+### Changed
+- `process_new_item.py` — autonomous mode is now the default; `--interactive` is the opt-out for the legacy v3.7 supervised flow
+- SKILL.md bumped from v3.7 → v6.0
+- Phase ordering (0 before 1) preserved from v3.7
+- `description_html`, `ROOM_BY_TYPE`, `sync_to_whatnot.py` `\n` fix, `remove_background.py` response.text leak fix — all preserved verbatim
+
+### Deferred to v6.1+
+- L3 pattern-detection feedback loop on `corrections.jsonl` (needs ≥30 items' correction data)
+- `audit_log.py drift` and `audit_log.py correct` CLI subcommands
+- Multi-environment (linux / cloud / cowork) portability — v5.0 epic, see `docs/plans/2026-05-13-v5-portability-deferred.md`
+- Real `_check_sku_in_square_cache` implementation (currently always returns None; v6.1 will wire it to the square-cache MCP)
+
+### Backward compatibility
+- Skill name stays `rg-full-auto` — cross-references in `items/CLAUDE.md`, `brand/BRAND.md`, Linear issues all keep working
+- `--autonomous` flag kept as a no-op alias so PR #2-era invocations still work
+- Existing items without `.state.json` are treated as "completed in legacy mode" — v6.0 never re-processes them
+
 ## v3.6 - Catalog governance delegation
 - Added delegation to `square-catalog-ops` for compliance and cleanup audits
 - Added post-write category integrity audit in Step 4.1

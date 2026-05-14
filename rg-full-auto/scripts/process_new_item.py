@@ -41,6 +41,9 @@ except ImportError:
     print("Error: requests library required. Install with: pip install requests")
     sys.exit(1)
 
+from item_state import ItemState
+from onboarding_queue import OnboardingQueue, QueueEntry
+
 
 class RGItemProcessor:
     """Processes new items through the complete Richmond General workflow."""
@@ -497,13 +500,33 @@ class RGItemProcessor:
         print("=" * 60)
 
 
+def _run_autonomous(image_path: str, items_dir: Optional[str] = None) -> int:
+    """v6.0 autonomous entry point. Init item state, run through orchestrator.
+
+    Opt-in path: only reached when `--autonomous` is passed. Default behavior
+    remains v3.7 interactive. PR #3 makes autonomous the default.
+    """
+    from process_batch import BatchOrchestrator
+
+    orch = BatchOrchestrator(items_dir=items_dir) if items_dir else BatchOrchestrator()
+    states = orch.ingest_photos([image_path])
+    if not states:
+        print("Could not ingest image. Aborting.", file=sys.stderr)
+        return 1
+    print(f"Ingested {states[0].sku}. Running orchestrator…")
+    summary = orch.process_all()
+    print(f"\nFinal: {summary['completed']} completed, {summary['blocked']} blocked, "
+          f"{summary['failed']} failed.")
+    return 0 if summary["failed"] == 0 else 1
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Process new Richmond General items through complete workflow',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
-    
+
     parser.add_argument(
         '--image', '-i',
         required=True,
@@ -520,16 +543,31 @@ def main():
         action='store_true',
         help='Automatic mode (unsupervised - future)'
     )
-    
+    parser.add_argument(
+        "--autonomous",
+        action="store_true",
+        help="v6.0 opt-in: run through BatchOrchestrator instead of interactive flow",
+    )
+    parser.add_argument(
+        "--items-dir",
+        default=None,
+        help="Override the items directory (default: /Users/scottybe/workspace/square/items)",
+    )
+
     args = parser.parse_args()
-    
+
+    if args.autonomous:
+        return _run_autonomous(args.image, items_dir=args.items_dir)
+
+    # Existing v3.7 interactive path
     try:
         processor = RGItemProcessor(interactive=not args.auto)
         processor.run(args.image)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        return 1
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

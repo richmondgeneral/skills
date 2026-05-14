@@ -40,7 +40,6 @@ class AuditLog:
 
     def __init__(self, log_dir: str = DEFAULT_LOG_DIR):
         self.log_dir = Path(log_dir)
-        self.log_dir.mkdir(parents=True, exist_ok=True)
         self.decisions_path = self.log_dir / "decisions.jsonl"
         self.corrections_path = self.log_dir / "corrections.jsonl"
         self.review_log_path = self.log_dir / "review_log.jsonl"
@@ -52,6 +51,7 @@ class AuditLog:
     def _append(self, path: Path, record: Dict[str, Any]) -> None:
         """Append one JSON object as a single line. Atomic at the OS
         level for line-sized writes on a single host (POSIX append)."""
+        self.log_dir.mkdir(parents=True, exist_ok=True)
         line = json.dumps(record, ensure_ascii=False) + "\n"
         with path.open("a", encoding="utf-8") as f:
             f.write(line)

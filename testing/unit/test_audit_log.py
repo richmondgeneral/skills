@@ -85,3 +85,16 @@ def test_concurrent_appends_dont_corrupt(tmp_path):
     # Every line must parse as valid JSON.
     for line in lines:
         json.loads(line)
+
+
+def test_audit_log_init_does_not_create_log_dir(tmp_path):
+    """AuditLog construction does NOT create the log_dir as a side effect.
+    The directory is created lazily on first write."""
+    nonexistent = tmp_path / "doesnt-exist-yet"
+    assert not nonexistent.exists()
+    al = AuditLog(log_dir=str(nonexistent))
+    # Construction alone must not create the directory.
+    assert not nonexistent.exists()
+    # First write should create it.
+    al.log_review_event(sku="RG-0001", event="review_started")
+    assert nonexistent.exists()

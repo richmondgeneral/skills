@@ -13,12 +13,14 @@ State file: <items_dir>/RG-XXXX/.state.json
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+
+DEFAULT_ITEMS_DIR = "/Users/scottybe/workspace/square/items"
 
 
 class PhaseStatus(str, Enum):
@@ -68,7 +70,7 @@ PHASES = [f"phase_{i}" for i in range(10)]
 class ItemState:
     """Per-item state container; persists to <items_dir>/<sku>/.state.json."""
     sku: str
-    items_dir: str = "/Users/scottybe/workspace/square/items"
+    items_dir: str = DEFAULT_ITEMS_DIR
     status: ItemStatus = ItemStatus.QUEUED
     source_image: Optional[str] = None
     created_at: str = ""
@@ -121,7 +123,7 @@ class ItemState:
         tmp.replace(self.state_file)
 
     @classmethod
-    def load(cls, sku: str, items_dir: str = "/Users/scottybe/workspace/square/items") -> Optional["ItemState"]:
+    def load(cls, sku: str, items_dir: str = DEFAULT_ITEMS_DIR) -> Optional["ItemState"]:
         """Load .state.json from disk. Returns None if no state file
         (legacy item that predates v6.0)."""
         path = Path(items_dir) / sku / ".state.json"

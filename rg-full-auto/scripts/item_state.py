@@ -111,12 +111,14 @@ class ItemState:
         }
 
     def save(self) -> None:
-        """Write .state.json. Parent dir must exist."""
+        """Write .state.json atomically (tmp → rename). Parent dir must exist."""
         self.updated_at = datetime.now(timezone.utc).isoformat()
-        self.state_file.write_text(
+        tmp = self.state_file.with_suffix(self.state_file.suffix + ".tmp")
+        tmp.write_text(
             json.dumps(self.to_dict(), indent=2),
             encoding="utf-8",
         )
+        tmp.replace(self.state_file)
 
     @classmethod
     def load(cls, sku: str, items_dir: str = "/Users/scottybe/workspace/square/items") -> Optional["ItemState"]:

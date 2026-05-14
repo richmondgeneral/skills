@@ -80,3 +80,57 @@ def test_item_state_load_legacy_item_no_state(tmp_path):
     (tmp_path / "RG-0001").mkdir()
     loaded = ItemState.load("RG-0001", items_dir=str(tmp_path))
     assert loaded is None
+
+
+def test_item_state_save_is_atomic_via_tmp_rename(tmp_path):
+    """save() writes via .tmp then renames; no .tmp file remains after."""
+    (tmp_path / "RG-0099").mkdir()
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.save()
+    final = tmp_path / "RG-0099" / ".state.json"
+    tmp_artifact = tmp_path / "RG-0099" / ".state.json.tmp"
+    assert final.exists()
+    assert not tmp_artifact.exists()  # rename moved it, no orphan
+
+
+def test_item_state_round_trip_preserves_review_block(tmp_path):
+    """The review block survives save → load with all 4 keys preserved."""
+    (tmp_path / "RG-0099").mkdir()
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.review["agent_finished_at"] = "2026-05-13T18:00:00+00:00"
+    state.review["human_reviewed_at"] = "2026-05-13T18:05:24+00:00"
+    state.review["elapsed_review_s"] = 324
+    state.review["outcome"] = "accepted_with_corrections"
+    state.save()
+    loaded = ItemState.load("RG-0099", items_dir=str(tmp_path))
+    assert loaded.review["agent_finished_at"] == "2026-05-13T18:00:00+00:00"
+    assert loaded.review["human_reviewed_at"] == "2026-05-13T18:05:24+00:00"
+    assert loaded.review["elapsed_review_s"] == 324
+    assert loaded.review["outcome"] == "accepted_with_corrections"
+
+
+def test_item_state_round_trip_preserves_decisions_and_questions(tmp_path):
+    """decisions and questions lists round-trip non-empty contents."""
+    (tmp_path / "RG-0099").mkdir()
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.decisions.append({"phase": "phase_1", "type": "price", "choice": 18.50})
+    state.questions.append({"phase": "phase_2", "q": "is this scrimshaw real?"})
+    state.save()
+    loaded = ItemState.load("RG-0099", items_dir=str(tmp_path))
+    assert len(loaded.decisions) == 1
+    assert loaded.decisions[0]["choice"] == 18.50
+    assert len(loaded.questions) == 1
+    assert loaded.questions[0]["q"] == "is this scrimshaw real?"
+
+
+def test_item_state_save_updates_updated_at(tmp_path):
+    """save() bumps updated_at but preserves created_at."""
+    import time
+    (tmp_path / "RG-0099").mkdir()
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    original_created_at = state.created_at
+    original_updated_at = state.updated_at
+    time.sleep(0.01)  # ensure monotonic clock has advanced
+    state.save()
+    assert state.created_at == original_created_at  # preserved
+    assert state.updated_at > original_updated_at   # bumped

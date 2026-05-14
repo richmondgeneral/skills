@@ -200,3 +200,73 @@ class ItemState:
             questions=d.get("questions", []),
             review=d.get("review", {}),
         )
+
+    def _validate_phase(self, phase: str) -> None:
+        if phase not in self.phases:
+            raise ValueError(f"Unknown phase: {phase}. Known: {list(self.phases.keys())}")
+
+    def start_phase(self, phase: str) -> None:
+        """Transition a phase from PENDING to IN_PROGRESS and update item status."""
+        self._validate_phase(phase)
+        p = self.phases[phase]
+        p.status = PhaseStatus.IN_PROGRESS
+        p.started_at = datetime.now(timezone.utc).isoformat()
+        self._recalculate_status()
+
+    def complete_phase(self, phase: str, outputs: Optional[Dict[str, Any]] = None) -> None:
+        """Mark a phase COMPLETED with its produced outputs."""
+        self._validate_phase(phase)
+        p = self.phases[phase]
+        p.status = PhaseStatus.COMPLETED
+        p.completed_at = datetime.now(timezone.utc).isoformat()
+        if p.started_at:
+            try:
+                started = datetime.fromisoformat(p.started_at)
+                completed = datetime.fromisoformat(p.completed_at)
+                p.duration_s = (completed - started).total_seconds()
+            except ValueError:
+                pass
+        if outputs:
+            p.outputs.update(outputs)
+        self._recalculate_status()
+
+    def fail_phase(self, phase: str, error: str) -> None:
+        """Mark a phase FAILED with the error message. Item status becomes FAILED."""
+        self._validate_phase(phase)
+        p = self.phases[phase]
+        p.status = PhaseStatus.FAILED
+        p.completed_at = datetime.now(timezone.utc).isoformat()
+        p.error = error
+        self._recalculate_status()
+
+    def block_phase(self, phase: str, question: "PendingQuestion") -> None:
+        """Park a phase BLOCKED with a question. Item status becomes BLOCKED."""
+        self._validate_phase(phase)
+        self.phases[phase].status = PhaseStatus.BLOCKED
+        # Store as plain dict so existing decisions/questions JSON layout still works.
+        from dataclasses import asdict
+        self.questions.append(asdict(question))
+        self._recalculate_status()
+
+    def skip_phase(self, phase: str, reason: str = "") -> None:
+        """Intentionally skip a phase (e.g., no Whatnot listing for this item)."""
+        self._validate_phase(phase)
+        p = self.phases[phase]
+        p.status = PhaseStatus.SKIPPED
+        if reason:
+            p.outputs["skip_reason"] = reason
+        self._recalculate_status()
+
+    def _recalculate_status(self) -> None:
+        """Sync item-level status with the aggregate of phase statuses."""
+        statuses = {p.status for p in self.phases.values()}
+        if PhaseStatus.FAILED in statuses:
+            self.status = ItemStatus.FAILED
+        elif PhaseStatus.BLOCKED in statuses:
+            self.status = ItemStatus.BLOCKED
+        elif PhaseStatus.IN_PROGRESS in statuses:
+            self.status = ItemStatus.PROCESSING
+        elif statuses.issubset({PhaseStatus.COMPLETED, PhaseStatus.SKIPPED}):
+            self.status = ItemStatus.COMPLETED
+        else:
+            self.status = ItemStatus.QUEUED

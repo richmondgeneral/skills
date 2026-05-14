@@ -199,3 +199,62 @@ def test_pending_question_round_trip(tmp_path):
     q2 = PendingQuestion(**d)
     assert q2.is_answered()
     assert q2.options == ["1970s", "1980s"]
+
+
+def test_start_phase_transitions_pending_to_in_progress(tmp_path):
+    """start_phase records started_at and transitions to IN_PROGRESS."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_0")
+    assert state.phases["phase_0"].status == PhaseStatus.IN_PROGRESS
+    assert state.phases["phase_0"].started_at != ""
+    assert state.status == ItemStatus.PROCESSING
+
+
+def test_complete_phase_records_outputs(tmp_path):
+    """complete_phase records completed_at and stores outputs."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_0")
+    state.complete_phase("phase_0", outputs={"hero_path": "/tmp/hero.png"})
+    p = state.phases["phase_0"]
+    assert p.status == PhaseStatus.COMPLETED
+    assert p.completed_at != ""
+    assert p.outputs["hero_path"] == "/tmp/hero.png"
+
+
+def test_fail_phase_records_error(tmp_path):
+    """fail_phase records the error and transitions item status to FAILED."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_0")
+    state.fail_phase("phase_0", error="remove.bg returned 500")
+    assert state.phases["phase_0"].status == PhaseStatus.FAILED
+    assert state.phases["phase_0"].error == "remove.bg returned 500"
+    assert state.status == ItemStatus.FAILED
+
+
+def test_block_phase_parks_question_and_blocks_item(tmp_path):
+    """block_phase moves phase to BLOCKED and item to BLOCKED."""
+    from item_state import PendingQuestion
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_1")
+    q = PendingQuestion(question_id="q-001", phase="phase_1", question="What era?")
+    state.block_phase("phase_1", q)
+    assert state.phases["phase_1"].status == PhaseStatus.BLOCKED
+    assert state.status == ItemStatus.BLOCKED
+    assert len(state.questions) == 1
+
+
+def test_skip_phase(tmp_path):
+    """skip_phase marks a phase SKIPPED with reason."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.skip_phase("phase_8", reason="not selling on Whatnot")
+    assert state.phases["phase_8"].status == PhaseStatus.SKIPPED
+    assert state.phases["phase_8"].outputs.get("skip_reason") == "not selling on Whatnot"
+
+
+def test_item_status_recalculates(tmp_path):
+    """After all phases complete or skip, item status becomes COMPLETED."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    for phase in [f"phase_{i}" for i in range(10)]:
+        state.start_phase(phase)
+        state.complete_phase(phase, outputs={})
+    assert state.status == ItemStatus.COMPLETED

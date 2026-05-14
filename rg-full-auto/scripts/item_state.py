@@ -62,6 +62,25 @@ class PhaseData:
         return cls(**d)
 
 
+@dataclass
+class PendingQuestion:
+    """A question parked for the user to answer asynchronously."""
+    question_id: str
+    phase: str
+    question: str
+    context: str = ""
+    options: List[str] = field(default_factory=list)
+    answer: Optional[str] = None
+    asked_at: str = ""
+
+    def __post_init__(self):
+        if not self.asked_at:
+            self.asked_at = datetime.now(timezone.utc).isoformat()
+
+    def is_answered(self) -> bool:
+        return bool(self.answer)
+
+
 # Canonical 10-phase sequence. Phase numbers align with SKILL.md §Phase 0..9.
 PHASES = [f"phase_{i}" for i in range(10)]
 

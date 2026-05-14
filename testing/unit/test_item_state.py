@@ -158,3 +158,44 @@ def test_phase_dependencies_constant_exists():
     # phase_4 (image upload) needs phase_0 (image) AND phase_2 (catalog)
     assert "phase_0" in PHASE_DEPENDENCIES["phase_4"]
     assert "phase_2" in PHASE_DEPENDENCIES["phase_4"]
+
+
+def test_pending_question_defaults():
+    """A new PendingQuestion has empty answer + asked_at timestamp."""
+    from item_state import PendingQuestion
+    q = PendingQuestion(question_id="q-001", phase="phase_1", question="What era?")
+    assert q.answer is None
+    assert q.is_answered() is False
+    assert q.context == ""
+    assert q.options == []
+    assert q.asked_at != ""  # __post_init__ sets it
+
+
+def test_pending_question_is_answered():
+    """is_answered returns True when answer is non-empty."""
+    from item_state import PendingQuestion
+    q = PendingQuestion(question_id="q-001", phase="phase_1", question="?")
+    assert q.is_answered() is False
+    q.answer = "1979"
+    assert q.is_answered() is True
+    q.answer = ""
+    assert q.is_answered() is False  # empty string doesn't count
+
+
+def test_pending_question_round_trip(tmp_path):
+    """PendingQuestion round-trips through asdict / from_dict."""
+    from item_state import PendingQuestion
+    from dataclasses import asdict
+    q = PendingQuestion(
+        question_id="q-001",
+        phase="phase_1",
+        question="What era?",
+        context="The cover has 1979 stamped",
+        options=["1970s", "1980s"],
+        answer="1979",
+    )
+    d = asdict(q)
+    assert d["answer"] == "1979"
+    q2 = PendingQuestion(**d)
+    assert q2.is_answered()
+    assert q2.options == ["1970s", "1980s"]

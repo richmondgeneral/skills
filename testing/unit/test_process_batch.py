@@ -474,3 +474,109 @@ def test_phase_9_photos_archive_runs_on_darwin(tmp_path, monkeypatch):
     result = orch._phase_9_photos_archive(state, str(items_dir / "RG-9999"))
     assert result["outputs"]["photos_archived"] is True
     assert any(d["type"] == "photos_archive" for d in state.decisions)
+
+
+def test_queue_updated_after_each_phase(tmp_path):
+    """I-1 carryover: queue entries reflect per-phase progress, not per-item.
+
+    After phase_0 completes but BEFORE process_all returns, the queue file
+    on disk should already show phases_completed >= 1.
+    """
+    items_dir = tmp_path / "items"
+    items_dir.mkdir()
+    sku = "RG-9999"
+    (items_dir / sku).mkdir()
+    queue_path = tmp_path / "queue.json"
+
+    state = ItemState(sku=sku, items_dir=str(items_dir),
+                      source_image=str(tmp_path / "src.jpg"))
+    (tmp_path / "src.jpg").write_bytes(b"x")
+    state.save()
+
+    queue_snapshots = []
+
+    def snapshotting_runner(state, phase, item_dir):
+        """After each phase, snapshot the on-disk queue file."""
+        result = {"outputs": {}}
+        # Read the queue from disk to capture what's been persisted
+        if queue_path.exists():
+            queue_snapshots.append({
+                "phase_about_to_run": phase,
+                "queue_data": json.loads(queue_path.read_text()),
+            })
+        return result
+
+    from onboarding_queue import OnboardingQueue, QueueEntry
+    queue = OnboardingQueue(queue_path=str(queue_path))
+    queue.upsert(QueueEntry(sku=sku, status="queued"))
+    queue.save()
+
+    import process_batch as pb
+    orch = pb.BatchOrchestrator(
+        items_dir=str(items_dir),
+        queue_path=str(queue_path),
+        phase_runner=snapshotting_runner,
+    )
+    orch.process_all()
+
+    # We should have snapshots taken just before each of the 10 phase runners.
+    # At least one mid-batch snapshot should show progress > 0.
+    progress_seen = False
+    for snap in queue_snapshots:
+        entries = snap["queue_data"]["entries"]
+        ours = next(e for e in entries if e["sku"] == sku)
+        if ours["phases_completed"] > 0:
+            progress_seen = True
+            break
+    assert progress_seen, (
+        "Queue file was never updated mid-batch — I-1 still present. "
+        f"Snapshots: {queue_snapshots[:3]}"
+    )
+
+
+def test_orchestrator_mirrors_decisions_to_audit_log(tmp_path):
+    """I-2 carryover: state.log_decision() calls during a phase get mirrored to
+    self.audit_log.decisions.jsonl so audit_log report can read them back."""
+    items_dir = tmp_path / "items"
+    items_dir.mkdir()
+    sku = "RG-9999"
+    (items_dir / sku).mkdir()
+    queue_path = tmp_path / "queue.json"
+    audit_dir = tmp_path / "audit"
+
+    state = ItemState(sku=sku, items_dir=str(items_dir),
+                      source_image=str(tmp_path / "src.jpg"))
+    (tmp_path / "src.jpg").write_bytes(b"x")
+    state.save()
+
+    def runner_with_decisions(state, phase, item_dir):
+        # Simulate a phase that records a decision via the per-item state
+        if phase == "phase_1":
+            state.log_decision(
+                phase="phase_1", decision_type="price",
+                choice=42.0, rationale="test",
+            )
+        return {"outputs": {}}
+
+    from onboarding_queue import OnboardingQueue, QueueEntry
+    queue = OnboardingQueue(queue_path=str(queue_path))
+    queue.upsert(QueueEntry(sku=sku, status="queued"))
+    queue.save()
+
+    import process_batch as pb
+    from audit_log import AuditLog
+    al = AuditLog(log_dir=str(audit_dir))
+    orch = pb.BatchOrchestrator(
+        items_dir=str(items_dir),
+        queue_path=str(queue_path),
+        phase_runner=runner_with_decisions,
+        audit_log=al,
+    )
+    orch.process_all()
+
+    # The central decisions.jsonl should have a record for phase_1 / type=price.
+    records = list(al.iter_records("decisions"))
+    assert any(
+        r.get("sku") == sku and r.get("phase") == "phase_1" and r.get("type") == "price"
+        for r in records
+    ), f"phase_1 price decision not mirrored to audit_log. Records: {records}"

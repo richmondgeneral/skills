@@ -207,7 +207,12 @@ class BatchOrchestrator:
     # ── Per-item advancement ──
 
     def _advance_item(self, state: ItemState) -> Dict[str, Any]:
-        """Drive an item through its phases until blocked or done."""
+        """Drive an item through its phases until blocked or done.
+
+        After every phase transition, updates the central queue and mirrors
+        any new decisions from state.decisions to the central audit_log.
+        Fixes PR #17 carryovers I-1 (queue/state desync) and I-2 (audit_log
+        was unused)."""
         phases_run: List[Dict[str, Any]] = []
         item_dir = str(self.items_dir / state.sku)
         while True:
@@ -216,12 +221,16 @@ class BatchOrchestrator:
                 break
             state.start_phase(phase)
             state.save()
+            self._sync_queue(state)  # I-1: queue reflects in-progress phase
+            decisions_before = len(state.decisions)
             try:
                 result = self.phase_runner(state, phase, item_dir)
             except Exception as exc:  # noqa: BLE001
                 err = f"{type(exc).__name__}: {exc}"
                 state.fail_phase(phase, error=err)
                 state.save()
+                self._mirror_new_decisions(state, decisions_before)
+                self._sync_queue(state)
                 phases_run.append({"phase": phase, "result": "failed", "error": err})
                 continue
             if result.get("blocked"):
@@ -234,25 +243,58 @@ class BatchOrchestrator:
                     )
                 state.block_phase(phase, question)
                 state.save()
+                self._mirror_new_decisions(state, decisions_before)
+                self._sync_queue(state)
                 phases_run.append({"phase": phase, "result": "blocked"})
             elif result.get("skipped"):
                 state.skip_phase(phase, reason=result.get("reason", ""))
                 state.save()
+                self._mirror_new_decisions(state, decisions_before)
+                self._sync_queue(state)
                 phases_run.append({"phase": phase, "result": "skipped"})
             elif "outputs" in result:
                 state.complete_phase(phase, outputs=result["outputs"])
                 state.save()
+                self._mirror_new_decisions(state, decisions_before)
+                self._sync_queue(state)
                 phases_run.append({"phase": phase, "result": "completed"})
             else:
                 err = f"runner returned unrecognized result: {result!r}"
                 state.fail_phase(phase, error=err)
                 state.save()
+                self._mirror_new_decisions(state, decisions_before)
+                self._sync_queue(state)
                 phases_run.append({"phase": phase, "result": "failed", "error": err})
         return {
             "final_status": state.status.value,
             "phases_run": phases_run,
             "progress": state.progress_summary(),
         }
+
+    def _sync_queue(self, state: ItemState) -> None:
+        """Update the central queue with the latest state snapshot."""
+        self.queue.upsert(QueueEntry.from_item_state(state))
+        self.queue.save()
+
+    def _mirror_new_decisions(self, state: ItemState, decisions_before: int) -> None:
+        """Mirror any new state.decisions entries to the central audit_log.
+
+        Walks state.decisions[decisions_before:] and writes each via the
+        AuditLog. Idempotent in the sense that decisions_before is the
+        index where this phase started, so we never double-write.
+        """
+        for d in state.decisions[decisions_before:]:
+            self.audit_log.log_decision(
+                sku=state.sku,
+                phase=d.get("phase", ""),
+                decision_type=d.get("type", "unknown"),
+                choice=d.get("choice"),
+                confidence=d.get("confidence", 0.0),
+                inputs_considered=d.get("inputs_considered", {}),
+                alternatives_seen=d.get("alternatives_seen", []),
+                rationale=d.get("rationale", ""),
+                decision_id=d.get("id"),
+            )
 
     # ── Phase execution (real handlers progressively wired in PR #3) ──
 

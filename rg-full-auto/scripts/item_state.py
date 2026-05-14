@@ -270,3 +270,60 @@ class ItemState:
             self.status = ItemStatus.COMPLETED
         else:
             self.status = ItemStatus.QUEUED
+
+    def next_runnable_phase(self) -> Optional[str]:
+        """Return the next phase that's PENDING and has all dependencies completed.
+        Returns None if nothing is runnable (all done, all blocked-by-deps, etc.)."""
+        for phase, deps in PHASE_DEPENDENCIES.items():
+            if self.phases[phase].status != PhaseStatus.PENDING:
+                continue
+            if all(self.phases[d].status == PhaseStatus.COMPLETED for d in deps):
+                return phase
+        return None
+
+    def progress_summary(self) -> Dict[str, int]:
+        """Phase-status counts for dashboard display."""
+        counts = {s.value: 0 for s in PhaseStatus}
+        for p in self.phases.values():
+            counts[p.status.value] += 1
+        counts["total"] = len(self.phases)
+        return counts
+
+    def log_decision(
+        self,
+        phase: str,
+        decision_type: str,
+        choice: Any,
+        rationale: str = "",
+        confidence: Optional[float] = None,
+        inputs_considered: Optional[Dict[str, Any]] = None,
+        alternatives_seen: Optional[List[Dict[str, Any]]] = None,
+    ) -> str:
+        """Append a decision record to state.decisions. Returns the decision_id."""
+        import uuid
+        did = f"dec-{uuid.uuid4().hex[:8]}"
+        record = {
+            "id": did,
+            "phase": phase,
+            "type": decision_type,
+            "choice": choice,
+            "rationale": rationale,
+            "made_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if confidence is not None:
+            record["confidence"] = confidence
+        if inputs_considered is not None:
+            record["inputs_considered"] = inputs_considered
+        if alternatives_seen is not None:
+            record["alternatives_seen"] = alternatives_seen
+        self.decisions.append(record)
+        return did
+
+    def answer_question(self, question_id: str, answer: str) -> Optional[str]:
+        """Fill in an answer for a parked question. Returns the phase id if found, else None."""
+        for q in self.questions:
+            if q.get("question_id") == question_id:
+                q["answer"] = answer
+                q["answered_at"] = datetime.now(timezone.utc).isoformat()
+                return q.get("phase")
+        return None

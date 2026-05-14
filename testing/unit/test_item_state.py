@@ -258,3 +258,79 @@ def test_item_status_recalculates(tmp_path):
         state.start_phase(phase)
         state.complete_phase(phase, outputs={})
     assert state.status == ItemStatus.COMPLETED
+
+
+def test_next_runnable_phase_starts_at_phase_0(tmp_path):
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    assert state.next_runnable_phase() == "phase_0"
+
+
+def test_next_runnable_phase_respects_dependencies(tmp_path):
+    """After phase_0 completes, phase_1 is runnable. phase_2 isn't until phase_1 done."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_0")
+    state.complete_phase("phase_0", outputs={})
+    runnable = state.next_runnable_phase()
+    assert runnable == "phase_1"
+
+
+def test_next_runnable_phase_returns_none_when_all_done(tmp_path):
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    for p in [f"phase_{i}" for i in range(10)]:
+        state.start_phase(p)
+        state.complete_phase(p, outputs={})
+    assert state.next_runnable_phase() is None
+
+
+def test_next_runnable_phase_skips_blocked_branch(tmp_path):
+    """If phase_1 is BLOCKED, phase_2 (depends on phase_1) can't run; but phase_4 only
+    needs phase_0 AND phase_2 — also can't run. Returns None when nothing runnable."""
+    from item_state import PendingQuestion
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_0")
+    state.complete_phase("phase_0", outputs={})
+    state.start_phase("phase_1")
+    state.block_phase("phase_1", PendingQuestion(question_id="q", phase="phase_1", question="?"))
+    # phase_1 is blocked. phase_2 depends on phase_1, can't run. Nothing else has phase_0 as
+    # its ONLY dep (phase_4 needs phase_2 too). So next runnable = None.
+    assert state.next_runnable_phase() is None
+
+
+def test_progress_summary(tmp_path):
+    """progress_summary returns counts by phase status."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_0")
+    state.complete_phase("phase_0", outputs={})
+    summary = state.progress_summary()
+    assert summary["completed"] == 1
+    assert summary["pending"] == 9
+    assert summary["total"] == 10
+
+
+def test_log_decision_appends_to_state(tmp_path):
+    """log_decision appends a decision record to state.decisions."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.log_decision(
+        phase="phase_1",
+        decision_type="price",
+        choice=18.50,
+        rationale="midpoint of comps",
+    )
+    assert len(state.decisions) == 1
+    assert state.decisions[0]["type"] == "price"
+    assert state.decisions[0]["choice"] == 18.50
+
+
+def test_answer_question_unblocks(tmp_path):
+    """answer_question fills in the answer + can transition the phase back."""
+    from item_state import PendingQuestion
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_1")
+    state.block_phase("phase_1", PendingQuestion(
+        question_id="q-001", phase="phase_1", question="?"
+    ))
+    result = state.answer_question("q-001", "1979")
+    assert result == "phase_1"
+    assert state.questions[0]["answer"] == "1979"
+    # Phase remains BLOCKED until orchestrator decides to re-run it; just stores answer.
+    assert state.phases["phase_1"].status == PhaseStatus.BLOCKED

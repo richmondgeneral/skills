@@ -355,3 +355,122 @@ def test_phase_3_records_inventory_decision(tmp_path):
     assert result["outputs"]["quantity"] == 1
     types = {d["type"] for d in state.decisions}
     assert "inventory" in types
+
+
+def test_phase_4_image_upload_logs_decision(tmp_path):
+    """phase_4 logs an image_upload decision and returns ready."""
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    (items_dir / "RG-9999").mkdir()
+    state = ItemState(sku="RG-9999", items_dir=str(items_dir))
+    state.phases["phase_4"].outputs.update({"item_id": "ITEM_ID", "hero_path": "/h.png"})
+
+    import process_batch as pb
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_4_image_upload(state, str(items_dir / "RG-9999"))
+    assert result["outputs"]["uploaded"] is True
+    assert any(d["type"] == "image_upload" for d in state.decisions)
+
+
+def test_phase_5_payment_link_records_decision(tmp_path):
+    """phase_5 logs a payment_link decision capturing shippable from phase_1."""
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    (items_dir / "RG-9999").mkdir()
+    state = ItemState(sku="RG-9999", items_dir=str(items_dir))
+    state.phases["phase_1"].outputs["shippable"] = False
+
+    import process_batch as pb
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_5_payment_link(state, str(items_dir / "RG-9999"))
+    assert result["outputs"]["payment_link_created"] is True
+    decisions = [d for d in state.decisions if d["type"] == "payment_link"]
+    assert len(decisions) == 1
+    assert decisions[0]["choice"]["shippable"] is False
+
+
+def test_phase_6_label_queues(tmp_path):
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    (items_dir / "RG-9999").mkdir()
+    state = ItemState(sku="RG-9999", items_dir=str(items_dir))
+
+    import process_batch as pb
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_6_label(state, str(items_dir / "RG-9999"))
+    assert result["outputs"]["label_queued"] is True
+    assert any(d["type"] == "label" for d in state.decisions)
+
+
+def test_phase_7_publishing_records_decision(tmp_path):
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    (items_dir / "RG-9999").mkdir()
+    state = ItemState(sku="RG-9999", items_dir=str(items_dir))
+
+    import process_batch as pb
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_7_publishing(state, str(items_dir / "RG-9999"))
+    assert result["outputs"]["page_drafted"] is True
+    assert any(d["type"] == "publishing" for d in state.decisions)
+
+
+def test_phase_8_whatnot_can_skip(tmp_path):
+    """When sell_on_whatnot is False, phase_8 returns skipped."""
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    (items_dir / "RG-9999").mkdir()
+    state = ItemState(sku="RG-9999", items_dir=str(items_dir))
+    state.phases["phase_8"].outputs["sell_on_whatnot"] = False
+
+    import process_batch as pb
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_8_whatnot(state, str(items_dir / "RG-9999"))
+    assert result.get("skipped") is True
+
+
+def test_phase_8_whatnot_records_when_selling(tmp_path):
+    """When sell_on_whatnot is True (or absent → default True), phase_8 logs and returns ready."""
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    (items_dir / "RG-9999").mkdir()
+    state = ItemState(sku="RG-9999", items_dir=str(items_dir))
+    # Leave sell_on_whatnot unset — implementation should treat that as default
+
+    import process_batch as pb
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_8_whatnot(state, str(items_dir / "RG-9999"))
+    assert result["outputs"]["whatnot_csv_appended"] is True
+    assert any(d["type"] == "whatnot" for d in state.decisions)
+
+
+def test_phase_9_photos_archive_is_mac_only(tmp_path, monkeypatch):
+    """On non-darwin platforms, phase_9 returns skipped with Mac-only reason."""
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    (items_dir / "RG-9999").mkdir()
+    state = ItemState(sku="RG-9999", items_dir=str(items_dir))
+
+    import process_batch as pb
+    monkeypatch.setattr(pb.sys, "platform", "linux")
+
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_9_photos_archive(state, str(items_dir / "RG-9999"))
+    assert result.get("skipped") is True
+    assert "Mac only" in result.get("reason", "")
+
+
+def test_phase_9_photos_archive_runs_on_darwin(tmp_path, monkeypatch):
+    """On darwin, phase_9 logs and returns ready."""
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    (items_dir / "RG-9999").mkdir()
+    state = ItemState(sku="RG-9999", items_dir=str(items_dir))
+
+    import process_batch as pb
+    monkeypatch.setattr(pb.sys, "platform", "darwin")
+
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_9_photos_archive(state, str(items_dir / "RG-9999"))
+    assert result["outputs"]["photos_archived"] is True
+    assert any(d["type"] == "photos_archive" for d in state.decisions)

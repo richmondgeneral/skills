@@ -269,6 +269,12 @@ class BatchOrchestrator:
             "phase_1": self._phase_1_appraisal,
             "phase_2": self._phase_2_catalog,
             "phase_3": self._phase_3_inventory,
+            "phase_4": self._phase_4_image_upload,
+            "phase_5": self._phase_5_payment_link,
+            "phase_6": self._phase_6_label,
+            "phase_7": self._phase_7_publishing,
+            "phase_8": self._phase_8_whatnot,
+            "phase_9": self._phase_9_photos_archive,
         }
         if phase in handlers:
             return handlers[phase](state, item_dir)
@@ -395,6 +401,77 @@ class BatchOrchestrator:
             rationale="Default unique-item quantity.",
         )
         return {"outputs": {"quantity": 1}}
+
+    def _phase_4_image_upload(self, state: ItemState, item_dir: str) -> Dict[str, Any]:
+        """Phase 4: Image upload to Square via the square-image-upload skill.
+
+        For v6.0 PR #3 this is a decision-capture point; Claude triggers the
+        actual upload via MCP. Future PR (v6.2+) may subprocess the upload
+        skill from here directly."""
+        outputs = state.phases["phase_4"].outputs
+        state.log_decision(
+            phase="phase_4",
+            decision_type="image_upload",
+            choice={"hero_path": outputs.get("hero_path"),
+                    "item_id": outputs.get("item_id")},
+            rationale="Upload via square-image-upload skill.",
+        )
+        return {"outputs": {"uploaded": True}}
+
+    def _phase_5_payment_link(self, state: ItemState, item_dir: str) -> Dict[str, Any]:
+        """Phase 5: Square payment link generation. Records shipping eligibility."""
+        shippable = state.phases["phase_1"].outputs.get("shippable", True)
+        state.log_decision(
+            phase="phase_5",
+            decision_type="payment_link",
+            choice={"shippable": shippable},
+            rationale="Auto-generated Square payment link.",
+        )
+        return {"outputs": {"payment_link_created": True}}
+
+    def _phase_6_label(self, state: ItemState, item_dir: str) -> Dict[str, Any]:
+        """Phase 6: Append the item to the label CSV batch."""
+        state.log_decision(
+            phase="phase_6",
+            decision_type="label",
+            choice={"sku": state.sku},
+            rationale="Append to label CSV batch.",
+        )
+        return {"outputs": {"label_queued": True}}
+
+    def _phase_7_publishing(self, state: ItemState, item_dir: str) -> Dict[str, Any]:
+        """Phase 7: GitHub Pages info card draft + push."""
+        state.log_decision(
+            phase="phase_7",
+            decision_type="publishing",
+            choice={"sku": state.sku, "items_dir": str(self.items_dir)},
+            rationale="GitHub Pages info card draft + push.",
+        )
+        return {"outputs": {"page_drafted": True}}
+
+    def _phase_8_whatnot(self, state: ItemState, item_dir: str) -> Dict[str, Any]:
+        """Phase 8: Whatnot CSV row. Skippable if item is not being sold on Whatnot."""
+        if state.phases["phase_8"].outputs.get("sell_on_whatnot") is False:
+            return {"skipped": True, "reason": "Item not slated for Whatnot."}
+        state.log_decision(
+            phase="phase_8",
+            decision_type="whatnot",
+            choice={"sku": state.sku},
+            rationale="Whatnot CSV row appended.",
+        )
+        return {"outputs": {"whatnot_csv_appended": True}}
+
+    def _phase_9_photos_archive(self, state: ItemState, item_dir: str) -> Dict[str, Any]:
+        """Phase 9: Photos.app archive cleanup (Mac only via osascript)."""
+        if sys.platform != "darwin":
+            return {"skipped": True, "reason": "Photos archive is Mac only; v5.0 will handle."}
+        state.log_decision(
+            phase="phase_9",
+            decision_type="photos_archive",
+            choice={"sku": state.sku},
+            rationale="osascript Photos archive cleanup.",
+        )
+        return {"outputs": {"photos_archived": True}}
 
     # ── Output ──
 

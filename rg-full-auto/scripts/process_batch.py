@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -37,6 +38,11 @@ from item_state import (
     PhaseStatus,
 )
 from onboarding_queue import DEFAULT_QUEUE_PATH, OnboardingQueue, QueueEntry
+
+try:
+    from remove_background import remove_background as _remove_background  # type: ignore
+except ImportError:  # pragma: no cover
+    _remove_background = None  # type: ignore[assignment]
 
 
 DEFAULT_ITEMS_DIR = "/Users/scottybe/workspace/square/items"
@@ -238,16 +244,25 @@ class BatchOrchestrator:
             "progress": state.progress_summary(),
         }
 
-    # ── Phase execution stub (replaced in PR #3) ──
+    # ── Phase execution (real handlers progressively wired in PR #3) ──
 
     def _default_phase_runner(
         self, state: ItemState, phase: str, item_dir: str
     ) -> Dict[str, Any]:
-        """Stub default: blocks every phase, asking the user to wire the real runner.
+        """Default phase runner — dispatches to per-phase handlers.
 
-        PR #3 replaces this with calls into the sibling skills:
-        square-image-upload, photos-library, rg-lot-tracker, etc.
+        Each handler returns the standard runner result shape (see PhaseRunner
+        type alias). Phases not yet wired return the legacy stub-block.
         """
+        handlers: Dict[str, Callable[[ItemState, str], Dict[str, Any]]] = {
+            "phase_0": self._phase_0_image,
+        }
+        if phase in handlers:
+            return handlers[phase](state, item_dir)
+        return self._stub_block(phase)
+
+    def _stub_block(self, phase: str) -> Dict[str, Any]:
+        """Block any phase not yet wired with a 'PR #3 will plug in' question."""
         return {
             "blocked": True,
             "question": PendingQuestion(
@@ -255,10 +270,57 @@ class BatchOrchestrator:
                 phase=phase,
                 question=(
                     f"phase_runner is not wired yet for {PHASE_NAMES.get(phase, phase)}. "
-                    "PR #3 of v6.0 will plug in the real handlers."
+                    "PR #3 of v6.0 is rolling out handlers — this phase isn't done yet."
                 ),
             ),
         }
+
+    def _phase_0_image(self, state: ItemState, item_dir: str) -> Dict[str, Any]:
+        """Phase 0: Image background removal via remove.bg.
+
+        Sources `REMOVEBG_API_KEY` from the environment. Writes hero.png into
+        the item folder. Blocks if the source image is missing or the
+        remove_background module didn't import."""
+        if not state.source_image or not Path(state.source_image).exists():
+            return {
+                "blocked": True,
+                "question": PendingQuestion(
+                    question_id=f"q-phase_0-{state.sku}-source",
+                    phase="phase_0",
+                    question=f"Source image not found for {state.sku}",
+                    context=f"Expected at: {state.source_image}",
+                ),
+            }
+        if _remove_background is None:
+            return {
+                "blocked": True,
+                "question": PendingQuestion(
+                    question_id=f"q-phase_0-{state.sku}-import",
+                    phase="phase_0",
+                    question="remove_background module not importable",
+                    context="Check that requests is installed and the module is on the path.",
+                ),
+            }
+        api_key = os.environ.get("REMOVEBG_API_KEY")
+        if not api_key:
+            return {
+                "blocked": True,
+                "question": PendingQuestion(
+                    question_id=f"q-phase_0-{state.sku}-no-key",
+                    phase="phase_0",
+                    question=f"REMOVEBG_API_KEY environment variable not set",
+                    context="Required for autonomous background removal.",
+                ),
+            }
+        hero_path = str(Path(item_dir) / "hero.png")
+        _remove_background(state.source_image, hero_path, api_key)
+        state.log_decision(
+            phase="phase_0",
+            decision_type="bg_removal",
+            choice={"output": hero_path, "model": "removebg"},
+            rationale="Default remove.bg path; preserves transparency.",
+        )
+        return {"outputs": {"hero_path": hero_path}}
 
     # ── Output ──
 

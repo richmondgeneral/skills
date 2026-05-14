@@ -203,3 +203,73 @@ def test_orchestrator_runner_unknown_shape_marks_phase_failed(tmp_path):
     # Every phase should fail with the unrecognized-result message
     assert state.phases["phase_0"].status == PhaseStatus.FAILED
     assert "unrecognized result" in state.phases["phase_0"].error
+
+
+def test_phase_0_invokes_remove_background(tmp_path, monkeypatch):
+    """The real phase_runner for phase_0 calls remove_background and stores the output path."""
+    photo = tmp_path / "src.jpg"
+    photo.write_bytes(b"x")
+    items_dir = tmp_path / "items"
+    items_dir.mkdir()
+    sku = "RG-9999"
+    (items_dir / sku).mkdir()
+
+    state = ItemState(sku=sku, items_dir=str(items_dir), source_image=str(photo))
+    state.save()
+
+    # Mock the import within process_batch so no API key / network needed
+    calls = []
+    def fake_remove_bg(input_path, output_path, api_key):
+        calls.append({"in": input_path, "out": output_path, "key": api_key})
+        Path(output_path).write_bytes(b"hero")
+
+    import process_batch as pb
+    monkeypatch.setattr(pb, "_remove_background", fake_remove_bg)
+    monkeypatch.setenv("REMOVEBG_API_KEY", "test-key-not-real")
+
+    orch = pb.BatchOrchestrator(
+        items_dir=str(items_dir),
+        queue_path=str(tmp_path / "q.json"),
+    )
+    state.start_phase("phase_0")
+    result = orch._phase_0_image(state, str(items_dir / sku))
+    assert "outputs" in result
+    assert "hero_path" in result["outputs"]
+    assert (items_dir / sku / "hero.png").exists()
+    assert len(calls) == 1
+    assert calls[0]["key"] == "test-key-not-real"
+
+
+def test_phase_0_blocks_when_source_image_missing(tmp_path, monkeypatch):
+    """If state.source_image doesn't exist on disk, phase_0 returns blocked."""
+    items_dir = tmp_path / "items"
+    items_dir.mkdir()
+    sku = "RG-9999"
+    (items_dir / sku).mkdir()
+    state = ItemState(sku=sku, items_dir=str(items_dir),
+                      source_image="/does/not/exist.jpg")
+    import process_batch as pb
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_0_image(state, str(items_dir / sku))
+    assert result.get("blocked") is True
+    assert isinstance(result.get("question"), PendingQuestion)
+
+
+def test_phase_0_blocks_when_remove_background_unavailable(tmp_path, monkeypatch):
+    """If the remove_background module didn't import, phase_0 blocks with a clear question."""
+    items_dir = tmp_path / "items"
+    items_dir.mkdir()
+    sku = "RG-9999"
+    (items_dir / sku).mkdir()
+    photo = tmp_path / "src.jpg"
+    photo.write_bytes(b"x")
+    state = ItemState(sku=sku, items_dir=str(items_dir), source_image=str(photo))
+
+    import process_batch as pb
+    monkeypatch.setattr(pb, "_remove_background", None)
+
+    orch = pb.BatchOrchestrator(items_dir=str(items_dir),
+                                queue_path=str(tmp_path / "q.json"))
+    result = orch._phase_0_image(state, str(items_dir / sku))
+    assert result.get("blocked") is True

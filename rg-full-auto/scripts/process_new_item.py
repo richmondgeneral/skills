@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
 """
-Richmond General - New Item Processing Workflow
+Richmond General - New Item Processing (v6.0)
 
-Claude-supervised, agent-run workflow for processing items from photo to live listing.
+Default mode is autonomous via the BatchOrchestrator (process_batch.py).
+The legacy v3.7 interactive RGItemProcessor remains callable via --interactive.
 
-This script orchestrates phases 0-3 of the 10-phase SKILL.md workflow:
+10-phase SKILL.md workflow:
 0. Image Processing (background removal, file prep)
 1. Appraisal & Research (visual analysis)
-2. Square Catalog Creation (uses description_html with <p> tags per v3.2)
+2. Square Catalog Creation (uses description_html with <p> tags)
 3. Inventory Setup
-
-Phases 4-9 (image upload, payment link, label, info card, Whatnot,
-Photos archive) are documented in SKILL.md and run via sibling skills /
-osascript steps; the script prints next-step hints at the end of run().
+4. Image Upload (square-image-upload skill)
+5. Payment Link
+6. Label CSV
+7. GitHub Pages publishing
+8. Whatnot CSV
+9. Photos library archive (Mac only)
 
 Usage:
-    # Interactive mode (Claude supervises each step)
-    python process_new_item.py --image photo.jpeg --interactive
+    # Default — autonomous (agent decides, user reviews after)
+    python process_new_item.py --image photo.jpeg
 
-    # Batch mode (future - unsupervised)
-    python process_new_item.py --image photo.jpeg --auto
+    # Legacy v3.7 interactive flow (opt-out)
+    python process_new_item.py --image photo.jpeg --interactive
 
 Environment Variables Required:
     SQUARE_ACCESS_TOKEN - Square API access token

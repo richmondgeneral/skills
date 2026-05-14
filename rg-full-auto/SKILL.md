@@ -10,10 +10,17 @@ description: >
   "add to whatnot". NOT for simple edits to existing items -- use rg-item-update for price
   changes, description tweaks, or adding images.
 metadata:
-  version: "3.7"
+  version: "6.0"
   author: scottybe
-  updated: "2026-02-16"
+  updated: "2026-05-14"
   changelog: |
+    v6.0 - Autonomous batch mode is now the default.
+    - process_batch.py orchestrates multi-item runs end-to-end
+    - audit_log.py captures every decision + correction + review timing
+    - --interactive is the opt-out flag for the legacy v3.7 supervised flow
+    - All v3.7 phase ordering and recent bugfixes preserved
+    See docs/plans/2026-05-13-v6-* for the full design + PR history.
+
     v3.7 - Packaging refactor for Mac app compatibility:
     - Moved JSON payloads, formatting rules, troubleshooting, and publishing commands to references/
     - SKILL.md trimmed from 987 to ~500 lines for reliable .skill import
@@ -29,16 +36,20 @@ Complete 10-phase workflow for onboarding new vintage/antique items from acquisi
 
 **Two environments:** Claude's container (text files via Filesystem tools) and User's Mac (binary operations via osascript). Use osascript for all file operations on user's Mac to avoid path case sensitivity issues.
 
-## v6.0 Autonomous Mode (opt-in)
+## v6.0 Autonomous Mode (default)
 
-PR #2 of the v6.0 ship wired the infrastructure from PR #1 into a working batch orchestrator. Autonomous mode runs end-to-end on real items but **only when explicitly invoked** — v3.7 interactive remains the default. PR #3 will flip the default.
+Agent decides everything; user reviews post-onboard. Audit trail captures every decision so review time is bounded and corrections feed the L3 pattern detector (deferred to v6.1+).
 
 ### Invocation
 
 ```bash
-# Single item, autonomous
+# Single item — autonomous by default
 uv run python ~/.claude/skills/rg-full-auto/scripts/process_new_item.py \
-    --image ~/Desktop/photo.jpeg --autonomous
+    --image ~/Desktop/photo.jpeg
+
+# Single item — opt-out to legacy v3.7 supervised flow
+uv run python ~/.claude/skills/rg-full-auto/scripts/process_new_item.py \
+    --image ~/Desktop/photo.jpeg --interactive
 
 # Batch
 uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py \
@@ -48,24 +59,39 @@ uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py status
 uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py resume
 ```
 
-### Audit trail
+### Review flow
 
-Every autonomous decision is recorded. Inspect with:
+After a batch completes:
 
-```bash
-uv run python ~/.claude/skills/rg-full-auto/scripts/audit_log.py report --sku RG-XXXX
-uv run python ~/.claude/skills/rg-full-auto/scripts/audit_log.py review-stats
-```
+1. `audit_log.py review-stats` shows where time was spent on prior reviews.
+2. For each item: open `<items_dir>/RG-XXXX/.state.json` to see the decisions.
+3. Edit any field — price, category, description — through the existing
+   `rg-item-update` skill or directly in Square.
+4. `audit_log.py correct --sku RG-XXXX --decision dec-001 --new 22.00 \
+   --reason "underpriced"` to record the correction (TODO: this subcommand
+   gets wired up in a v6.1 follow-up).
 
-### What's still TODO
+### What changed from v3.7
 
-- The default `phase_runner` in `process_batch.py` blocks every phase pending PR #3, which wires the real Square / remove.bg / Photos integrations.
-- `audit_log.py drift` and `correct` are stubbed (TODO PR #3 / v6.1).
+- `prompt()` and `confirm()` interactive checkpoints are now gated by the
+  `--interactive` flag. Default flow is fully autonomous.
+- New `.state.json` per item; new `ops/inventory/onboarding-queue.json` for
+  the dashboard view; new JSONL audit streams.
+- Phase 0 (image processing) runs first, before Phase 1 (appraisal) — same
+  ordering as v3.7's most recent fixes.
+
+### What stayed the same
+
+- `description_html` field with `<p>` tags
+- `ROOM_BY_TYPE` map with `TOP_LEVEL_ROOMS` handling
+- `sync_to_whatnot.py` literal-`\n` fix
+- `remove_background.py` response.text leak fix
+- Square Location, SKU prefix, GitHub Pages URL — all unchanged
 
 Design: `docs/plans/2026-05-13-v6-super-full-auto-design.md`
 v5.0 portability (deferred): `docs/plans/2026-05-13-v5-portability-deferred.md`
-PR #2 plan (this one): `docs/plans/2026-05-13-v6-pr2-orchestrator.md`
-PR #3 plan: `docs/plans/2026-05-13-v6-pr3-flip-default.md`
+PR #2 plan: `docs/plans/2026-05-13-v6-pr2-orchestrator.md`
+PR #3 plan (this one): `docs/plans/2026-05-13-v6-pr3-flip-default.md`
 
 ## Quick Reference
 

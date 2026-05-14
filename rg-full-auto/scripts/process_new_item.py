@@ -506,8 +506,12 @@ class RGItemProcessor:
 def _run_autonomous(image_path: str, items_dir: Optional[str] = None) -> int:
     """v6.0 autonomous entry point. Init item state, run through orchestrator.
 
-    Opt-in path: only reached when `--autonomous` is passed. Default behavior
-    remains v3.7 interactive. PR #3 makes autonomous the default.
+    Exit codes:
+        0 — all items completed cleanly
+        1 — at least one item failed (unrecoverable error)
+        2 — at least one item is blocked on a pending question (env var
+            missing, source image missing, SKU collision, etc.) — user
+            action required before resume
     """
     from process_batch import BatchOrchestrator
 
@@ -520,7 +524,11 @@ def _run_autonomous(image_path: str, items_dir: Optional[str] = None) -> int:
     summary = orch.process_all()
     print(f"\nFinal: {summary['completed']} completed, {summary['blocked']} blocked, "
           f"{summary['failed']} failed.")
-    return 0 if summary["failed"] == 0 else 1
+    if summary["failed"] > 0:
+        return 1
+    if summary["blocked"] > 0:
+        return 2
+    return 0
 
 
 def main() -> int:

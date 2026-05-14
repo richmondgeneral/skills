@@ -24,6 +24,12 @@
 - `audit_log.py drift` and `audit_log.py correct` CLI subcommands
 - Multi-environment (linux / cloud / cowork) portability — v5.0 epic, see `docs/plans/2026-05-13-v5-portability-deferred.md`
 - Real `_check_sku_in_square_cache` implementation (currently always returns None; v6.1 will wire it to the square-cache MCP)
+- Phase 2 collision-question answer handlers (`overwrite` / `skip` / `renumber`). v6.0 captures the question + user answer in `state.questions`, but the answer text isn't consumed by `_phase_2_catalog` on resume. Because `_check_sku_in_square_cache` always returns None in v6.0, this dead branch isn't exposed in practice; v6.1 will wire both pieces together.
+
+### Exit code contract (process_new_item.py)
+- `0` — all items completed cleanly
+- `1` — at least one item failed (unrecoverable error)
+- `2` — at least one item is blocked on a pending question; user action required before `process_batch.py resume`
 
 ### Backward compatibility
 - Skill name stays `rg-full-auto` — cross-references in `items/CLAUDE.md`, `brand/BRAND.md`, Linear issues all keep working

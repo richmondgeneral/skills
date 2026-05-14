@@ -78,6 +78,51 @@ def test_default_dispatches_to_autonomous(tmp_path, monkeypatch):
     assert calls[0]["image"] == str(photo)
 
 
+def test_autonomous_exit_codes(tmp_path, monkeypatch):
+    """_run_autonomous returns 0 / 1 / 2 based on completed / failed / blocked."""
+    import importlib.util
+    import types
+
+    spec = importlib.util.spec_from_file_location("process_new_item", str(SCRIPT))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # type: ignore
+
+    class FakeState:
+        sku = "RG-TEST"
+
+    class FakeOrchestrator:
+        def __init__(self, *args, **kwargs):
+            self.summary = None
+        def ingest_photos(self, paths):
+            return [FakeState()]
+        def process_all(self):
+            return self.summary
+
+    orch = FakeOrchestrator()
+    fake_process_batch = types.ModuleType("process_batch")
+    fake_process_batch.BatchOrchestrator = lambda *a, **kw: orch
+    monkeypatch.setitem(sys.modules, "process_batch", fake_process_batch)
+
+    photo = tmp_path / "p.jpeg"
+    photo.write_bytes(b"x")
+
+    # Clean success → exit 0
+    orch.summary = {"processed": 1, "completed": 1, "blocked": 0, "failed": 0, "items": {}}
+    assert mod._run_autonomous(str(photo), items_dir=str(tmp_path)) == 0
+
+    # Failed → exit 1
+    orch.summary = {"processed": 1, "completed": 0, "blocked": 0, "failed": 1, "items": {}}
+    assert mod._run_autonomous(str(photo), items_dir=str(tmp_path)) == 1
+
+    # Blocked, none failed → exit 2 (pending question; user action required)
+    orch.summary = {"processed": 1, "completed": 0, "blocked": 1, "failed": 0, "items": {}}
+    assert mod._run_autonomous(str(photo), items_dir=str(tmp_path)) == 2
+
+    # Mixed failed + blocked → exit 1 (failed takes precedence)
+    orch.summary = {"processed": 2, "completed": 0, "blocked": 1, "failed": 1, "items": {}}
+    assert mod._run_autonomous(str(photo), items_dir=str(tmp_path)) == 1
+
+
 def test_interactive_flag_uses_legacy_processor(tmp_path, monkeypatch):
     """When --interactive IS passed, the legacy RGItemProcessor runs (not _run_autonomous)."""
     import importlib.util

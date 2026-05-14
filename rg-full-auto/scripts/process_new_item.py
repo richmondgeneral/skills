@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
 """
-Richmond General - New Item Processing Workflow
+Richmond General - New Item Processing (v6.0)
 
-Claude-supervised, agent-run workflow for processing items from photo to live listing.
+Default mode is autonomous via the BatchOrchestrator (process_batch.py).
+The legacy v3.7 interactive RGItemProcessor remains callable via --interactive.
 
-This script orchestrates phases 0-3 of the 10-phase SKILL.md workflow:
+10-phase SKILL.md workflow:
 0. Image Processing (background removal, file prep)
 1. Appraisal & Research (visual analysis)
-2. Square Catalog Creation (uses description_html with <p> tags per v3.2)
+2. Square Catalog Creation (uses description_html with <p> tags)
 3. Inventory Setup
-
-Phases 4-9 (image upload, payment link, label, info card, Whatnot,
-Photos archive) are documented in SKILL.md and run via sibling skills /
-osascript steps; the script prints next-step hints at the end of run().
+4. Image Upload (square-image-upload skill)
+5. Payment Link
+6. Label CSV
+7. GitHub Pages publishing
+8. Whatnot CSV
+9. Photos library archive (Mac only)
 
 Usage:
-    # Interactive mode (Claude supervises each step)
-    python process_new_item.py --image photo.jpeg --interactive
+    # Default — autonomous (agent decides, user reviews after)
+    python process_new_item.py --image photo.jpeg
 
-    # Batch mode (future - unsupervised)
-    python process_new_item.py --image photo.jpeg --auto
+    # Legacy v3.7 interactive flow (opt-out)
+    python process_new_item.py --image photo.jpeg --interactive
 
 Environment Variables Required:
     SQUARE_ACCESS_TOKEN - Square API access token
@@ -503,8 +506,12 @@ class RGItemProcessor:
 def _run_autonomous(image_path: str, items_dir: Optional[str] = None) -> int:
     """v6.0 autonomous entry point. Init item state, run through orchestrator.
 
-    Opt-in path: only reached when `--autonomous` is passed. Default behavior
-    remains v3.7 interactive. PR #3 makes autonomous the default.
+    Exit codes:
+        0 — all items completed cleanly
+        1 — at least one item failed (unrecoverable error)
+        2 — at least one item is blocked on a pending question (env var
+            missing, source image missing, SKU collision, etc.) — user
+            action required before resume
     """
     from process_batch import BatchOrchestrator
 
@@ -517,36 +524,43 @@ def _run_autonomous(image_path: str, items_dir: Optional[str] = None) -> int:
     summary = orch.process_all()
     print(f"\nFinal: {summary['completed']} completed, {summary['blocked']} blocked, "
           f"{summary['failed']} failed.")
-    return 0 if summary["failed"] == 0 else 1
+    if summary["failed"] > 0:
+        return 1
+    if summary["blocked"] > 0:
+        return 2
+    return 0
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
-        description='Process new Richmond General items through complete workflow',
+        description=(
+            "rg-full-auto v6.0 item processor. Default is autonomous "
+            "(agent decides everything, user reviews after). Use --interactive "
+            "for the legacy v3.7 supervised flow."
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
+        epilog=__doc__,
     )
-
     parser.add_argument(
-        '--image', '-i',
+        "--image", "-i",
         required=True,
-        help='Path to item photo'
+        help="Path to item photo",
     )
     parser.add_argument(
-        '--interactive',
-        action='store_true',
-        default=True,
-        help='Interactive mode with user supervision (default)'
-    )
-    parser.add_argument(
-        '--auto',
-        action='store_true',
-        help='Automatic mode (unsupervised - future)'
+        "--interactive",
+        action="store_true",
+        help="Use the legacy v3.7 interactive flow (asks for each decision). "
+             "Default behavior is autonomous.",
     )
     parser.add_argument(
         "--autonomous",
         action="store_true",
-        help="v6.0 opt-in: run through BatchOrchestrator instead of interactive flow",
+        help="(Now the default; kept for backward compatibility with PR #2 invocations.)",
+    )
+    parser.add_argument(
+        "--auto",
+        action="store_true",
+        help="(Legacy v3.7 unsupervised flag; only relevant with --interactive.)",
     )
     parser.add_argument(
         "--items-dir",
@@ -556,10 +570,11 @@ def main():
 
     args = parser.parse_args()
 
-    if args.autonomous:
+    # Default path: autonomous via BatchOrchestrator
+    if not args.interactive:
         return _run_autonomous(args.image, items_dir=args.items_dir)
 
-    # Existing v3.7 interactive path
+    # Opt-out: legacy v3.7 interactive flow
     try:
         processor = RGItemProcessor(interactive=not args.auto)
         processor.run(args.image)

@@ -17,6 +17,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+# Import from sibling module; both live in the same scripts/ dir on sys.path.
+from item_state import ItemState, ItemStatus, PhaseStatus  # type: ignore
+
 
 DEFAULT_QUEUE_PATH = "/Users/scottybe/workspace/square/ops/inventory/onboarding-queue.json"
 
@@ -38,6 +41,23 @@ class QueueEntry:
         if not self.created_at:
             self.created_at = now
         self.updated_at = now
+
+    @classmethod
+    def from_item_state(cls, state: "ItemState") -> "QueueEntry":
+        """Build a queue entry from a live ItemState. Both sides share strings."""
+        completed = sum(
+            1 for p in state.phases.values() if p.status == PhaseStatus.COMPLETED
+        )
+        unanswered = sum(1 for q in state.questions if not q.get("answer"))
+        return cls(
+            sku=state.sku,
+            status=state.status.value,
+            source_image=state.source_image,
+            created_at=state.created_at,
+            phases_completed=completed,
+            phases_total=len(state.phases),
+            pending_questions=unanswered,
+        )
 
 
 @dataclass
@@ -78,3 +98,11 @@ class OnboardingQueue:
         }
         tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         tmp.replace(path)
+
+    def get_active(self) -> List[QueueEntry]:
+        """Entries in non-terminal states: queued / processing / blocked."""
+        terminal = {ItemStatus.COMPLETED.value, ItemStatus.FAILED.value}
+        return [e for e in self.entries if e.status not in terminal]
+
+    def get_blocked(self) -> List[QueueEntry]:
+        return [e for e in self.entries if e.status == ItemStatus.BLOCKED.value]

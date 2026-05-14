@@ -29,18 +29,43 @@ Complete 10-phase workflow for onboarding new vintage/antique items from acquisi
 
 **Two environments:** Claude's container (text files via Filesystem tools) and User's Mac (binary operations via osascript). Use osascript for all file operations on user's Mac to avoid path case sensitivity issues.
 
-## v6.0 Infrastructure (dormant in v3.7 behavior)
+## v6.0 Autonomous Mode (opt-in)
 
-PR #1 of the v6.0 ship landed three new modules. **None are active in the default flow** — v3.7 interactive behavior is unchanged. They exist so PR #2 can wire them up:
+PR #2 of the v6.0 ship wired the infrastructure from PR #1 into a working batch orchestrator. Autonomous mode runs end-to-end on real items but **only when explicitly invoked** — v3.7 interactive remains the default. PR #3 will flip the default.
 
-| Module | Purpose |
-|---|---|
-| `scripts/item_state.py` | Per-item state machine. Will persist `.state.json` in each item folder once PR #2 activates it. |
-| `scripts/onboarding_queue.py` | Centralized queue dashboard. Will write `ops/inventory/onboarding-queue.json` once activated. |
-| `scripts/audit_log.py` | Append-only JSONL writer for `decisions.jsonl`, `corrections.jsonl`, `review_log.jsonl`. Used by v6.0's "agent decides, user reviews" autonomy flow. |
+### Invocation
+
+```bash
+# Single item, autonomous
+uv run python ~/.claude/skills/rg-full-auto/scripts/process_new_item.py \
+    --image ~/Desktop/photo.jpeg --autonomous
+
+# Batch
+uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py \
+    ingest --photos ~/Desktop/batch/*.jpeg
+uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py run
+uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py status
+uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py resume
+```
+
+### Audit trail
+
+Every autonomous decision is recorded. Inspect with:
+
+```bash
+uv run python ~/.claude/skills/rg-full-auto/scripts/audit_log.py report --sku RG-XXXX
+uv run python ~/.claude/skills/rg-full-auto/scripts/audit_log.py review-stats
+```
+
+### What's still TODO
+
+- The default `phase_runner` in `process_batch.py` blocks every phase pending PR #3, which wires the real Square / remove.bg / Photos integrations.
+- `audit_log.py drift` and `correct` are stubbed (TODO PR #3 / v6.1).
 
 Design: `docs/plans/2026-05-13-v6-super-full-auto-design.md`
 v5.0 portability (deferred): `docs/plans/2026-05-13-v5-portability-deferred.md`
+PR #2 plan (this one): `docs/plans/2026-05-13-v6-pr2-orchestrator.md`
+PR #3 plan: `docs/plans/2026-05-13-v6-pr3-flip-default.md`
 
 ## Quick Reference
 

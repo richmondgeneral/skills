@@ -98,3 +98,54 @@ def test_audit_log_init_does_not_create_log_dir(tmp_path):
     # First write should create it.
     al.log_review_event(sku="RG-0001", event="review_started")
     assert nonexistent.exists()
+
+
+def test_log_correction_returns_id(tmp_path):
+    """log_correction returns a correction_id for chained traceability."""
+    al = AuditLog(log_dir=str(tmp_path))
+    cid = al.log_correction(
+        sku="RG-0099",
+        decision_id="dec-001",
+        decision_type="price",
+        agent_choice=18.50,
+        corrected_to=22.00,
+        correction_source="manual",
+        reason="underpriced",
+        reviewer="scottybe",
+    )
+    assert cid.startswith("cor-")
+    assert len(cid) == 12  # "cor-" + 8 hex
+
+
+def test_iter_records_yields_decoded_jsonl(tmp_path):
+    """iter_records yields one dict per JSONL line, lazily."""
+    al = AuditLog(log_dir=str(tmp_path))
+    for i in range(3):
+        al.log_decision(
+            sku=f"RG-{i:04d}",
+            phase="phase_1",
+            decision_type="price",
+            choice=float(10 + i),
+            confidence=0.5,
+            inputs_considered={},
+            alternatives_seen=[],
+            rationale="t",
+        )
+    records = list(al.iter_records("decisions"))
+    assert len(records) == 3
+    assert records[0]["sku"] == "RG-0000"
+    assert records[2]["choice"] == 12.0
+
+
+def test_iter_records_empty_file(tmp_path):
+    """iter_records on a non-existent stream returns an empty iterator."""
+    al = AuditLog(log_dir=str(tmp_path / "empty"))
+    records = list(al.iter_records("decisions"))
+    assert records == []
+
+
+def test_iter_records_invalid_stream_raises(tmp_path):
+    """iter_records rejects unknown stream names."""
+    al = AuditLog(log_dir=str(tmp_path))
+    with pytest.raises(ValueError, match="Unknown stream"):
+        list(al.iter_records("not_a_stream"))

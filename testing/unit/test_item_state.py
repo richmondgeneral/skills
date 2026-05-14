@@ -134,3 +134,203 @@ def test_item_state_save_updates_updated_at(tmp_path):
     state.save()
     assert state.created_at == original_created_at  # preserved
     assert state.updated_at > original_updated_at   # bumped
+
+
+def test_item_state_load_preserves_updated_at(tmp_path):
+    """Loading a serialized item should NOT bump updated_at — only mutations should."""
+    import time
+    (tmp_path / "RG-0099").mkdir()
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.save()
+    original_updated = state.updated_at
+    time.sleep(0.01)
+    loaded = ItemState.load("RG-0099", items_dir=str(tmp_path))
+    assert loaded.updated_at == original_updated, \
+        "load() must preserve updated_at; bumping makes the in-memory model disagree with disk"
+
+
+def test_phase_dependencies_constant_exists():
+    """PHASE_DEPENDENCIES maps each phase to its required predecessors."""
+    from item_state import PHASE_DEPENDENCIES, PHASES
+    assert set(PHASE_DEPENDENCIES.keys()) == set(PHASES)
+    # phase_0 has no deps
+    assert PHASE_DEPENDENCIES["phase_0"] == []
+    # phase_4 (image upload) needs phase_0 (image) AND phase_2 (catalog)
+    assert "phase_0" in PHASE_DEPENDENCIES["phase_4"]
+    assert "phase_2" in PHASE_DEPENDENCIES["phase_4"]
+
+
+def test_pending_question_defaults():
+    """A new PendingQuestion has empty answer + asked_at timestamp."""
+    from item_state import PendingQuestion
+    q = PendingQuestion(question_id="q-001", phase="phase_1", question="What era?")
+    assert q.answer is None
+    assert q.is_answered() is False
+    assert q.context == ""
+    assert q.options == []
+    assert q.asked_at != ""  # __post_init__ sets it
+
+
+def test_pending_question_is_answered():
+    """is_answered returns True when answer is non-empty."""
+    from item_state import PendingQuestion
+    q = PendingQuestion(question_id="q-001", phase="phase_1", question="?")
+    assert q.is_answered() is False
+    q.answer = "1979"
+    assert q.is_answered() is True
+    q.answer = ""
+    assert q.is_answered() is False  # empty string doesn't count
+
+
+def test_pending_question_round_trip(tmp_path):
+    """PendingQuestion round-trips through asdict / from_dict."""
+    from item_state import PendingQuestion
+    from dataclasses import asdict
+    q = PendingQuestion(
+        question_id="q-001",
+        phase="phase_1",
+        question="What era?",
+        context="The cover has 1979 stamped",
+        options=["1970s", "1980s"],
+        answer="1979",
+    )
+    d = asdict(q)
+    assert d["answer"] == "1979"
+    q2 = PendingQuestion(**d)
+    assert q2.is_answered()
+    assert q2.options == ["1970s", "1980s"]
+
+
+def test_start_phase_transitions_pending_to_in_progress(tmp_path):
+    """start_phase records started_at and transitions to IN_PROGRESS."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_0")
+    assert state.phases["phase_0"].status == PhaseStatus.IN_PROGRESS
+    assert state.phases["phase_0"].started_at != ""
+    assert state.status == ItemStatus.PROCESSING
+
+
+def test_complete_phase_records_outputs(tmp_path):
+    """complete_phase records completed_at and stores outputs."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_0")
+    state.complete_phase("phase_0", outputs={"hero_path": "/tmp/hero.png"})
+    p = state.phases["phase_0"]
+    assert p.status == PhaseStatus.COMPLETED
+    assert p.completed_at != ""
+    assert p.outputs["hero_path"] == "/tmp/hero.png"
+
+
+def test_fail_phase_records_error(tmp_path):
+    """fail_phase records the error and transitions item status to FAILED."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_0")
+    state.fail_phase("phase_0", error="remove.bg returned 500")
+    assert state.phases["phase_0"].status == PhaseStatus.FAILED
+    assert state.phases["phase_0"].error == "remove.bg returned 500"
+    assert state.status == ItemStatus.FAILED
+
+
+def test_block_phase_parks_question_and_blocks_item(tmp_path):
+    """block_phase moves phase to BLOCKED and item to BLOCKED."""
+    from item_state import PendingQuestion
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_1")
+    q = PendingQuestion(question_id="q-001", phase="phase_1", question="What era?")
+    state.block_phase("phase_1", q)
+    assert state.phases["phase_1"].status == PhaseStatus.BLOCKED
+    assert state.status == ItemStatus.BLOCKED
+    assert len(state.questions) == 1
+
+
+def test_skip_phase(tmp_path):
+    """skip_phase marks a phase SKIPPED with reason."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.skip_phase("phase_8", reason="not selling on Whatnot")
+    assert state.phases["phase_8"].status == PhaseStatus.SKIPPED
+    assert state.phases["phase_8"].outputs.get("skip_reason") == "not selling on Whatnot"
+
+
+def test_item_status_recalculates(tmp_path):
+    """After all phases complete or skip, item status becomes COMPLETED."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    for phase in [f"phase_{i}" for i in range(10)]:
+        state.start_phase(phase)
+        state.complete_phase(phase, outputs={})
+    assert state.status == ItemStatus.COMPLETED
+
+
+def test_next_runnable_phase_starts_at_phase_0(tmp_path):
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    assert state.next_runnable_phase() == "phase_0"
+
+
+def test_next_runnable_phase_respects_dependencies(tmp_path):
+    """After phase_0 completes, phase_1 is runnable. phase_2 isn't until phase_1 done."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_0")
+    state.complete_phase("phase_0", outputs={})
+    runnable = state.next_runnable_phase()
+    assert runnable == "phase_1"
+
+
+def test_next_runnable_phase_returns_none_when_all_done(tmp_path):
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    for p in [f"phase_{i}" for i in range(10)]:
+        state.start_phase(p)
+        state.complete_phase(p, outputs={})
+    assert state.next_runnable_phase() is None
+
+
+def test_next_runnable_phase_skips_blocked_branch(tmp_path):
+    """If phase_1 is BLOCKED, phase_2 (depends on phase_1) can't run; but phase_4 only
+    needs phase_0 AND phase_2 — also can't run. Returns None when nothing runnable."""
+    from item_state import PendingQuestion
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_0")
+    state.complete_phase("phase_0", outputs={})
+    state.start_phase("phase_1")
+    state.block_phase("phase_1", PendingQuestion(question_id="q", phase="phase_1", question="?"))
+    # phase_1 is blocked. phase_2 depends on phase_1, can't run. Nothing else has phase_0 as
+    # its ONLY dep (phase_4 needs phase_2 too). So next runnable = None.
+    assert state.next_runnable_phase() is None
+
+
+def test_progress_summary(tmp_path):
+    """progress_summary returns counts by phase status."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_0")
+    state.complete_phase("phase_0", outputs={})
+    summary = state.progress_summary()
+    assert summary["completed"] == 1
+    assert summary["pending"] == 9
+    assert summary["total"] == 10
+
+
+def test_log_decision_appends_to_state(tmp_path):
+    """log_decision appends a decision record to state.decisions."""
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.log_decision(
+        phase="phase_1",
+        decision_type="price",
+        choice=18.50,
+        rationale="midpoint of comps",
+    )
+    assert len(state.decisions) == 1
+    assert state.decisions[0]["type"] == "price"
+    assert state.decisions[0]["choice"] == 18.50
+
+
+def test_answer_question_unblocks(tmp_path):
+    """answer_question fills in the answer + can transition the phase back."""
+    from item_state import PendingQuestion
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.start_phase("phase_1")
+    state.block_phase("phase_1", PendingQuestion(
+        question_id="q-001", phase="phase_1", question="?"
+    ))
+    result = state.answer_question("q-001", "1979")
+    assert result == "phase_1"
+    assert state.questions[0]["answer"] == "1979"
+    # Phase remains BLOCKED until orchestrator decides to re-run it; just stores answer.
+    assert state.phases["phase_1"].status == PhaseStatus.BLOCKED

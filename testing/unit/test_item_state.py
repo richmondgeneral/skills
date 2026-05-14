@@ -134,3 +134,27 @@ def test_item_state_save_updates_updated_at(tmp_path):
     state.save()
     assert state.created_at == original_created_at  # preserved
     assert state.updated_at > original_updated_at   # bumped
+
+
+def test_item_state_load_preserves_updated_at(tmp_path):
+    """Loading a serialized item should NOT bump updated_at — only mutations should."""
+    import time
+    (tmp_path / "RG-0099").mkdir()
+    state = ItemState(sku="RG-0099", items_dir=str(tmp_path))
+    state.save()
+    original_updated = state.updated_at
+    time.sleep(0.01)
+    loaded = ItemState.load("RG-0099", items_dir=str(tmp_path))
+    assert loaded.updated_at == original_updated, \
+        "load() must preserve updated_at; bumping makes the in-memory model disagree with disk"
+
+
+def test_phase_dependencies_constant_exists():
+    """PHASE_DEPENDENCIES maps each phase to its required predecessors."""
+    from item_state import PHASE_DEPENDENCIES, PHASES
+    assert set(PHASE_DEPENDENCIES.keys()) == set(PHASES)
+    # phase_0 has no deps
+    assert PHASE_DEPENDENCIES["phase_0"] == []
+    # phase_4 (image upload) needs phase_0 (image) AND phase_2 (catalog)
+    assert "phase_0" in PHASE_DEPENDENCIES["phase_4"]
+    assert "phase_2" in PHASE_DEPENDENCIES["phase_4"]

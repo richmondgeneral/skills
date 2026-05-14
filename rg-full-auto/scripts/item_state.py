@@ -66,6 +66,38 @@ class PhaseData:
 PHASES = [f"phase_{i}" for i in range(10)]
 
 
+# Each phase lists its required predecessors. Used by next_runnable_phase()
+# to determine which phases can run when others are blocked.
+PHASE_DEPENDENCIES: Dict[str, List[str]] = {
+    "phase_0": [],                              # image bg-removal
+    "phase_1": ["phase_0"],                     # appraisal (needs cleaned hero)
+    "phase_2": ["phase_1"],                     # catalog (needs price + title)
+    "phase_3": ["phase_2"],                     # inventory (needs variation_id)
+    "phase_4": ["phase_0", "phase_2"],          # image upload (hero + item_id)
+    "phase_5": ["phase_2"],                     # payment link (needs price)
+    "phase_6": ["phase_1", "phase_5"],          # label CSV (needs appraisal + link)
+    "phase_7": ["phase_0", "phase_1", "phase_5"], # publishing (hero + content + link)
+    "phase_8": ["phase_7"],                     # Whatnot CSV (needs published card)
+    "phase_9": ["phase_0", "phase_7"],          # Photos archive (cleanup last)
+}
+
+
+# Human-readable labels for logs and dashboards. The on-disk schema uses
+# the numeric phase_N keys; labels are display-only.
+PHASE_NAMES: Dict[str, str] = {
+    "phase_0": "Image Processing",
+    "phase_1": "Appraisal & Research",
+    "phase_2": "Square Catalog",
+    "phase_3": "Inventory Setup",
+    "phase_4": "Image Upload",
+    "phase_5": "Payment Link",
+    "phase_6": "Label CSV",
+    "phase_7": "Publishing",
+    "phase_8": "Whatnot CSV",
+    "phase_9": "Photos Archive",
+}
+
+
 @dataclass
 class ItemState:
     """Per-item state container; persists to <items_dir>/<sku>/.state.json."""
@@ -92,7 +124,12 @@ class ItemState:
         now = datetime.now(timezone.utc).isoformat()
         if not self.created_at:
             self.created_at = now
-        self.updated_at = now
+        if not self.updated_at:                    # NEW — only set on first creation
+            self.updated_at = now
+
+    def touch(self) -> None:                       # NEW
+        """Bump updated_at to now. Call before save() on mutations."""
+        self.updated_at = datetime.now(timezone.utc).isoformat()
 
     @property
     def state_file(self) -> Path:
@@ -114,7 +151,7 @@ class ItemState:
 
     def save(self) -> None:
         """Write .state.json atomically (tmp → rename). Parent dir must exist."""
-        self.updated_at = datetime.now(timezone.utc).isoformat()
+        self.touch()
         tmp = self.state_file.with_suffix(self.state_file.suffix + ".tmp")
         tmp.write_text(
             json.dumps(self.to_dict(), indent=2),

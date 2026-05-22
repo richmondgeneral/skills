@@ -84,12 +84,11 @@ def parse_env_value(raw: str) -> str:
     Without this, a perfectly normal `KEY=token # prod` produces a malformed
     `token # prod` and fails Square auth silently with a 401.
 
-    Conceptually derived from `parse_env_value` in
-    `skills/square-image-upload-cowork/scripts/upload_to_square.py`, but with
-    the close-quote search fixed so quoted values followed by inline comments
-    parse correctly (the peer treats the line's last char as the close quote,
-    which breaks on `KEY="value" # comment`). TODO: backport this fix to the
-    peer skill when it's next touched — they should share one implementation.
+    Shared implementation with `parse_env_value` in
+    `skills/square-image-upload-cowork/scripts/upload_to_square.py`. Both
+    skills are deliberately stdlib-only and self-contained for cowork sandbox
+    portability, so the helper is duplicated rather than extracted — keep the
+    two copies in sync when changing either.
     """
     val = raw.strip()
     # Quoted value — find the next matching quote, discard everything after it.

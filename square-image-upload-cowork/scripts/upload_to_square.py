@@ -84,14 +84,30 @@ def log(msg: str) -> None:
 
 def parse_env_value(raw: str) -> str:
     """Strip whitespace, matching outer quotes, and unquoted inline `#`
-    comments from a .env value. Quoted values are taken verbatim — a `#`
-    inside `"..."` or `'...'` is part of the token, not a comment marker.
+    comments from a .env value.
+
+    - Quoted value: take everything between the opening and the next matching
+      quote verbatim — `#` inside quotes is part of the token. Anything after
+      the closing quote (typically a trailing inline comment) is discarded.
+    - Unquoted: everything from the first `#` onward is a comment.
+
     Without this, a perfectly normal `KEY=token # prod` produces a malformed
-    `token # prod` and fails auth silently.
+    `token # prod` and fails Square auth silently with a 401.
+
+    Shared implementation with `parse_env_value` in
+    `skills/rg-item-mark-sold/scripts/delete_payment_link.py`. Both skills
+    are deliberately stdlib-only and self-contained for cowork sandbox
+    portability, so the helper is duplicated rather than extracted — keep
+    the two copies in sync when changing either.
     """
     val = raw.strip()
-    if len(val) >= 2 and val[0] == val[-1] and val[0] in ("'", '"'):
-        return val[1:-1]
+    # Quoted value — find the next matching quote, discard everything after it.
+    if val and val[0] in ("'", '"'):
+        quote = val[0]
+        close = val.find(quote, 1)
+        if close >= 1:
+            return val[1:close]
+        # No closing quote on this line — fall through and treat as unquoted.
     # Unquoted: everything from the first `#` onward is a comment.
     if "#" in val:
         val = val.split("#", 1)[0].strip()

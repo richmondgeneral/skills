@@ -1,6 +1,6 @@
 ---
 name: rg-item-update
-description: Quick edits to existing Richmond General catalog items. Use for price changes, description updates, SEO tweaks, adding/replacing images, category changes, or fixing typos. Triggers on "update item", "change price", "edit description", "fix", "modify existing". Also handles BATCH operations like "move all food items" or "update category for multiple items". NOT for new items—use rg-full-auto for complete onboarding workflow.
+description: Quick edits to existing Richmond General catalog items. Use for price changes, description updates, SEO tweaks, adding/replacing images, category changes, or fixing typos. Triggers on "update item", "change price", "edit description", "fix", "modify existing". Also handles BATCH operations like "move all food items" or "update category for multiple items". NOT for new items—use rg-full-auto for complete onboarding workflow. NOT for items that have sold—use rg-item-mark-sold to migrate the listing to the sold-archive pattern and delete the Square payment link.
 metadata:
   version: "1.4"
   author: scottybe
@@ -223,6 +223,7 @@ Verification:
 | Skill | Use For |
 |-------|---------|
 | `rg-full-auto` | New item onboarding (10-phase workflow) |
+| `rg-item-mark-sold` | Terminal state — item sold, kill the Square payment link, migrate the GitHub Pages card to the sold-archive pattern |
 | `square-image-upload` | Dedicated image upload handling |
 | `square-catalog-ops` | Category merge, cleanup audit, compliance proof |
 | `square-webhook-monitor` | Webhook subscription and monitor operations |

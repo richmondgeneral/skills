@@ -74,3 +74,13 @@ def test_empty_value(parse):
 
 def test_whitespace_only(parse):
     assert parse("   ") == ""
+
+
+def test_quoted_value_with_trailing_comment(parse):
+    """A `.env` line of `KEY="value" # comment` must yield `value`.
+
+    The naive `val[0] == val[-1]` close-quote detector misses this: the last
+    char is `t` (from `comment`), not `"`, so the value falls through to the
+    unquoted branch and returns `"value` (leading quote intact). Silent 401
+    against Square in production."""
+    assert parse('"sq0atp-xxxxxxxx"  # prod') == "sq0atp-xxxxxxxx"

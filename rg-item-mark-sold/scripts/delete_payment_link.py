@@ -85,10 +85,11 @@ def parse_env_value(raw: str) -> str:
     `token # prod` and fails Square auth silently with a 401.
 
     Shared implementation with `parse_env_value` in
-    `skills/square-image-upload-cowork/scripts/upload_to_square.py`. Both
-    skills are deliberately stdlib-only and self-contained for cowork sandbox
-    portability, so the helper is duplicated rather than extracted — keep the
-    two copies in sync when changing either.
+    `skills/square-image-upload-cowork/scripts/upload_to_square.py` and
+    `skills/square-image-upload/scripts/refresh_item_image.py`. All three
+    scripts are deliberately stdlib-only and self-contained for cowork
+    sandbox portability, so the helper is duplicated rather than extracted
+    — keep the three copies in sync when changing any one.
     """
     val = raw.strip()
     # Quoted value — find the next matching quote, discard everything after it.

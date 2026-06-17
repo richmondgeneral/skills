@@ -188,14 +188,18 @@ log "INFO" "Sync complete: Created=$CREATED Updated=$UPDATED Errors=$ERRORS"
 STATUS="success"
 [ "$ERRORS" -gt 0 ] && STATUS="partial"
 
-mongosh square_cache --quiet --eval "db.sync_log.insertOne({
-    timestamp: new Date(),
-    sync_type: 'crm_contacts',
-    contact_count: $CONTACT_COUNT,
-    created: $CREATED,
-    updated: $UPDATED,
-    errors: $ERRORS,
-    status: '$STATUS'
-})" >> "$LOG_FILE" 2>&1 || true
-
-log "INFO" "Sync logged to MongoDB"
+if command -v mongosh > /dev/null 2>&1; then
+    mongosh square_cache --quiet --eval "db.sync_log.insertOne({
+        timestamp: new Date(),
+        sync_type: 'crm_contacts',
+        contact_count: $CONTACT_COUNT,
+        created: $CREATED,
+        updated: $UPDATED,
+        errors: $ERRORS,
+        status: '$STATUS'
+    })" >> "$LOG_FILE" 2>&1 \
+        && log "INFO" "Sync logged to MongoDB" \
+        || log "WARN" "MongoDB write failed"
+else
+    log "WARN" "mongosh not found in PATH ($PATH) - sync not logged to MongoDB"
+fi

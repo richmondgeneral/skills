@@ -86,9 +86,11 @@ class PhotosLibrary:
 
     def _connect(self) -> sqlite3.Connection:
         """Create database connection."""
-        # Read-only connection to avoid any issues
+        # Open read-only AND immutable: Photos.sqlite is a live, WAL-mode,
+        # cloudphotod-managed database. immutable=1 means reads take no locks
+        # and never touch the WAL, so they can't disrupt iCloud Photos sync.
         try:
-            conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
+            conn = sqlite3.connect(f"file:{self.db_path}?mode=ro&immutable=1", uri=True)
             conn.row_factory = sqlite3.Row
             return conn
         except sqlite3.OperationalError as e:

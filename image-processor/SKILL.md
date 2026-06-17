@@ -2,10 +2,16 @@
 name: image-processor
 description: Unified image processing with background removal, generation, editing, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "photos library", "get from photos", or when rg-full-auto needs image processing.
 metadata:
-  version: "1.4"
+  version: "1.5"
   author: scottybe
-  updated: "2026-05-11"
+  updated: "2026-06-17"
   changelog: |
+    v1.5 - Safe Photos database access:
+    - lib/photos.py now opens Photos.sqlite with mode=ro&immutable=1 (was
+      mode=ro only). immutable=1 additionally prevents shared locks and WAL
+      reads on the live cloudphotod-managed database, matching photos-library
+      v1.3. Avoids any chance of disrupting iCloud Photos sync.
+
     v1.4 - Catalog-cleanup CLI, model upgrade, reliability:
     - Added `clean.py` — catalog-image cleanup driver. One universal prompt
       produces a clean storefront-ready photo from any source. Replaces the

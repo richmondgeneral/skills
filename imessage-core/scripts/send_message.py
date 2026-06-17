@@ -17,6 +17,10 @@ import sys
 import subprocess
 import re
 
+# chat.db is live, WAL-mode, and continuously written by Messages + iCloud.
+# Open it read-only AND immutable so reads take no locks and never touch the
+# WAL — a plain connection can checkpoint it and disrupt Messages/iCloud sync.
+# (Reads only; messages are sent via AppleScript, not by writing chat.db.)
 DB_PATH = os.path.expanduser('~/Library/Messages/chat.db')
 
 SERVICE_IDS = {
@@ -28,7 +32,7 @@ SERVICE_IDS = {
 def get_best_service(phone_number):
     """Get the last successful service type for a contact."""
     phone_clean = re.sub(r'[^\d]', '', phone_number)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro&immutable=1", uri=True)
     cursor = conn.cursor()
     
     query = '''
@@ -48,7 +52,7 @@ def get_best_service(phone_number):
 
 def get_chat_guid(chat_id):
     """Get the GUID for a chat by its ROWID."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro&immutable=1", uri=True)
     cursor = conn.cursor()
     cursor.execute("SELECT guid, chat_identifier FROM chat WHERE ROWID = ?", (chat_id,))
     row = cursor.fetchone()
@@ -107,7 +111,7 @@ def lookup_chat(chat_id):
         print(f"GUID: {guid}")
         print(f"Identifier: {identifier}")
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro&immutable=1", uri=True)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT h.id FROM handle h

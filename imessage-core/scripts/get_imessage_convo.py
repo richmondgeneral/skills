@@ -15,6 +15,9 @@ Usage:
 import sqlite3, os, sys, re
 from datetime import datetime, timedelta
 
+# chat.db is live, WAL-mode, and continuously written by Messages + iCloud.
+# Open it read-only AND immutable so reads take no locks and never touch the
+# WAL — a plain connection can checkpoint it and disrupt Messages/iCloud sync.
 DB = os.path.expanduser('~/Library/Messages/chat.db')
 
 SERVICE_IDS = {
@@ -25,7 +28,7 @@ SERVICE_IDS = {
 
 def get_database_range():
     """Get the date range of messages in the local database."""
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(f"file:{DB}?mode=ro&immutable=1", uri=True)
     c = conn.cursor()
     
     # Get oldest message
@@ -95,7 +98,7 @@ def extract_text(blob):
 def get_service(phone):
     """Get best service type for a phone number."""
     phone = re.sub(r'[^\d]', '', phone)
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(f"file:{DB}?mode=ro&immutable=1", uri=True)
     c = conn.cursor()
     c.execute('''SELECT m.service FROM message m JOIN handle h ON m.handle_id=h.ROWID
                  WHERE h.id LIKE ? AND m.is_from_me=1 AND m.is_delivered=1 AND m.error=0
@@ -107,7 +110,7 @@ def get_service(phone):
     return None, None
 
 def list_groups():
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(f"file:{DB}?mode=ro&immutable=1", uri=True)
     c = conn.cursor()
     c.execute('''SELECT c.ROWID, c.display_name, COUNT(chj.handle_id)
                  FROM chat c JOIN chat_handle_join chj ON chj.chat_id=c.ROWID
@@ -123,7 +126,7 @@ def list_groups():
     conn.close()
 
 def get_group(chat_id, limit=25):
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(f"file:{DB}?mode=ro&immutable=1", uri=True)
     c = conn.cursor()
     c.execute('''SELECT datetime(m.date/1000000000+978307200,'unixepoch','localtime'),
                         m.is_from_me, h.id, m.text, m.attributedBody, m.cache_has_attachments
@@ -144,7 +147,7 @@ def get_group(chat_id, limit=25):
 
 def get_convo(phone, limit=25):
     phone = re.sub(r'[^\d]', '', phone)
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(f"file:{DB}?mode=ro&immutable=1", uri=True)
     c = conn.cursor()
     c.execute('''SELECT datetime(m.date/1000000000+978307200,'unixepoch','localtime'),
                         m.is_from_me, m.text, m.attributedBody, m.cache_has_attachments,
@@ -169,7 +172,7 @@ def get_convo(phone, limit=25):
 
 def today_summary():
     """Get summary of today's messages by contact."""
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(f"file:{DB}?mode=ro&immutable=1", uri=True)
     c = conn.cursor()
     today = datetime.now().strftime('%Y-%m-%d')
     c.execute('''SELECT h.id, 

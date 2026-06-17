@@ -13,10 +13,13 @@ import os
 import sys
 from datetime import datetime
 
+# chat.db is live, WAL-mode, and continuously written by Messages + iCloud.
+# Open it read-only AND immutable so reads take no locks and never touch the
+# WAL — a plain connection can checkpoint it and disrupt Messages/iCloud sync.
 DB = os.path.expanduser('~/Library/Messages/chat.db')
 
 def sent_today(failed_only=False):
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(f"file:{DB}?mode=ro&immutable=1", uri=True)
     c = conn.cursor()
     
     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)

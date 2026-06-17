@@ -2,10 +2,18 @@
 name: imessage-core
 description: Read and send iMessage/RCS/SMS messages. Use when user asks to check messages, read texts, send a text, text back, reply to someone, respond to a message, check delivery status, or list group chats. Queries chat.db directly for full sent+received history. Supports 1:1 conversations, group chats, and smart service detection (iMessage vs RCS vs SMS).
 metadata:
-  version: "1.1"
+  version: "1.2"
   author: scottybe
-  updated: "2025-12-21"
+  updated: "2026-06-17"
   changelog: |
+    v1.2 - Safe database access (critical fix):
+    - All scripts now open chat.db with mode=ro&immutable=1 (was a plain
+      read-write connection). chat.db is a live, WAL-mode database written
+      continuously by Messages + iCloud; a plain connection could take locks
+      and checkpoint the WAL, disrupting Messages/iCloud sync. immutable=1
+      guarantees no locks and no WAL access. Scripts are read-only; sending
+      still goes through AppleScript and is unaffected.
+
     v1.1 - Anthropic skills update:
     - Enhanced triggers: "text back", "reply to", "respond to a message"
     - Added author and updated fields

@@ -31,7 +31,10 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
 
     os.makedirs(output_dir, exist_ok=True)
 
-    with sqlite3.connect(db_path) as conn:
+    # Open the live Photos library read-only AND immutable so we never take
+    # locks or touch the WAL — anything less can disrupt cloudphotod's sync
+    # state tracking and force a full iCloud re-pull.
+    with sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True) as conn:
         cursor = conn.cursor()
 
         conditions = ["a.ZTRASHEDSTATE = 0", "a.ZHIDDEN = 0", "a.ZKIND = 0"]

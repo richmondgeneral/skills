@@ -23,7 +23,10 @@ def query_photos(db_path, days=7, min_width=0, favorites_only=False, limit=20, o
     COCOA_EPOCH_OFFSET = 978307200  # Seconds between Unix epoch (1970) and Cocoa epoch (2001)
     SECONDS_PER_DAY = 86400
     
-    with sqlite3.connect(db_path) as conn:
+    # Open the live Photos library read-only AND immutable so we never take
+    # locks or touch the WAL — anything less can disrupt cloudphotod's sync
+    # state tracking and force a full iCloud re-pull.
+    with sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True) as conn:
         cursor = conn.cursor()
 
         conditions = ["a.ZTRASHEDSTATE = 0", "a.ZHIDDEN = 0", "a.ZKIND = 0"]

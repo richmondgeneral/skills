@@ -2,10 +2,21 @@
 name: photos-library
 description: Query and extract photos from macOS Photos Library. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, or pull images from Photos app for processing. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll".
 metadata:
-  version: "1.2"
+  version: "1.3"
   author: scottybe
-  updated: "2026-01-18"
+  updated: "2026-06-17"
   changelog: |
+    v1.3 - Safe database access (critical fix):
+    - All scripts now open Photos.sqlite with mode=ro&immutable=1
+    - Previously query/extract/find_product_clusters used a plain
+      read-write connection, which could take locks and checkpoint the
+      WAL of the live, cloudphotod-managed database. This disrupted
+      iCloud sync-state tracking and forced full re-pulls (symptoms:
+      CloudTrackerLastKnownCloudVersion fetch failures, out-of-order
+      and delayed photo arrival, rotation re-processing, choppy UI).
+    - immutable=1 guarantees no locks and no WAL access; reads can no
+      longer disturb Photos/iCloud sync.
+
     v1.2 - Product photo clustering:
     - Added find_product_clusters.py for auto-grouping photos by shoot
     - Classifies clusters as: product, real_estate, screenshot, single, mixed

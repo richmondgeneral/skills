@@ -73,7 +73,10 @@ def classify_cluster(cluster):
 
 def find_product_clusters(db_path, days=14, min_width=2000, cluster_gap=300):
     """Find photo clusters that are likely product photos."""
-    with sqlite3.connect(db_path) as conn:
+    # Open the live Photos library read-only AND immutable so we never take
+    # locks or touch the WAL — anything less can disrupt cloudphotod's sync
+    # state tracking and force a full iCloud re-pull.
+    with sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True) as conn:
         cursor = conn.cursor()
 
         conditions = [

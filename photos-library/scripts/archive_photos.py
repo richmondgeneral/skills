@@ -73,7 +73,9 @@ def find_uuids_by_filename(
         )
 
     try:
-        conn = sqlite3.connect(f"file:{PHOTOS_DB}?mode=ro", uri=True)
+        # immutable=1 (not just mode=ro) so we take no locks and never touch
+        # the WAL — avoids disrupting cloudphotod's iCloud sync state.
+        conn = sqlite3.connect(f"file:{PHOTOS_DB}?mode=ro&immutable=1", uri=True)
         cursor = conn.cursor()
     except sqlite3.Error as exc:
         return {}, (

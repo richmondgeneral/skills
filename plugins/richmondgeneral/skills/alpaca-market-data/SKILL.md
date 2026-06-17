@@ -43,4 +43,4 @@ python scripts/get_trade.py AAPL
 ```
 
 ## Environment
-Uses shared venv at `~/.claude/skills/.venv`
+Uses the repo's shared `uv` environment (`pyproject.toml` at the repo root).

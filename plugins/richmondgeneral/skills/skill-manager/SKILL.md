@@ -24,7 +24,7 @@ metadata:
 
 # Skill Manager
 
-Repository maintenance skill for `~/.claude/skills`.
+Repository maintenance skill for this repo's `richmondgeneral` plugin (skills under `plugins/richmondgeneral/skills/`).
 
 ## Scope
 
@@ -38,7 +38,7 @@ Do not use this skill as the canonical source for how to design a skill from scr
 ## Canonical Skill-Creation Standard
 
 For creating or substantially rewriting skills, follow this first:
-- `/Users/scottybe/.claude/skills/.system/skill-creator/SKILL.md`
+- `${CLAUDE_PLUGIN_ROOT}/skills/.system/skill-creator/SKILL.md`
 
 Use this skill to enforce those standards across the repository after edits.
 
@@ -58,17 +58,17 @@ Preferred structure:
 
 ## Repository Paths
 
-- Skills root: `~/.claude/skills/`
-- Archive: `~/.claude/skills/archive/`
-- Packaging helper: `~/.claude/skills/docs/build-skill.sh`
-- Template: `~/.claude/skills/docs/reference/SKILL_TEMPLATE.md`
+- Skills root: `${CLAUDE_PLUGIN_ROOT}/skills/`
+- Archive: `${CLAUDE_PLUGIN_ROOT}/skills/archive/`
+- Packaging helper: `${CLAUDE_PLUGIN_ROOT}/skills/docs/build-skill.sh`
+- Template: `${CLAUDE_PLUGIN_ROOT}/skills/docs/reference/SKILL_TEMPLATE.md`
 
 ## Metadata Audit Commands
 
 List active skills and metadata snapshot:
 
 ```bash
-for d in ~/.claude/skills/*; do
+for d in ${CLAUDE_PLUGIN_ROOT}/skills/*; do
   [ -d "$d" ] || continue
   b=$(basename "$d")
   case "$b" in .git|.venv|archive|docs|testing|.pytest_cache|__pycache__) continue;; esac
@@ -83,7 +83,7 @@ done | sort
 Find missing required frontmatter fields:
 
 ```bash
-rg -n "^name:|^description:|^metadata:|version:|author:|updated:" ~/.claude/skills/*/SKILL.md
+rg -n "^name:|^description:|^metadata:|version:|author:|updated:" ${CLAUDE_PLUGIN_ROOT}/skills/*/SKILL.md
 ```
 
 ## Active Skills Snapshot (2026-02-17)
@@ -168,13 +168,13 @@ rg -n "^name:|^description:|^metadata:|version:|author:|updated:" ~/.claude/skil
 Build one skill:
 
 ```bash
-~/.claude/skills/docs/build-skill.sh <skill-name>
+${CLAUDE_PLUGIN_ROOT}/skills/docs/build-skill.sh <skill-name>
 ```
 
 Build all:
 
 ```bash
-~/.claude/skills/docs/build-skill.sh --all
+${CLAUDE_PLUGIN_ROOT}/skills/docs/build-skill.sh --all
 ```
 
 ## Safety Rules

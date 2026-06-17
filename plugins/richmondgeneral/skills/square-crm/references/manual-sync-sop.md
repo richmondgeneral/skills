@@ -13,9 +13,9 @@
 
 | What | Where | How Often |
 |------|-------|-----------|
-| Check for changes in contacts.md | `~/.claude/skills/contacts-manager/references/contacts.md` | Before syncing |
+| Check for changes in contacts.md | `${CLAUDE_PLUGIN_ROOT}/skills/contacts-manager/references/contacts.md` | Before syncing |
 | Check for Square changes | [Square Dashboard](https://dashboard.squareup.com) → Customers | Before syncing |
-| Document conflicts | `~/.claude/skills/square-crm/working/conflict_review_YYYYMMDD.md` | As found |
+| Document conflicts | `${CLAUDE_PLUGIN_ROOT}/skills/square-crm/working/conflict_review_YYYYMMDD.md` | As found |
 | Verify after sync | Both systems | After completing |
 
 ---
@@ -41,7 +41,7 @@
 
 ```bash
 # Open contacts.md
-open ~/.claude/skills/contacts-manager/references/contacts.md
+open ${CLAUDE_PLUGIN_ROOT}/skills/contacts-manager/references/contacts.md
 
 # Open Square Dashboard in browser
 open https://dashboard.squareup.com/login
@@ -52,7 +52,7 @@ open https://dashboard.squareup.com/login
 Create a new file to track what you're syncing:
 
 ```bash
-touch ~/.claude/skills/square-crm/working/sync_log_$(date +%Y%m%d).md
+touch ${CLAUDE_PLUGIN_ROOT}/skills/square-crm/working/sync_log_$(date +%Y%m%d).md
 ```
 
 Edit this file and add:
@@ -196,7 +196,7 @@ Use phone as lookup key:
 
 ```bash
 # Use your lookup script (if available)
-python3 ~/.claude/skills/square-crm/scripts/lookup_customer.py +13124483219
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-crm/scripts/lookup_customer.py +13124483219
 
 # Or manually search Square Dashboard
 Square Dashboard → Customers → Search "+1312-448-3219"
@@ -263,7 +263,7 @@ Square change:    Dec 19, 02:30 PM
 
 **Step 3.3b: Log the conflict**
 
-Create/update `~/.claude/skills/square-crm/working/conflict_review_20251219.md`:
+Create/update `${CLAUDE_PLUGIN_ROOT}/skills/square-crm/working/conflict_review_20251219.md`:
 
 ```markdown
 ## Conflict #1: Walid Bandar (+13124483219)
@@ -411,7 +411,7 @@ Promise: Call confirmed for Tuesday
 
 **What to do:**
 
-1. Open `~/.claude/skills/square-crm/working/conflict_review_20251219.md`
+1. Open `${CLAUDE_PLUGIN_ROOT}/skills/square-crm/working/conflict_review_20251219.md`
 2. Document both versions with timestamps
 3. Think: "What's actually true?"
    - Did you make a promise in contacts.md?
@@ -453,7 +453,7 @@ These are the same! But formatting differs.
 
 - Use normalized format in both: `+13124483219` (E.164)
 - Update whichever system has sloppy formatting
-- Script available: `python3 ~/.claude/skills/square-crm/scripts/lookup_customer.py +13124483219`
+- Script available: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-crm/scripts/lookup_customer.py +13124483219`
 
 ---
 
@@ -475,7 +475,7 @@ Co-Authored-By: Warp <agent@warp.dev>"
 
 ```bash
 # Move completed log to archive
-mv ~/.claude/skills/square-crm/working/sync_log_20251219.md ~/.claude/skills/square-crm/working/archive/
+mv ${CLAUDE_PLUGIN_ROOT}/skills/square-crm/working/sync_log_20251219.md ${CLAUDE_PLUGIN_ROOT}/skills/square-crm/working/archive/
 
 # Or just leave it as-is for quick reference
 ```
@@ -523,7 +523,7 @@ git checkout contacts-manager/references/contacts.md
 **Solution:**
 - Normalize both to E.164 format: `+1 + [area code] + [number]`
 - Example: (312) 448-3219 → +13124483219
-- Use: `python3 ~/.claude/skills/square-crm/scripts/lookup_customer.py [phone]`
+- Use: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-crm/scripts/lookup_customer.py [phone]`
 
 ---
 
@@ -648,16 +648,16 @@ Last Modified: 2025-12-19 11:45:00
 
 ```bash
 # Validate all customers before syncing
-python3 ~/.claude/skills/square-crm/scripts/parse_contacts.py --validate
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-crm/scripts/parse_contacts.py --validate
 
 # Look up a customer by phone
-python3 ~/.claude/skills/square-crm/scripts/lookup_customer.py +13124483219
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-crm/scripts/lookup_customer.py +13124483219
 
 # View current sync state
-cat ~/.claude/skills/square-crm/working/sync_log_*.md
+cat ${CLAUDE_PLUGIN_ROOT}/skills/square-crm/working/sync_log_*.md
 
 # Review conflicts
-cat ~/.claude/skills/square-crm/working/conflict_review_*.md
+cat ${CLAUDE_PLUGIN_ROOT}/skills/square-crm/working/conflict_review_*.md
 ```
 
 ---
@@ -666,8 +666,8 @@ cat ~/.claude/skills/square-crm/working/conflict_review_*.md
 
 - **Square Dashboard**: https://dashboard.squareup.com
 - **Square API Docs**: https://developer.squareup.com/reference/square/v2026-04-21
-- **contacts.md**: `~/.claude/skills/contacts-manager/references/contacts.md`
-- **Sync working directory**: `~/.claude/skills/square-crm/working/`
+- **contacts.md**: `${CLAUDE_PLUGIN_ROOT}/skills/contacts-manager/references/contacts.md`
+- **Sync working directory**: `${CLAUDE_PLUGIN_ROOT}/skills/square-crm/working/`
 
 ---
 

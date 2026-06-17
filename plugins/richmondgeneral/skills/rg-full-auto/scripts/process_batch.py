@@ -9,10 +9,10 @@ Processes multiple items through the 10-phase pipeline with:
   - State persistence (resume across sessions)
 
 Usage:
-  uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py \
+  uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_batch.py \
       --photos ~/Desktop/batch/*.jpeg
-  uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py --resume
-  uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py --status
+  uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_batch.py --resume
+  uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_batch.py --status
 
 This script provides STATE MANAGEMENT and ORCHESTRATION. The actual phase
 execution is delegated to a `phase_runner(state, phase, item_dir)` callable.

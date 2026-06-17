@@ -52,7 +52,7 @@ Use preflight before mutation steps:
 ### 1) Compliance Proof
 
 ```bash
-python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py compliance
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py compliance
 ```
 
 Runs REST + SDK version checks and returns docs traceability for each API call.
@@ -60,7 +60,7 @@ Runs REST + SDK version checks and returns docs traceability for each API call.
 ### 2) List Active Sites
 
 ```bash
-python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py list-sites
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py list-sites
 ```
 
 Returns active `ONLINE_SITE` channels and mapped domains.
@@ -70,13 +70,13 @@ Returns active `ONLINE_SITE` channels and mapped domains.
 Dry-run:
 
 ```bash
-python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py merge-food
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py merge-food
 ```
 
 Apply:
 
 ```bash
-python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py merge-food --apply
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py merge-food --apply
 ```
 
 | Flag | Default | Purpose |
@@ -87,7 +87,7 @@ python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py
 ### 4) Cleanup Audit
 
 ```bash
-python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
 ```
 
 | Flag | Default | Purpose |

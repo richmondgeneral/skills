@@ -10,10 +10,10 @@ When you discover new information about a customer in Square (like their last na
 
 ```bash
 # Update name + add alternate phone
-~/.claude/skills/square-crm/scripts/update_contact_simple.sh "+13129143889" "Mike Giba" "+17085970480"
+${CLAUDE_PLUGIN_ROOT}/skills/square-crm/scripts/update_contact_simple.sh "+13129143889" "Mike Giba" "+17085970480"
 
 # Just update name
-~/.claude/skills/square-crm/scripts/update_contact_simple.sh "+13129143889" "Mike Giba"
+${CLAUDE_PLUGIN_ROOT}/skills/square-crm/scripts/update_contact_simple.sh "+13129143889" "Mike Giba"
 ```
 
 That's it! Your Apple Contacts will be updated instantly.
@@ -264,6 +264,6 @@ When **Phase 3** (bidirectional sync) is implemented, this will be automated. Fo
 ## Next Steps
 
 - Run `./update_contact_simple.sh --help` to see options
-- Check `~/.claude/skills/square-crm/scripts/` for other tools
+- Check `${CLAUDE_PLUGIN_ROOT}/skills/square-crm/scripts/` for other tools
 - See `manual-sync-sop.md` for full 4-system sync workflow
 - See `bidirectional-sync-design.md` for planned automation (Phase 3)

@@ -44,19 +44,19 @@ Agent decides everything; user reviews post-onboard. Audit trail captures every 
 
 ```bash
 # Single item — autonomous by default
-uv run python ~/.claude/skills/rg-full-auto/scripts/process_new_item.py \
+uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_new_item.py \
     --image ~/Desktop/photo.jpeg
 
 # Single item — opt-out to legacy v3.7 supervised flow
-uv run python ~/.claude/skills/rg-full-auto/scripts/process_new_item.py \
+uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_new_item.py \
     --image ~/Desktop/photo.jpeg --interactive
 
 # Batch
-uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py \
+uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_batch.py \
     ingest --photos ~/Desktop/batch/*.jpeg
-uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py run
-uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py status
-uv run python ~/.claude/skills/rg-full-auto/scripts/process_batch.py resume
+uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_batch.py run
+uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_batch.py status
+uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_batch.py resume
 ```
 
 ### Review flow
@@ -129,7 +129,7 @@ Pick one **type** (primary, sets `reporting_category`) + one **tier** (secondary
 
 ## Python Environment
 
-All scripts use **uv**: `uv run --project ~/.claude/skills python ~/.claude/skills/<skill>/scripts/<script>.py <args>`
+All scripts use **uv**: `uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/<skill>/scripts/<script>.py <args>`
 
 ---
 
@@ -160,12 +160,12 @@ do shell script "mkdir -p /Users/scottybe/workspace/square/items/RG-XXXX"
 ### Step 0.4: Auto-discover product photo cluster (preferred)
 
 ```applescript
-do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills python ~/.claude/skills/photos-library/scripts/find_product_clusters.py --days 14 --type product"
+do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/photos-library/scripts/find_product_clusters.py --days 14 --type product"
 ```
 
 If clusters found: confirm with user, copy best image by UUID:
 ```applescript
-do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills python ~/.claude/skills/image-processor/scripts/photos.py --copy 'PHOTO_UUID' --output '/Users/scottybe/workspace/square/items/RG-XXXX/source-original.EXT' 2>&1"
+do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/photos.py --copy 'PHOTO_UUID' --output '/Users/scottybe/workspace/square/items/RG-XXXX/source-original.EXT' 2>&1"
 ```
 
 If no cluster found, fall back to Step 0.5.
@@ -184,7 +184,7 @@ Check size (`stat -f%z`). If > 20MB, compress first: `sips -Z 3000 source --out 
 ### Step 0.7: Remove background
 
 ```applescript
-do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/image-processor/scripts/process.py '/ABSOLUTE/REMOVE_BG_INPUT' --output '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' --quality premium --model removebg 2>&1"
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/process.py '/ABSOLUTE/REMOVE_BG_INPUT' --output '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' --quality premium --model removebg 2>&1"
 ```
 
 Prerequisites: `~/.env` must have `REMOVEBG_API_KEY`. Monitor credits -- alert user if <= 5. If bg removal fails, fall back to original image.
@@ -278,7 +278,7 @@ Do NOT include `catalog_object_type`. `quantity` is a STRING. `occurred_at` must
 Use `square-image-upload` skill script on user's Mac:
 
 ```applescript
-do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ~/.claude/skills python ~/.claude/skills/square-image-upload/scripts/upload_image.py --image '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' --item-id 'CATALOG_ITEM_ID' --name 'RG-XXXX Hero' --caption 'Front view' --primary 2>&1"
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/square-image-upload/scripts/upload_image.py --image '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' --item-id 'CATALOG_ITEM_ID' --name 'RG-XXXX Hero' --caption 'Front view' --primary 2>&1"
 ```
 
 WebP not supported -- convert if needed: `sips -s format png image.webp --out hero.png`
@@ -292,7 +292,7 @@ After Phase 2/3/4 writes, reconcile cache:
 
 **Category governance gate:**
 ```bash
-python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
 ```
 
 Verify: 1. Exact SKU exists in cache (`square_cache_search`). 2. Cached item includes uploaded image ID (`square_cache_get_item`). If missing, sync once more.
@@ -397,12 +397,12 @@ Prerequisite: Git push (Step 7.6) must be complete.
 
 **Mode A -- Direct UUID** (from Step 0.4 cluster discovery):
 ```applescript
-do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills python ~/.claude/skills/photos-library/scripts/archive_photos.py --item-id RG-XXXX --uuids UUID1 UUID2 UUID3 --json 2>&1"
+do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/photos-library/scripts/archive_photos.py --item-id RG-XXXX --uuids UUID1 UUID2 UUID3 --json 2>&1"
 ```
 
 **Mode B -- Reverse filename lookup** (from Step 0.5 manual):
 ```applescript
-do shell script "source ~/.local/bin/env && uv run --project ~/.claude/skills python ~/.claude/skills/photos-library/scripts/archive_photos.py --item-id RG-XXXX --reverse --include 'IMG_*' --json 2>&1"
+do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/photos-library/scripts/archive_photos.py --item-id RG-XXXX --reverse --include 'IMG_*' --json 2>&1"
 ```
 
 Add `--dry-run` to preview without touching Photos.

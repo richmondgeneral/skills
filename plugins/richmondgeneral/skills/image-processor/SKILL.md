@@ -415,8 +415,8 @@ This skill replaces:
 Update Phase 0.6 to use:
 
 ```bash
-uv run --project ~/.claude/skills python \
-  ~/.claude/skills/image-processor/scripts/process.py \
+uv run --project ${CLAUDE_PLUGIN_ROOT} python \
+  ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/process.py \
   '/path/to/input.png' --output '/path/to/output.png'
 ```
 

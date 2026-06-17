@@ -26,15 +26,15 @@ Last updated: 2026-02-15
 **Use for:** Binary operations, shell commands, git, API scripts
 
 ```applescript
-do shell script "source ~/.env && python3 ~/.claude/skills/[skill]/scripts/[script].py"
+do shell script "source ~/.env && python3 ${CLAUDE_PLUGIN_ROOT}/skills/[skill]/scripts/[script].py"
 ```
 
 | Operation | Example |
 |-----------|---------|
 | Background removal | `python3 scripts/remove_background.py input.jpg output.png` |
-| Image upload to Square | `python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py ...` |
+| Image upload to Square | `python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-image-upload/scripts/upload_image.py ...` |
 | QR generation | `python3 -c "import qrcode; ..."` |
-| Git operations | `cd ~/.claude/skills && git add . && git commit -m "msg" && git push` |
+| Git operations | `cd ~/workspace/richmondgeneral/skills && git add . && git commit -m "msg" && git push` |
 | Open apps | `tell application "Preview" to open ...` |
 
 **Why:** Scripts on Mac have access to `~/.env` (API keys), binary file I/O, and git.
@@ -85,7 +85,7 @@ This keeps Square auth/runtime managed by Square. If strict API version pinning 
 Use `square-image-upload` as the default production path for image uploads:
 
 ```applescript
-do shell script "source ~/.env && python3 ~/.claude/skills/square-image-upload/scripts/upload_image.py \
+do shell script "source ~/.env && python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-image-upload/scripts/upload_image.py \
   --image /path/to/hero.png \
   --item-id CATALOG_ITEM_ID \
   --name 'Product Hero' \
@@ -142,6 +142,6 @@ Need to...
 | Environment | Paths | Access |
 |-------------|-------|--------|
 | **Claude's container** | `/mnt/skills/`, `/home/claude/` | `bash_tool`, `view`, `create_file` |
-| **User's Mac** | `/Users/scottybe/`, `~/.claude/skills/` | `Filesystem:*`, `osascript` |
+| **User's Mac** | `/Users/scottybe/`, `${CLAUDE_PLUGIN_ROOT}/skills/` | `Filesystem:*`, `osascript` |
 
 **Rule:** Files don't transfer between environments. Process everything on Mac.

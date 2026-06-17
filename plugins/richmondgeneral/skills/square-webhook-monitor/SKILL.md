@@ -59,13 +59,13 @@ Optional:
 ### List event types + subscriptions
 
 ```bash
-python3 /Users/scottybe/.claude/skills/square-webhook-monitor/scripts/webhook_ops.py list
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-webhook-monitor/scripts/webhook_ops.py list
 ```
 
 ### Create subscription
 
 ```bash
-python3 /Users/scottybe/.claude/skills/square-webhook-monitor/scripts/webhook_ops.py create \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-webhook-monitor/scripts/webhook_ops.py create \
   --name "Catalog Monitor" \
   --notification-url "https://example.com/webhooks/square" \
   --event-type "catalog.version.updated"
@@ -74,7 +74,7 @@ python3 /Users/scottybe/.claude/skills/square-webhook-monitor/scripts/webhook_op
 ### Test subscription
 
 ```bash
-python3 /Users/scottybe/.claude/skills/square-webhook-monitor/scripts/webhook_ops.py test \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-webhook-monitor/scripts/webhook_ops.py test \
   --subscription-id "<SUBSCRIPTION_ID>" \
   --event-type "catalog.version.updated"
 ```
@@ -82,14 +82,14 @@ python3 /Users/scottybe/.claude/skills/square-webhook-monitor/scripts/webhook_op
 ### Rotate signature key
 
 ```bash
-python3 /Users/scottybe/.claude/skills/square-webhook-monitor/scripts/webhook_ops.py rotate-signature-key \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-webhook-monitor/scripts/webhook_ops.py rotate-signature-key \
   --subscription-id "<SUBSCRIPTION_ID>"
 ```
 
 ### Run local monitor
 
 ```bash
-python3 /Users/scottybe/.claude/skills/square-webhook-monitor/scripts/webhook_ops.py run-monitor --host 0.0.0.0 --port 8087
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-webhook-monitor/scripts/webhook_ops.py run-monitor --host 0.0.0.0 --port 8087
 ```
 
 Endpoints:

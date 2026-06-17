@@ -21,16 +21,16 @@ Unified morning briefing: personal contacts first, then business CRM.
 
 ```bash
 # Terminal output
-uv run --project /Users/scottybe/.claude/skills \
-    python /Users/scottybe/.claude/skills/daily-briefing/scripts/daily_briefing.py
+uv run --project ${CLAUDE_PLUGIN_ROOT} \
+    python ${CLAUDE_PLUGIN_ROOT}/skills/daily-briefing/scripts/daily_briefing.py
 
 # Save to Apple Notes (Daily Briefings folder)
-uv run --project /Users/scottybe/.claude/skills \
-    python /Users/scottybe/.claude/skills/daily-briefing/scripts/daily_briefing.py --note
+uv run --project ${CLAUDE_PLUGIN_ROOT} \
+    python ${CLAUDE_PLUGIN_ROOT}/skills/daily-briefing/scripts/daily_briefing.py --note
 
 # Debug mode
-uv run --project /Users/scottybe/.claude/skills \
-    python /Users/scottybe/.claude/skills/daily-briefing/scripts/daily_briefing.py --verbose
+uv run --project ${CLAUDE_PLUGIN_ROOT} \
+    python ${CLAUDE_PLUGIN_ROOT}/skills/daily-briefing/scripts/daily_briefing.py --verbose
 ```
 
 ## Output Structure
@@ -74,7 +74,7 @@ uv run --project /Users/scottybe/.claude/skills \
 
 ## Data Sources
 
-- **Contacts**: `/Users/scottybe/.claude/skills/contacts-manager/references/contacts.md`
+- **Contacts**: `${CLAUDE_PLUGIN_ROOT}/skills/contacts-manager/references/contacts.md`
   - Core section → Personal contacts
   - Richmond General Customers → CRM contacts
 - **Messages**: `/Users/scottybe/Library/Messages/chat.db` (one query pass for all)
@@ -85,10 +85,10 @@ Install launchd plist for 7am daily runs:
 
 ```bash
 # Make wrapper script executable
-chmod +x /Users/scottybe/.claude/skills/daily-briefing/scripts/run_briefing.sh
+chmod +x ${CLAUDE_PLUGIN_ROOT}/skills/daily-briefing/scripts/run_briefing.sh
 
 # Copy plist to LaunchAgents
-cp /Users/scottybe/.claude/skills/daily-briefing/scripts/com.claude.dailybriefing.plist \
+cp ${CLAUDE_PLUGIN_ROOT}/skills/daily-briefing/scripts/com.claude.dailybriefing.plist \
    /Users/scottybe/Library/LaunchAgents/
 
 # Load the schedule
@@ -110,7 +110,7 @@ launchctl unload /Users/scottybe/Library/LaunchAgents/com.claude.dailybriefing.p
 - macOS 26+ for rich Notes import
 - System Events accessibility permission
 - contacts-manager skill (for contacts.md)
-- uv with shared environment at `/Users/scottybe/.claude/skills/`
+- uv with shared environment at `${CLAUDE_PLUGIN_ROOT}/skills/`
 
 ## Troubleshooting
 

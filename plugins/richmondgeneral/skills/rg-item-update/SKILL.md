@@ -175,13 +175,13 @@ Use `square-catalog-ops` for taxonomy-level operations (not ad-hoc inline update
 
 ```bash
 # Prove version + SDK compliance
-python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py compliance
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py compliance
 
 # Merge legacy food categories -> Food & Pantry
-python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py merge-food --apply
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py merge-food --apply
 
 # Verify cleanup/channel assignment integrity
-python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
 ```
 
 ## Cache Reconciliation (Required)
@@ -191,7 +191,7 @@ After any write to Square (price, description, category, image, inventory), sync
 Before cache reconciliation on category/visibility updates, run cleanup audit:
 
 ```bash
-python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
 ```
 
 **Primary (MCP):**
@@ -201,7 +201,7 @@ square_cache_mcp:square_cache_sync
 
 **Fallback (local script):**
 ```bash
-uv run --project ~/.claude/skills python ~/.claude/skills/square-cache/scripts/cache_wrapper.py sync --json
+uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/square-cache/scripts/cache_wrapper.py sync --json
 ```
 
 Verification:

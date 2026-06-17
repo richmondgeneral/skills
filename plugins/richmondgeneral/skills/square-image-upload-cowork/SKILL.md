@@ -7,7 +7,7 @@ description: Cowork-native workflow to upload product images to Square Catalog, 
 
 Push a product image to Square Catalog from a Cowork session, with optional Cloudinary-based pre-processing for background removal and/or price-tag removal. No Mac filesystem or Photos.app dependencies — runs entirely inside Cowork's sandbox.
 
-**Why this exists separately from the Mac `square-image-upload` skill:** the Mac version assumes `osascript`, the user's `~/.claude/skills` symlink tree, and a Mac-side Python venv. None of those work from Cowork. This skill runs against the Square MCP + Cloudinary MCP + the workspace mount only.
+**Why this exists separately from the Mac `square-image-upload` skill:** the Mac version assumes `osascript`, the local Mac skills install, and a Mac-side Python venv. None of those work from Cowork. This skill runs against the Square MCP + Cloudinary MCP + the workspace mount only.
 
 ## Intentional subset — capability gap vs. the Mac path
 

@@ -498,7 +498,7 @@ class RGItemProcessor:
         print("  Phase 6: Label CSV")
         print("  Phase 7: GitHub Pages deployment")
         print("\nFor Phase 7 file placement, use place_files.py:")
-        print("  python3 ~/.claude/skills/rg-full-auto/scripts/place_files.py \\")
+        print("  python3 ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/place_files.py \\")
         print("    --sku RG-XXXX --qr-base64 <data> --image <path>")
         print("=" * 60)
 

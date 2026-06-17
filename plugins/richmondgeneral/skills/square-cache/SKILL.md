@@ -297,7 +297,7 @@ When generating labels:
 
 After any category/visibility mutation:
 1. Run cleanup audit:
-   - `python3 /Users/scottybe/.claude/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues`
+   - `python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues`
 2. Run cache sync:
    - `~/workspace/square/square-tools/bin/square_cache.sh sync`
 3. Verify recent diffs:

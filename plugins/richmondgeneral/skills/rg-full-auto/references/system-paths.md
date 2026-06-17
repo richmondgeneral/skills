@@ -34,12 +34,12 @@ updated: 2026-02-15
 ## Skills Directory
 
 ```
-/Users/scottybe/.claude/skills/rg-full-auto/
+${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/
 ```
 
 **Structure:**
 ```
-/Users/scottybe/.claude/skills/rg-full-auto/
+${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/
 ├── SKILL.md
 ├── references/
 │   ├── mcp-connectors.md
@@ -58,7 +58,7 @@ updated: 2026-02-15
 ## Delegated Lot Tracking Skill
 
 ```
-/Users/scottybe/.claude/skills/rg-lot-tracker/
+${CLAUDE_PLUGIN_ROOT}/skills/rg-lot-tracker/
 ```
 
 **Purpose:** Lot creation, cost allocation, margin validation, and ROI tracking.

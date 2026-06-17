@@ -7,7 +7,7 @@
     
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/scottybe/workspace/richmondgeneral/skills/square-crm/scripts/auto_sync.sh</string>
+        <string>/Users/scottybe/workspace/richmondgeneral/skills/plugins/richmondgeneral/skills/square-crm/scripts/auto_sync.sh</string>
     </array>
     
     <key>StartCalendarInterval</key>

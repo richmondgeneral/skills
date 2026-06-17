@@ -50,7 +50,7 @@ case "${1:-}" in
         echo "  $SCRIPT_DIR/auto_sync.sh --dry-run"
         echo ""
         echo "To check logs:"
-        echo "  tail -f ~/.claude/skills/square-crm/logs/sync.log"
+        echo "  tail -f ~/Library/Logs/RichmondGeneral/sync.log"
         ;;
         
     uninstall)
@@ -101,8 +101,8 @@ case "${1:-}" in
         
         echo ""
         echo "Recent sync log:"
-        if [ -f ~/.claude/skills/square-crm/logs/sync.log ]; then
-            tail -n 5 ~/.claude/skills/square-crm/logs/sync.log
+        if [ -f ~/Library/Logs/RichmondGeneral/sync.log ]; then
+            tail -n 5 ~/Library/Logs/RichmondGeneral/sync.log
         else
             echo "  (no log file yet)"
         fi

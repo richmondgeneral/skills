@@ -4,7 +4,7 @@
 
 set -o pipefail
 
-SKILLS_DIR="/Users/scottybe/.claude/skills"
+SKILLS_DIR="$(cd "$(dirname "$0")/../plugins/richmondgeneral/skills" && pwd)"
 cd "$SKILLS_DIR" || exit 1
 
 # Colors

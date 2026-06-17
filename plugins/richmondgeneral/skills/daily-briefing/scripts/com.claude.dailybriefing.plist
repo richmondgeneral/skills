@@ -8,7 +8,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/scottybe/.claude/skills/daily-briefing/scripts/run_briefing.sh</string>
+        <string>/Users/scottybe/workspace/richmondgeneral/skills/plugins/richmondgeneral/skills/daily-briefing/scripts/run_briefing.sh</string>
         <string>--note</string>
     </array>
     

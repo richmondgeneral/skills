@@ -22,7 +22,11 @@ from pathlib import Path
 # Open it read-only AND immutable so reads take no locks and never touch the
 # WAL — a plain connection can checkpoint it and disrupt Messages/iCloud sync.
 DB = '/Users/scottybe/Library/Messages/chat.db'
-CONTACTS_FILE = '/Users/scottybe/.claude/skills/contacts-manager/references/contacts.md'
+# contacts-manager is a sibling skill; resolve relative to this script so the
+# briefing works from the repo clone or the installed plugin (no hardcoded path).
+CONTACTS_FILE = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', '..', 'contacts-manager', 'references', 'contacts.md'))
 TEMP_MD_FILE = '/tmp/daily_briefing.md'
 VERBOSE = '--verbose' in sys.argv or '-v' in sys.argv
 

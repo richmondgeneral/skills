@@ -20,6 +20,10 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
+# chat.db is live, WAL-mode, and continuously written by Messages + iCloud.
+# Open it read-only AND immutable so reads take no locks and never touch the
+# WAL — a plain connection can checkpoint it and disrupt Messages/iCloud sync.
+# (Reads only; the archive is written to Apple Notes via AppleScript.)
 DB_PATH = os.path.expanduser("~/Library/Messages/chat.db")
 TEMP_DIR = os.path.expanduser("~/Desktop")  # Desktop for reliable AppleScript access
 MAX_IMAGE_SIZE = 800  # Max dimension for resizing
@@ -33,7 +37,7 @@ def get_messages(phone: str, since_date: str, limit: int = 100) -> list:
     """Get messages from chat.db for a phone number since a date."""
     phone_pattern = f"%{normalize_phone(phone)}%"
     
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro&immutable=1", uri=True)
     cursor = conn.cursor()
     
     query = """
@@ -62,7 +66,7 @@ def get_attachments(phone: str, since_date: str) -> list:
     """Get attachments for messages from a phone number since a date."""
     phone_pattern = f"%{normalize_phone(phone)}%"
     
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro&immutable=1", uri=True)
     cursor = conn.cursor()
     
     query = """

@@ -2,10 +2,16 @@
 name: imessage-archiver
 description: Archive iMessage/RCS/SMS conversations to Apple Notes with inline images and attachments. Use when user wants to save, archive, or export text message conversations to Notes. Handles media embedding correctly using sequential attachment pattern. Supports date ranges, contact filtering, and automatic image resizing.
 metadata:
-  version: "1.1"
+  version: "1.2"
   author: scottybe
-  updated: "2025-12-21"
+  updated: "2026-06-17"
   changelog: |
+    v1.2 - Safe database access (critical fix):
+    - archive_to_notes.py now opens chat.db with mode=ro&immutable=1 (was a
+      plain read-write connection). Prevents taking locks / checkpointing the
+      live WAL, which could disrupt Messages/iCloud sync. Reads only; the
+      archive is written to Apple Notes via AppleScript.
+
     v1.1 - Anthropic skills update:
     - Added author and updated fields
 ---

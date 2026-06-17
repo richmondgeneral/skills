@@ -3,7 +3,7 @@
 A comprehensive collection of AI assistant skills for managing Richmond General's vintage and antique inventory system. These skills integrate with Square Catalog, Apple ecosystem (iMessage, Contacts, Notes), and external identification databases to streamline operations.
 
 **Repository:** `richmondgeneral/skills`
-**Current Version:** v2026.02.15
+**Current Version:** v2026.06.17
 
 ## Overview
 
@@ -59,104 +59,60 @@ Skills are **model-invoked**. You do not need to run scripts manually. Simply as
 
 The agent will automatically select the correct skill and execute the workflow.
 
-For creating new skills or major rewrites, use the canonical creator guidance:
-- `/Users/scottybe/.claude/skills/.system/skill-creator/SKILL.md`
-
 ## How Skills Are Loaded
 
-Skills work in two environments with **different loading mechanisms**:
-
-### Claude Code (terminal)
-
-- **Auto-discovers** `SKILL.md` files from `~/.claude/skills/*/`
-- Parses YAML frontmatter (`name`, `description`, `metadata`)
-- Injects matching skills as `<system-reminder>` blocks based on trigger keywords in `description`
-- **Hot-reloads** on file changes — no restart needed
-- Zero config required
-
-### Claude for Mac (desktop app — chat, cowork, code modes)
-
-- **Does NOT read** the `~/.claude/skills/` filesystem
-- Skills must be packaged as `.skill` files (ZIP archives) and **installed through the Mac app UX**
-- The UX handles installation and registration under the hood
-- MCP servers are separately configured in `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-### Symlink
+This repo is a **single-plugin marketplace**. The Claude **desktop app** and **Cowork** both load skills through the plugin system (`~/.claude/plugins/`) — *not* from `~/.claude/skills/`. The repo exposes one plugin, **`richmondgeneral`**, bundling every skill under `plugins/richmondgeneral/skills/`. Skills surface namespaced as `richmondgeneral:<skill>`.
 
 ```
-~/.claude/skills/ → ~/workspace/richmondgeneral/skills/
+.claude-plugin/marketplace.json      # advertises the richmondgeneral plugin
+plugins/richmondgeneral/
+  .claude-plugin/plugin.json         # plugin manifest
+  skills/<skill>/SKILL.md            # the skills
 ```
 
-The git repo lives at `~/workspace/richmondgeneral/skills/`. Claude Code reads skills through the symlink. Edits to the repo are immediately available in Claude Code.
+Repo-meta (`docs/`, `archive/`, `dist/`, and legacy skills like `rg-*-legacy`) lives at the repo root, deliberately **outside** the plugin, so it isn't packaged.
 
-### Current MCP Servers (Claude for Mac)
+### Install (one-time, per surface)
 
-These provide tool access in the Mac app independent of skills:
+The marketplace reads from this **local clone**, so GitHub stays the source of truth without needing private-repo auth.
 
-| Server | Type | Purpose |
-|--------|------|---------|
-| `mcp_square_api` | Remote (SSE) | Official Square API |
-| `square_cache_mcp` | Local | MongoDB-backed Square catalog cache |
-| `alpaca` | Local | Alpaca trading / market data |
+1. In the desktop app and in Cowork, add a **directory**-type marketplace pointing at this clone's `.claude-plugin/marketplace.json` (the same mechanism behind the app's built-in `local-desktop-app-uploads` marketplace).
+2. Install the **`richmondgeneral`** plugin from it.
 
-## Building .skill Packages
-
-To install or update skills in Claude for Mac, package them as `.skill` files:
+Validate the manifests anytime:
 
 ```bash
-# Build a single skill
-./docs/build-skill.sh contacts-manager
+claude plugin validate .                        # marketplace
+claude plugin validate plugins/richmondgeneral  # plugin
+```
 
-# Build all skills
-./docs/build-skill.sh --all
+### Update (propagates to both surfaces)
 
-# Custom output directory
+1. Edit a skill under `plugins/richmondgeneral/skills/`, commit, and `git push`.
+2. `git pull` this clone.
+3. Refresh the marketplace in each surface — the plugin updates in both.
+
+## Building .skill Packages (legacy upload path)
+
+Before the marketplace, skills were installed by dragging individual `.skill` ZIPs into the Mac app. That still works as a fallback:
+
+```bash
+./docs/build-skill.sh contacts-manager    # one skill
+./docs/build-skill.sh --all               # all skills
 ./docs/build-skill.sh --all --output-dir ~/Desktop
 ```
 
-Output: `dist/<skill-name>-v<version>.skill`
+Output: `dist/<skill-name>-v<version>.skill`. Prefer the marketplace install above for ongoing use — it updates both surfaces from one source instead of per-skill re-uploads.
 
-Install by dragging the `.skill` file into Claude for Mac or using the app's skill import UX.
+## MCP Servers (configured separately)
 
-### Keeping Mac App Skills in Sync
+MCP servers provide tool access independent of skills, and are configured in the desktop app (`~/Library/Application Support/Claude/claude_desktop_config.json`), not in this repo:
 
-1. Edit the skill source in this repo (Claude Code picks up changes automatically)
-2. Rebuild: `./docs/build-skill.sh <skill-name>`
-3. Re-install the `.skill` file through the Mac app UX
-
-## Installation (Claude Code)
-
-Skills auto-load from `~/.claude/skills/`. To update:
-
-```bash
-cd ~/workspace/richmondgeneral/skills
-git pull
-```
-
-The symlink at `~/.claude/skills/` ensures Claude Code sees changes immediately.
-
-## Dual-Target Skill Sync (Claude + Codex)
-
-Canonical source remains this repo:
-
-- `/Users/scottybe/workspace/richmondgeneral/skills`
-
-Sync both local destinations from canonical source:
-
-```bash
-./docs/sync-skills.sh
-```
-
-Dry run:
-
-```bash
-./docs/sync-skills.sh --dry-run
-```
-
-Targets:
-
-- `~/.claude/skills`
-- `~/.codex/skills`
+| Server | Purpose |
+|--------|---------|
+| `mcp_square_api` | Official Square API |
+| `square_cache_mcp` | Local Square catalog cache |
+| `alpaca` | Alpaca trading / market data |
 
 ## Related Repositories
 

@@ -2,10 +2,16 @@
 name: imessage-archiver
 description: Archive iMessage/RCS/SMS conversations to Apple Notes with inline images and attachments. Use when user wants to save, archive, or export text message conversations to Notes. Handles media embedding correctly using sequential attachment pattern. Supports date ranges, contact filtering, and automatic image resizing.
 metadata:
-  version: "1.2"
+  version: "1.3"
   author: scottybe
   updated: "2026-06-17"
   changelog: |
+    v1.3 - Safe database access in docs:
+    - Quick Start attachment query now opens chat.db via the read-only +
+      immutable URI (file:...?mode=ro&immutable=1) instead of a plain
+      read-write `sqlite3 <db>`. Matches the archive_to_notes.py fix in v1.2;
+      the documented CLI example carried the same lock / WAL-checkpoint risk.
+
     v1.2 - Safe database access (critical fix):
     - archive_to_notes.py now opens chat.db with mode=ro&immutable=1 (was a
       plain read-write connection). Prevents taking locks / checkpointing the
@@ -39,8 +45,9 @@ Archive conversations from Messages app to Apple Notes with proper inline media 
 # Get conversation with phone number
 python3 ~/scripts/get_imessage_convo.py +1XXXXXXXXXX 30
 
-# Get attachments for date range
-sqlite3 ~/Library/Messages/chat.db "
+# Get attachments for date range.
+# Open chat.db read-only + immutable so the query can't lock/checkpoint the live WAL.
+sqlite3 "file:$HOME/Library/Messages/chat.db?mode=ro&immutable=1" "
 SELECT datetime(m.date/1000000000 + 978307200, 'unixepoch', 'localtime') as ts,
        a.filename, a.mime_type, a.total_bytes
 FROM message m

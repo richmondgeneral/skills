@@ -2,9 +2,15 @@
 name: daily-briefing
 description: Generate morning briefing with personal contact status and CRM action items. Use when user asks for daily briefing, morning briefing, who needs a reply, what they owe people, who they're waiting on, or CRM status. Personal contacts first (family, close friends), then Richmond General CRM. Outputs to Apple Notes with rich formatting. NOT for sending messages—use imessage-core. NOT for contact lookup—use contacts-manager.
 metadata:
-  version: "2.0"
+  version: "2.1"
   author: scottybe
-  updated: "2025-12-22"
+  updated: "2026-06-17"
+  changelog: |
+    v2.1 - Safe database access (critical fix):
+    - daily_briefing.py now opens chat.db with mode=ro&immutable=1 (was a
+      plain read-write connection). Prevents locks / WAL checkpointing on the
+      live Messages database, which could disrupt Messages/iCloud sync. The
+      briefing only reads chat.db; Notes output goes through AppleScript.
 ---
 
 # Daily Briefing

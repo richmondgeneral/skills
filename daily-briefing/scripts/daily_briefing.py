@@ -18,6 +18,9 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
+# chat.db is live, WAL-mode, and continuously written by Messages + iCloud.
+# Open it read-only AND immutable so reads take no locks and never touch the
+# WAL — a plain connection can checkpoint it and disrupt Messages/iCloud sync.
 DB = '/Users/scottybe/Library/Messages/chat.db'
 CONTACTS_FILE = '/Users/scottybe/.claude/skills/contacts-manager/references/contacts.md'
 TEMP_MD_FILE = '/tmp/daily_briefing.md'
@@ -136,7 +139,7 @@ def get_message_status_batch(phones):
         return {}
     
     results = {}
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(f"file:{DB}?mode=ro&immutable=1", uri=True)
     c = conn.cursor()
     
     for phone in phones:

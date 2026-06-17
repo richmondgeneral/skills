@@ -27,6 +27,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DIST_DIR="${DIST_DIR:-$SKILLS_ROOT/dist}"
+# Skills live inside the plugin dir (see .claude-plugin/marketplace.json)
+SKILLS_DIR="${SKILLS_DIR:-$SKILLS_ROOT/plugins/richmondgeneral/skills}"
 
 # Skip these directories when building --all
 SKIP_DIRS=".git|.venv|.claude|archive|dist|docs|testing|.pytest_cache|__pycache__|node_modules"
@@ -129,7 +131,7 @@ validate_skill() {
 # Build a single skill
 build_skill() {
     local skill_name="$1"
-    local skill_dir="$SKILLS_ROOT/$skill_name"
+    local skill_dir="$SKILLS_DIR/$skill_name"
     local -a package_entries=()
 
     echo "Building skill: $skill_name"
@@ -177,7 +179,7 @@ build_skill() {
     done
 
     # Create .skill (ZIP) file
-    (cd "$SKILLS_ROOT" && zip -r "$out_file" "${package_entries[@]}" \
+    (cd "$SKILLS_DIR" && zip -r "$out_file" "${package_entries[@]}" \
         -x "*.pyc" \
         -x "*__pycache__*" \
         -x "*.DS_Store" \
@@ -203,7 +205,7 @@ build_all() {
     local success_count=0
     local error_count=0
 
-    for skill_dir in "$SKILLS_ROOT"/*/; do
+    for skill_dir in "$SKILLS_DIR"/*/; do
         [[ -d "$skill_dir" ]] || continue
 
         local dir_name
@@ -255,7 +257,7 @@ main() {
                 echo "  -h, --help         Show this help"
                 echo
                 echo "Available skills:"
-                for skill_dir in "$SKILLS_ROOT"/*/; do
+                for skill_dir in "$SKILLS_DIR"/*/; do
                     if [[ -f "$skill_dir/SKILL.md" ]]; then
                         local name ver
                         name=$(basename "$skill_dir")

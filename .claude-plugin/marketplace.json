@@ -1,0 +1,16 @@
+{
+  "name": "richmondgeneral",
+  "owner": {
+    "name": "Scott Beilfuss"
+  },
+  "plugins": [
+    {
+      "name": "richmondgeneral",
+      "source": "./plugins/richmondgeneral",
+      "description": "Richmond General full skill set — Square catalog & storefront ops, item lifecycle (intake, lotting, mark-sold), iMessage/CRM, photo library, image processing, appraisal, and Whatnot tooling."
+    }
+  ],
+  "metadata": {
+    "description": "Richmond General skills — single-plugin marketplace read by the Claude desktop app and Cowork."
+  }
+}

@@ -32,7 +32,7 @@ Push a product image to Square Catalog from a Cowork session, with optional back
   osascript → do shell script "source $HOME/.local/bin/env && \
     uv run --project $HOME/workspace/richmondgeneral/skills/plugins/richmondgeneral \
     python $HOME/workspace/richmondgeneral/skills/plugins/richmondgeneral/skills/image-processor/scripts/clean.py \
-    '<INPUT>' --output '<OUTPUT>' [--remove 'price tag'] [--fix-damage]"
+    --input '<INPUT>' --output '<OUTPUT>' [--remove 'price tag'] [--fix-damage]"
   ```
   `uv` is at `$HOME/.local/bin/uv`; `source $HOME/.local/bin/env` is required (the bare osascript shell has neither `uv` on PATH nor a new-enough Python — system is 3.9.6; `uv` provisions ≥3.11).
 
@@ -90,7 +90,7 @@ Re-fetch the item: confirm the new `image_id` is in `image_ids` (position 0 if `
 User: *"There's a price sticker on the photo for RG-0023. Replace the image without the sticker and remove the background."*
 1. Look up RG-0023 → `item_id` + current `image_ids[0]`.
 2. `catalog.batchGetObjects` on `image_ids[0]` → S3 URL → download to `~/workspace/richmondgeneral/rg-pending/RG-0023-src.png`.
-3. Bridge-clean: `… clean.py '~/workspace/richmondgeneral/rg-pending/RG-0023-src.png' --output '~/workspace/richmondgeneral/rg-pending/RG-0023-clean.png' --remove 'price tag'` (bg removal is clean.py's default storefront treatment).
+3. Bridge-clean: `… clean.py --input '~/workspace/richmondgeneral/rg-pending/RG-0023-src.png' --output '~/workspace/richmondgeneral/rg-pending/RG-0023-clean.png' --remove 'price tag'` (bg removal is clean.py's default storefront treatment).
 4. Show the cleaned file; get sign-off.
 5. `python3 scripts/upload_to_square.py --source ~/workspace/richmondgeneral/rg-pending/RG-0023-clean.png --image-id <existing image_ids[0]> --name "RG-0023 hero (cleaned)" --json`
 6. Verify `image_ids[0]` now points to the cleaned version.

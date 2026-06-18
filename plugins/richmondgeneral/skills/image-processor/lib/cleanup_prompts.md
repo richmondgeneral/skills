@@ -4,7 +4,7 @@ Shared prompt library for AI-driven catalog-image cleanup.
 
 **Consumers:**
 - `skills/image-processor/scripts/clean.py` — Mac / Gemini path, run from Claude Code
-- (future) `square-image-upload-cowork` — Cowork / Cloudinary path
+- `square-image-upload-cowork` — Cowork path, calls clean.py over the osascript bridge
 
 **Composition:**
 - Default cleanup = `base` + `damage-preserve`

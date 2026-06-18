@@ -14,8 +14,8 @@ Examples:
   clean.py -i photo.jpg -o cleaned.jpg --pro              # gemini-3-pro-image-preview (~$2.13)
   clean.py -i photo.jpg -o cleaned.jpg --remove "the dust on the rim"
 
-Prompt sections live in ../lib/cleanup_prompts.md so the (future) Cowork
-Cloudinary path can read the same prompt verbatim.
+Prompt sections live in ../lib/cleanup_prompts.md. The Cowork
+square-image-upload-cowork skill calls this script over the osascript bridge.
 """
 import argparse
 import json

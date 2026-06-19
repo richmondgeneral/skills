@@ -1,15 +1,27 @@
 ---
 name: rg-item-mark-sold
-description: Mark a Richmond General item as sold across all surfaces — migrate the GitHub Pages item card to the sold-archive pattern (brown SOLD badge, "Sold · $X" front price, sold-status-panel back footer replacing the QR + buy button), write status.json with sold metadata, delete the Square payment link via API so the printed QR / bookmarked checkout URL can no longer charge a phantom sale, validate, and commit/push. Use this skill whenever the user says any of "mark RG-XXXX as sold", "mark as sold", "this sold", "[item] sold for $X", "RG-XXXX sold on Square", "buyer paid", "this item sold", "update RG-XXXX to sold", "set RG-XXXX status to sold", "deactivate the buy link", "kill the payment link for X", "retire this listing", or otherwise indicates that a unique inventory item has been purchased and needs the listing taken down without being deleted. Do NOT use for inventory loss/giveaways/damage (use square-inventory-loss instead), description or price edits on still-available items (use rg-item-update), or new item onboarding (use rg-full-auto).
+description: Mark a Richmond General item as sold across all surfaces — migrate the GitHub Pages item card (and the matching gallery grid card on the landing page) to the sold-archive pattern (brown SOLD badge, "Sold · $X" front price, sold-status-panel back footer replacing the QR + buy button), write status.json with sold metadata, delete the Square payment link via API so the printed QR / bookmarked checkout URL can no longer charge a phantom sale, validate, and commit/push. Use this skill whenever the user says any of "mark RG-XXXX as sold", "mark as sold", "this sold", "[item] sold for $X", "RG-XXXX sold on Square", "buyer paid", "this item sold", "update RG-XXXX to sold", "set RG-XXXX status to sold", "deactivate the buy link", "kill the payment link for X", "retire this listing", or otherwise indicates that a unique inventory item has been purchased and needs the listing taken down without being deleted. Do NOT use for inventory loss/giveaways/damage (use square-inventory-loss instead), description or price edits on still-available items (use rg-item-update), or new item onboarding (use rg-full-auto).
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: scottybe
-  updated: "2026-05-20"
+  updated: "2026-06-18"
+  changelog: |
+    v1.1 - Gallery-card surface:
+    - Added Step 5 "Migrate the gallery card in items/index.html" — the
+      landing-page grid card is a separate GitHub Pages surface that does
+      NOT auto-update; missing it left RG-0002 showing as available (green
+      "New" badge, live price) after its item page was migrated. Fixed in
+      richmondgeneral/items commit f05c330.
+    - Step 1 "already on clean sold pattern" row now routes through the
+      gallery step instead of skipping straight to status.json.
+    - The commit step's git add now also stages index.html (the gallery);
+      renumbered status.json/Square/validate/commit to Steps 6-9 and
+      corrected the stale "Step 5/6" numbering in the workflow intro.
 ---
 
 # Richmond General — Mark Item as Sold
 
-End-to-end "this item just sold" workflow. One skill, every surface kept consistent: the GitHub Pages item card flips into the sold-archive presentation, a `status.json` records what happened, and the Square payment link is destroyed so neither the short URL (`square.link/u/...`) nor the long checkout URL (`checkout.square.site/...`) can still take a payment from someone with a stale bookmark, a printed QR label, or an old marketing post.
+End-to-end "this item just sold" workflow. One skill, every surface kept consistent: the GitHub Pages item card flips into the sold-archive presentation, the matching card in the landing-page gallery grid is flipped to the sold treatment, a `status.json` records what happened, and the Square payment link is destroyed so neither the short URL (`square.link/u/...`) nor the long checkout URL (`checkout.square.site/...`) can still take a payment from someone with a stale bookmark, a printed QR label, or an old marketing post.
 
 **Why this exists separately from rg-item-update:** updating a listing's price or description leaves it for sale. Marking it sold is a *terminal* state change with side effects across three systems (GitHub Pages, status ledger, Square checkout). Conflating the two led to sold items with live payment links — exactly the bug this skill prevents.
 
@@ -40,7 +52,7 @@ Confirm these with the user up front. If anything is missing or ambiguous, ask �
 
 ## The workflow
 
-Execute in order. Steps 1–4 are local-only and trivially reversible. Step 5 (Square delete) is irreversible — confirm with the user before running it. Step 6 is the push.
+Execute in order. Steps 1–6 are local-only and trivially reversible. Step 7 (Square delete) is irreversible — confirm with the user before running it. Step 9 is the push.
 
 ### Step 1 — Read the current state of the item card
 
@@ -54,7 +66,7 @@ Then classify what you're looking at:
 |---|---|---|
 | **Active listing** (clean active pattern) | `<a … class="buy-button">Buy Now</a>` linking to `square.link/u/...` is present in the back-footer. (QR section presence is *not* a reliable signal — some legacy items omit it.) | Full migration: front badge + price, back footer, CSS additions |
 | **Old sold pattern** (pre-RG-0005 style) | `<span class="sold-ribbon">SOLD</span>` diagonal banner on the hero, plus strikethrough `item-price`, `.buy-button.sold` disabled span, `.qr-section.sold` grayscale | Same full migration, plus *remove* the old `.sold-ribbon` / `.buy-button.sold` / `.qr-section.sold` / `.price-wrap` CSS blocks. RG-0002 was the last instance — if you find another, the migration in [commit `5d93566` on richmondgeneral/items](https://github.com/richmondgeneral/items/commit/5d93566) (RG-0002/index.html + RG-0002/status.json) is the model |
-| **Already on clean sold pattern** | `sku-badge sold-badge`, `item-price sold-price`, `sold-status-panel` present | No HTML changes needed — skip to step 5 (status.json) and step 6 (Square) |
+| **Already on clean sold pattern** | `sku-badge sold-badge`, `item-price sold-price`, `sold-status-panel` present | Item-page HTML needs no changes — but the **gallery card may still be stale** (this is exactly how RG-0002 slipped through). Still do Step 5 (gallery card), then Step 6 (status.json) and Step 7 (Square). |
 
 ### Step 2 — Edit the front face
 
@@ -158,7 +170,30 @@ If the page was an active listing with no sold-state rules at all, just append t
 
 > **Leave the existing `.buy-button` and `.buy-button:hover` CSS rules in place** even after the buy-button element is removed from the markup. They're dead but harmless, the validator does not flag them, and this matches the convention on RG-0005 (which kept them after sale). RG-0003 stripped them, but RG-0005 is the more recent reference — when the two disagree, follow RG-0005. Removing dead CSS is a separate cleanup pass, not part of mark-sold.
 
-### Step 5 — Write `items/RG-XXXX/status.json`
+### Step 5 — Migrate the gallery card in `items/index.html`
+
+The item's own page (Steps 2–4) is **not** the only GitHub Pages surface. The curated landing-page grid in `items/index.html` has its own card for the item, and it does **not** update automatically. Skipping this is the gap that left RG-0002 showing as available in the grid (green "New" badge, live `$35` price, "View Story") long after its item page was migrated — and it also inflated the header's available-item counter (`#item-count`, computed near the bottom of `index.html` via `document.querySelectorAll('.item-card:not([data-status="sold"])')`). Fixed in richmondgeneral/items commit `f05c330`.
+
+Find the item's card block (search `items/index.html` for `RG-XXXX`) and transform it to match the canonical sold cards — `RG-0003` (~line 660) and `RG-0005` (~line 706):
+
+| Element | From | To |
+|---|---|---|
+| `.item-card` anchor | `<a href="./RG-XXXX/" class="item-card" data-category="…">` | add ` data-status="sold"` |
+| Badge | `<span class="item-badge">New</span>` | `<span class="item-badge sold">Sold</span>` |
+| Category | `<p class="item-category">Books & Paper</p>` | append ` · Archive` → `…Books & Paper · Archive</p>` |
+| Era line | `<p class="item-era">1892 Victorian • …</p>` | append ` • Sold <Month D, YYYY>` (date from `status.json` `sold_at`) |
+| Price | `<span class="item-price">$X</span>` | `<span class="item-price sold">Sold · $X.00</span>` |
+| CTA | `View Story` | `View Archive` |
+
+Write the price with `.00` in source — the gallery has its **own** `PRICE_DISPLAY_FORMATTER` at the bottom of `index.html` (targets `.item-price, .sold-meta`) that strips trailing `.00` at render, exactly like the item page. So `Sold · $35.00` displays as `Sold · $35`.
+
+The required CSS (`.item-badge.sold`, `.item-price.sold`, `.item-card[data-status="sold"]`) **already exists** in `items/index.html` — no CSS changes needed here.
+
+If the user opted out of a specific sold date (Step 3), drop the ` • Sold …` suffix from the era line and keep the rest.
+
+> **Not covered by `validate-item.sh`.** The validator (Step 8) checks the `RG-XXXX/` folder, not the root `index.html`. Verify this edit by hand: `cd items && grep -n 'RG-XXXX' index.html` should now show `data-status="sold"`, `item-badge sold`, `· Archive`, and `item-price sold` on that card. (Optional: serve locally and confirm the card renders with the brown SOLD badge and the available-item count dropped by one.)
+
+### Step 6 — Write `items/RG-XXXX/status.json`
 
 ```json
 {
@@ -174,7 +209,7 @@ If the page was an active listing with no sold-state rules at all, just append t
 
 Prices are JSON numbers (not strings, no `$`). If `listed_price === sold_price`, write both anyway — downstream reporting expects both keys present. See `RG-0003/status.json` (sold below ask) and `RG-0005/status.json` (sold at ask) for canonical examples.
 
-### Step 6 — Delete the Square payment link
+### Step 7 — Delete the Square payment link
 
 This is the irreversible step. **Confirm with the user before running** unless they've already explicitly said "deactivate it" in this session.
 
@@ -204,7 +239,7 @@ Expected: short URL `303` (Square's "link gone" redirect page), long URL `404`.
 
 **If the user reports they already deleted the link via Square Dashboard**, the script will return "no matches found" — that's fine, skip the API call and note it in the commit message.
 
-### Step 7 — Validate
+### Step 8 — Validate
 
 ```bash
 cd items && ./validate-item.sh RG-XXXX
@@ -218,12 +253,12 @@ The validator is sold-aware — when `status.json` says `status: sold`, it does 
 
 - **`✓ qr-code.png`** — `qr-code.png` stays in the folder. The validator still expects it, RG-0003 and RG-0005 both keep theirs, and the file is just a static PNG encoding a now-dead URL. It's a harmless archival artifact — do NOT `git rm` it as part of marking sold. (If you ever decide to clean these up, that's a separate audit pass across all sold items, and the validator would need updating in the same PR.)
 
-### Step 8 — Commit and push
+### Step 9 — Commit and push
 
 From `items/`:
 
 ```bash
-git add RG-XXXX/index.html RG-XXXX/status.json
+git add index.html RG-XXXX/index.html RG-XXXX/status.json
 git commit -m "chore(RG-XXXX): mark sold and migrate to clean sold-archive pattern" -m "[multi-line body — see template below]"
 git push origin main
 ```
@@ -233,7 +268,9 @@ Commit message body template (substitute every `{{…}}` before committing; alwa
 ```
 Aligns {{SKU}} with the RG-0003/RG-0005 sold pattern: brown SOLD badge,
 "Sold · ${{PRICE}}" front price (no strikethrough), sold-status-panel on
-the back footer. Adds status.json (sold_at {{DATE}}, ${{PRICE}}). Square
+the back footer, and the matching sold treatment on the gallery grid card
+in index.html (data-status="sold", brown "Sold" badge, "Sold · ${{PRICE}}"
+price, "View Archive" CTA). Adds status.json (sold_at {{DATE}}, ${{PRICE}}). Square
 payment link {{LINK_ID}} deleted via API (cancelled_order_id:
 {{ORDER_ID}}) — buy button removed rather than disabled.
 
@@ -246,16 +283,17 @@ GitHub Pages auto-deploys from `main` in 1–2 minutes. No further action.
 
 State, in this shape:
 - Which item was marked sold (SKU + name) and the sold price / date written
-- That the Square payment link was deleted (include the link id and the returned `cancelled_order_id`) — or note "already deleted" if step 6 found no match
+- That **both** GitHub Pages surfaces were flipped — the item's own card *and* the gallery grid card on the landing page (so it no longer shows as available in the grid, and the available-item count is correct)
+- That the Square payment link was deleted (include the link id and the returned `cancelled_order_id`) — or note "already deleted" if step 7 found no match
 - The commit SHA and that it has been pushed to `main` (so they know GitHub Pages will redeploy)
 - A reminder that the printed thermal label on the physical item (if any) still carries the now-dead QR — the customer-facing card flip ALREADY shows "SOLD", but the physical label may need to be physically removed or marked over if the item is still on display
 
 ## Edge cases worth knowing
 
 - **Items where Square inventory `track_inventory: true`** — payment-link deletion is independent from inventory state. Square Online auto-decrements inventory at checkout; payment links don't. If the item is also in the Square Catalog and inventory matters, that's `rg-item-update`'s job (set quantity to 0 separately) — this skill doesn't touch the Catalog object.
-- **Items sold off-channel (cash, Facebook Marketplace, etc.) where no Square payment link ever existed** — skip step 6, but still write the `status.json` and migrate the HTML. The skill is the source of truth for "this listing is retired", not just for Square-sourced sales.
+- **Items sold off-channel (cash, Facebook Marketplace, etc.) where no Square payment link ever existed** — skip Step 7 (no link to delete), but still write the `status.json` and migrate **both** HTML surfaces (item page + gallery card). The skill is the source of truth for "this listing is retired", not just for Square-sourced sales.
 - **Multiple payment links for the same SKU** — happens occasionally when someone regenerated a link mid-listing. The script will refuse to auto-delete and print all matches with their `created_at`. Confirm with the user which to delete (usually all of them).
-- **Already-sold items with stale live links** — discovered during the 2026-05-20 audit: RG-0002, RG-0003, RG-0005 were all marked SOLD on the site but had live `square.link/u/...` URLs. All three were cleaned up in commit `5d93566` and the API DELETE in the same session. If you find another, treat it exactly like a fresh sale — run this skill end-to-end, even though the HTML may already be on the clean pattern (step 1 will detect that and skip to step 5).
+- **Already-sold items with stale live links** — discovered during the 2026-05-20 audit: RG-0002, RG-0003, RG-0005 were all marked SOLD on the site but had live `square.link/u/...` URLs. All three were cleaned up in commit `5d93566` and the API DELETE in the same session. If you find another, treat it exactly like a fresh sale — run this skill end-to-end. The item page may already be on the clean pattern, but the **gallery card is often the surface still left stale** (Step 1 detects the clean item page and routes you to Step 5 for exactly this). RG-0002 is the canonical example: item page migrated in `5d93566`, gallery card missed until `f05c330`.
 - **User wants to "un-sell" an item** — out of scope for this skill. The Square payment link is gone permanently; regenerating one requires the `rg-item-update` flow (or a fresh listing) plus a manual `git revert` on the sold-state commit.
 
 ## Related skills

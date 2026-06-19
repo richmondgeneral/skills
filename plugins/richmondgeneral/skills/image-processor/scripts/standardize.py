@@ -21,7 +21,8 @@ import subprocess
 import sys
 import tempfile
 
-from PIL import Image, ImageOps, ImageStat
+from PIL import Image, ImageOps, ImageStat, ImageFilter
+from PIL.PngImagePlugin import PngInfo
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROCESS_PY = os.path.join(SCRIPT_DIR, "process.py")
@@ -69,17 +70,33 @@ def color_correct(img):
     return _merge_alpha(ImageOps.autocontrast(rgb, cutoff=0.5), alpha)
 
 
-def square_pad_centered(img, margin=0.06, size=2000, bg=(0, 0, 0, 0)):
+def square_pad_centered(img, fill=0.85, size=2000, shadow=False, bg=(0, 0, 0, 0)):
     """Crop to the object (alpha bbox when present), then center it on a transparent
-    square canvas with ``margin`` padding all around; resize the square to ``size``
-    (set size to 0/None to skip the resize)."""
+    square canvas so the longest side fills `fill` fraction of the canvas.
+    Adds an optional soft drop shadow for grounding."""
     rgba = img.convert("RGBA")
     bbox = rgba.getchannel("A").getbbox() or rgba.getbbox() or (0, 0, rgba.width, rgba.height)
     obj = rgba.crop(bbox)
     w, h = obj.size
-    side = int(round(max(w, h) * (1 + 2 * margin)))
+    
+    # Calculate canvas side to ensure object fills `fill` of the frame
+    side = int(round(max(w, h) / fill)) if fill > 0 else max(w, h)
     canvas = Image.new("RGBA", (side, side), bg)
-    canvas.paste(obj, ((side - w) // 2, (side - h) // 2), obj)
+    
+    paste_x = (side - w) // 2
+    paste_y = (side - h) // 2
+    
+    # Apply grounding shadow if requested
+    if shadow:
+        # 40% opacity shadow, blurred
+        shadow_mask = obj.getchannel("A").point(lambda a: int(a * 0.4))
+        shadow_img = Image.new("RGBA", obj.size, (0, 0, 0, 0))
+        shadow_img.putalpha(shadow_mask)
+        shadow_img = shadow_img.filter(ImageFilter.GaussianBlur(10))
+        # Drop it 15 pixels downwards
+        canvas.paste(shadow_img, (paste_x, paste_y + 15), shadow_img)
+
+    canvas.paste(obj, (paste_x, paste_y), obj)
     if size and side != size:
         canvas = canvas.resize((size, size), Image.LANCZOS)
     return canvas
@@ -98,8 +115,8 @@ def remove_background(src, dst, model=None, allow_rect_mask=False):
         raise RuntimeError("background removal failed:\n" + (r.stderr.strip() or r.stdout.strip()))
 
 
-def standardize(input_path, output_path, do_color=True, do_bg=True, margin=0.06, size=2000,
-                model=None, allow_rect_mask=False):
+def standardize(input_path, output_path, do_color=True, do_bg=True, fill=0.85, size=2000,
+                shadow=False, copyright_text=None, sku=None, model=None, allow_rect_mask=False):
     with tempfile.TemporaryDirectory() as td:
         cur = input_path
         if do_color:
@@ -110,7 +127,18 @@ def standardize(input_path, output_path, do_color=True, do_bg=True, margin=0.06,
             transp = os.path.join(td, "transp.png")
             remove_background(cur, transp, model=model, allow_rect_mask=allow_rect_mask)
             cur = transp
-        square_pad_centered(Image.open(cur), margin=margin, size=size).save(output_path)
+            
+        final_img = square_pad_centered(Image.open(cur), fill=fill, size=size, shadow=shadow)
+        
+        # PIL drops GPS and device EXIF automatically when saving without `exif` kwarg.
+        # We explicitly inject our provenance metadata here.
+        metadata = PngInfo()
+        if copyright_text:
+            metadata.add_text("Copyright", copyright_text)
+        if sku:
+            metadata.add_text("Title", sku)
+            
+        final_img.save(output_path, "PNG", pnginfo=metadata)
     return output_path
 
 
@@ -120,7 +148,10 @@ def main():
     p.add_argument("-o", "--output", required=True, help="output PNG path")
     p.add_argument("--no-color", action="store_true", help="skip color correction")
     p.add_argument("--no-bg", action="store_true", help="skip background removal (input already transparent)")
-    p.add_argument("--margin", type=float, default=0.06, help="padding fraction around the object (default 0.06)")
+    p.add_argument("--fill", type=float, default=0.85, help="fraction of canvas the object should fill (default 0.85)")
+    p.add_argument("--shadow", action="store_true", help="add a grounding drop shadow")
+    p.add_argument("--copyright", type=str, help="embed copyright metadata (e.g. 'Richmond General')")
+    p.add_argument("--sku", type=str, help="embed SKU metadata")
     p.add_argument("--size", type=int, default=2000, help="output square side in px (0 = keep native)")
     p.add_argument("--model", choices=["nano-banana", "gemini25", "removebg", "auto"],
                    help="bg-removal model (default auto; removebg is best for clean cutouts)")
@@ -132,7 +163,8 @@ def main():
     if args.straighten:
         print("warning: --straighten is not implemented (needs opencv); skipping.", file=sys.stderr)
     out = standardize(args.input, args.output, do_color=not args.no_color,
-                      do_bg=not args.no_bg, margin=args.margin, size=args.size,
+                      do_bg=not args.no_bg, fill=args.fill, size=args.size, shadow=args.shadow,
+                      copyright_text=args.copyright, sku=args.sku,
                       model=args.model, allow_rect_mask=args.allow_rect_mask)
     print(out)
 

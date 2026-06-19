@@ -11,7 +11,7 @@ def test_square_pad_centered_makes_square_and_centers():
     # a 100x40 opaque object placed off-center on a 200x200 transparent canvas
     img = Image.new("RGBA", (200, 200), (0, 0, 0, 0))
     img.paste(Image.new("RGBA", (100, 40), (255, 0, 0, 255)), (10, 80))
-    out = st.square_pad_centered(img, margin=0.0, size=0)  # size 0 -> no resize
+    out = st.square_pad_centered(img, fill=1.0, size=0)  # size 0 -> no resize
     assert out.width == out.height                          # square
     assert out.size == (100, 100)                           # side = max(100,40)
     bbox = out.getchannel("A").getbbox()
@@ -21,16 +21,16 @@ def test_square_pad_centered_makes_square_and_centers():
 
 def test_square_pad_centered_resizes_to_size():
     img = Image.new("RGBA", (50, 50), (0, 255, 0, 255))
-    out = st.square_pad_centered(img, margin=0.1, size=512)
+    out = st.square_pad_centered(img, fill=0.8, size=512)
     assert out.size == (512, 512)
 
 
 def test_square_pad_centered_adds_margin():
     img = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
     img.paste(Image.new("RGBA", (60, 60), (0, 0, 255, 255)), (20, 20))
-    out = st.square_pad_centered(img, margin=0.25, size=0)
-    # side = 60 * (1 + 0.5) = 90; object 60 -> padding present
-    assert out.size == (90, 90)
+    out = st.square_pad_centered(img, fill=0.5, size=0)
+    # side = 60 / 0.5 = 120; object 60 -> padding present
+    assert out.size == (120, 120)
 
 
 def test_gray_world_white_balance_neutralizes_cast():

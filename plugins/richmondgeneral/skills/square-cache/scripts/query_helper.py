@@ -22,83 +22,83 @@ class QueryHelper:
     @staticmethod
     def items_with_images() -> str:
         """Get all items that have images attached"""
-        return """mongosh square_cache --eval "db.catalog_items.find({'item_data.image_ids': {\$exists: true, \$ne: []}}).pretty()" """
+        return r"""mongosh square_cache --eval "db.catalog_items.find({'item_data.image_ids': {\$exists: true, \$ne: []}}).pretty()" """
     
     @staticmethod
     def items_without_images() -> str:
         """Get all items missing images"""
-        return """mongosh square_cache --eval "db.catalog_items.find({\$or: [{'item_data.image_ids': {\$exists: false}}, {'item_data.image_ids': []}]}).pretty()" """
+        return r"""mongosh square_cache --eval "db.catalog_items.find({\$or: [{'item_data.image_ids': {\$exists: false}}, {'item_data.image_ids': []}]}).pretty()" """
     
     @staticmethod
     def items_without_descriptions() -> str:
         """Get items missing descriptions"""
-        return """mongosh square_cache --eval "db.catalog_items.find({\$or: [{'item_data.description': {\$exists: false}}, {'item_data.description': ''}, {'item_data.description': null}]}).pretty()" """
+        return r"""mongosh square_cache --eval "db.catalog_items.find({\$or: [{'item_data.description': {\$exists: false}}, {'item_data.description': ''}, {'item_data.description': null}]}).pretty()" """
     
     @staticmethod
     def items_by_category(category_id: str) -> str:
         """Get items in a specific category"""
         safe_id = QueryHelper._sanitize(category_id)
-        return f"""mongosh square_cache --eval "db.catalog_items.find({{'item_data.categories': {{\\$elemMatch: {{id: '{safe_id}'}}}}}}).pretty()" """
+        return rf"""mongosh square_cache --eval "db.catalog_items.find({{'item_data.categories': {{\\$elemMatch: {{id: '{safe_id}'}}}}}}).pretty()" """
     
     @staticmethod
     def changes_by_date_range(start_date: str, end_date: str) -> str:
         """Get changes between two dates (YYYY-MM-DD format)"""
         s = QueryHelper._sanitize(start_date)
         e = QueryHelper._sanitize(end_date)
-        return f"""mongosh square_cache --eval "db.change_snapshots.find({{timestamp: {{\$gte: new Date('{s}'), \$lte: new Date('{e}')}}}}).sort({{timestamp: -1}}).pretty()" """
+        return rf"""mongosh square_cache --eval "db.change_snapshots.find({{timestamp: {{\$gte: new Date('{s}'), \$lte: new Date('{e}')}}}}).sort({{timestamp: -1}}).pretty()" """
     
     @staticmethod
     def changes_by_item(item_id: str) -> str:
         """Get all changes for a specific item"""
         safe_id = QueryHelper._sanitize(item_id)
-        return f"""mongosh square_cache --eval "db.change_snapshots.find({{item_id: '{safe_id}'}}).sort({{timestamp: -1}}).pretty()" """
+        return rf"""mongosh square_cache --eval "db.change_snapshots.find({{item_id: '{safe_id}'}}).sort({{timestamp: -1}}).pretty()" """
     
     @staticmethod
     def recent_changes(limit: int = 50) -> str:
         """Get most recent changes"""
-        return f"""mongosh square_cache --eval "db.change_snapshots.find({{}}).sort({{timestamp: -1}}).limit({limit}).pretty()" """
+        return rf"""mongosh square_cache --eval "db.change_snapshots.find({{}}).sort({{timestamp: -1}}).limit({limit}).pretty()" """
     
     @staticmethod
     def sync_errors() -> str:
         """Get recent sync errors"""
-        return """mongosh square_cache --eval "db.sync_log.find({error: {\$exists: true}}).sort({timestamp: -1}).limit(10).pretty()" """
+        return r"""mongosh square_cache --eval "db.sync_log.find({error: {\$exists: true}}).sort({timestamp: -1}).limit(10).pretty()" """
     
     @staticmethod
     def last_sync() -> str:
         """Get last sync operation details"""
-        return """mongosh square_cache --eval "db.sync_log.findOne({}, {sort: {timestamp: -1}})" """
+        return r"""mongosh square_cache --eval "db.sync_log.findOne({}, {sort: {timestamp: -1}})" """
     
     @staticmethod
     def cache_stats() -> str:
         """Get overall cache statistics"""
-        return """mongosh square_cache --eval "printjson({items: db.catalog_items.countDocuments(), changes: db.change_snapshots.countDocuments(), syncs: db.sync_log.countDocuments(), last_sync: db.sync_log.findOne({}, {sort: {timestamp: -1}})?.timestamp})" """
+        return r"""mongosh square_cache --eval "printjson({items: db.catalog_items.countDocuments(), changes: db.change_snapshots.countDocuments(), syncs: db.sync_log.countDocuments(), last_sync: db.sync_log.findOne({}, {sort: {timestamp: -1}})?.timestamp})" """
     
     @staticmethod
     def changes_by_type() -> str:
         """Count changes grouped by type (create/update/delete)"""
-        return """mongosh square_cache --eval "db.change_snapshots.aggregate([{\\$group: {_id: '\\$change_type', count: {\\$sum: 1}}}])" """
+        return r"""mongosh square_cache --eval "db.change_snapshots.aggregate([{\\$group: {_id: '\\$change_type', count: {\\$sum: 1}}}])" """
     
     @staticmethod
     def items_updated_recently(days: int = 7) -> str:
         """Get items updated in the last N days"""
-        return f"""mongosh square_cache --eval "db.catalog_items.find({{updated_at: {{\$gte: new Date(Date.now() - {days}*24*60*60*1000)}}}}).sort({{updated_at: -1}}).pretty()" """
+        return rf"""mongosh square_cache --eval "db.catalog_items.find({{updated_at: {{\$gte: new Date(Date.now() - {days}*24*60*60*1000)}}}}).sort({{updated_at: -1}}).pretty()" """
     
     @staticmethod
     def search_by_name(pattern: str) -> str:
         """Search items by name pattern (case-insensitive)"""
         safe_pat = QueryHelper._sanitize(pattern)
-        return f"""mongosh square_cache --eval "db.catalog_items.find({{'item_data.name': {{\$regex: '{safe_pat}', \$options: 'i'}}}}).pretty()" """
+        return rf"""mongosh square_cache --eval "db.catalog_items.find({{'item_data.name': {{\$regex: '{safe_pat}', \$options: 'i'}}}}).pretty()" """
     
     @staticmethod
     def get_item(item_id: str) -> str:
         """Get specific item by ID"""
         safe_id = QueryHelper._sanitize(item_id)
-        return f"""mongosh square_cache --eval "db.catalog_items.findOne({{id: '{safe_id}'}})" """
+        return rf"""mongosh square_cache --eval "db.catalog_items.findOne({{id: '{safe_id}'}})" """
     
     @staticmethod
     def items_with_variations() -> str:
         """Get items that have variations"""
-        return """mongosh square_cache --eval "db.catalog_items.find({'item_data.variations': {\$exists: true, \$ne: []}}).pretty()" """
+        return r"""mongosh square_cache --eval "db.catalog_items.find({'item_data.variations': {\$exists: true, \$ne: []}}).pretty()" """
     
     @staticmethod
     def export_items_json(output_file: str = "items.json") -> str:
@@ -113,7 +113,7 @@ class QueryHelper:
     @staticmethod
     def count_items_by_field(field: str) -> str:
         """Count items grouped by a specific field value"""
-        return f"""mongosh square_cache --eval "db.catalog_items.aggregate([{{\\$group: {{_id: '\\${field}', count: {{\\$sum: 1}}}}}}])" """
+        return rf"""mongosh square_cache --eval "db.catalog_items.aggregate([{{\\$group: {{_id: '\\${field}', count: {{\\$sum: 1}}}}}}])" """
 
 
 def main():

@@ -180,3 +180,19 @@ def test_concurrent_allocations_are_unique_under_contention():
     assert len(results) == N
     assert len(set(results)) == N          # zero collisions
     assert store.conflict_count > 0        # PROVES real contention occurred (retry path exercised)
+
+
+def test_square_store_is_constructible_without_network():
+    from sku_authority import SquareCounterStore
+    store = SquareCounterStore(client=object())   # inject dummy; no calls made
+    assert hasattr(store, "read") and hasattr(store, "cas_set") and hasattr(store, "create")
+
+
+def test_cli_help_runs():
+    import subprocess
+    import sys
+    import sku_authority
+    path = sku_authority.__file__
+    r = subprocess.run([sys.executable, path, "--help"], capture_output=True, text=True)
+    assert r.returncode == 0
+    assert "bootstrap" in r.stdout and "peek" in r.stdout

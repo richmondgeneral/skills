@@ -11,7 +11,9 @@ Design: docs/plans/2026-06-19-sku-allocation-design.md
 from __future__ import annotations
 
 import re
+import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional, Protocol
 
 SENTINEL_SKU = "__RG_SKU_COUNTER__"        # stable variation SKU used to locate the sentinel
@@ -100,3 +102,184 @@ def bootstrap(store: CounterStore, fs_max: int = 0) -> int:
 def peek(store: CounterStore) -> Optional[int]:
     """Return the current counter N without allocating; None if the sentinel is absent. Propagates SquareUnavailable."""
     return store.read().n
+
+
+def _is_version_conflict(errors) -> bool:
+    for e in errors or []:
+        code = getattr(e, "code", None) or (e.get("code") if isinstance(e, dict) else None) or ""
+        detail = getattr(e, "detail", None) or (e.get("detail") if isinstance(e, dict) else None) or ""
+        if str(code).upper() == "VERSION_MISMATCH" or "version" in str(detail).lower():
+            return True
+    return False
+
+
+class SquareCounterStore:
+    """CounterStore backed by the live Square catalog via the official SDK.
+
+    Contract: cas_set() must be preceded by read() in the same allocate attempt
+    (read() caches the fetched sentinel object whose version cas_set sends back).
+    """
+
+    def __init__(self, client=None):
+        self._client = client
+        self._cached_obj = None
+
+    def _client_or_make(self):
+        if self._client is None:
+            try:
+                from square.client import Square
+                from item_model.instance import resolve_square_token
+                token = resolve_square_token()
+                if not token:
+                    raise SquareUnavailable("no Square access token resolved")
+                self._client = Square(token=token)
+            except SquareUnavailable:
+                raise
+            except Exception as e:                          # noqa: BLE001
+                raise SquareUnavailable(f"cannot construct Square client: {e}") from e
+        return self._client
+
+    def _scan(self):
+        """One catalog pass -> (sentinel_item_id, sentinel_name, rg_max)."""
+        client = self._client_or_make()
+        sentinel_id = sentinel_name = None
+        rg_max = 0
+        cursor = None
+        try:
+            while True:
+                resp = (client.catalog.search_items(cursor=cursor)
+                        if cursor else client.catalog.search_items())
+                if getattr(resp, "errors", None):
+                    raise SquareUnavailable(f"search_items errors: {resp.errors}")
+                for item in (getattr(resp, "items", None) or []):
+                    data = getattr(item, "item_data", None)
+                    if data is None:
+                        continue
+                    for v in (getattr(data, "variations", None) or []):
+                        vd = getattr(v, "item_variation_data", None)
+                        sku = getattr(vd, "sku", None) if vd else None
+                        if sku == SENTINEL_SKU:
+                            sentinel_id, sentinel_name = item.id, getattr(data, "name", None)
+                        else:
+                            n = parse_rg_n(sku)
+                            if n is not None:
+                                rg_max = max(rg_max, n)
+                cursor = getattr(resp, "cursor", None)
+                if not cursor:
+                    break
+        except SquareUnavailable:
+            raise
+        except Exception as e:                              # noqa: BLE001
+            raise SquareUnavailable(f"catalog scan failed: {e}") from e
+        return sentinel_id, sentinel_name, rg_max
+
+    def read(self) -> CounterState:
+        sentinel_id, sentinel_name, rg_max = self._scan()
+        self._cached_obj = None
+        if sentinel_id is None:
+            return CounterState(n=None, version=None, rg_max=rg_max)
+        client = self._client_or_make()
+        try:
+            got = client.catalog.batch_get(object_ids=[sentinel_id])
+            if getattr(got, "errors", None):
+                raise SquareUnavailable(f"batch_get errors: {got.errors}")
+            obj = (getattr(got, "objects", None) or [None])[0]
+            if obj is None:
+                return CounterState(n=None, version=None, rg_max=rg_max)
+            self._cached_obj = obj
+            return CounterState(n=parse_counter_n(sentinel_name),
+                                version=getattr(obj, "version", None), rg_max=rg_max)
+        except SquareUnavailable:
+            raise
+        except Exception as e:                              # noqa: BLE001
+            raise SquareUnavailable(f"sentinel fetch failed: {e}") from e
+
+    def cas_set(self, expected_version: int, n: int) -> bool:
+        if self._cached_obj is None:
+            return False                                    # force a re-read
+        client = self._client_or_make()
+        d = self._cached_obj.model_dump(mode="json", exclude_none=True)
+        d["version"] = expected_version
+        d["item_data"]["name"] = format_counter_name(n)
+        try:
+            r = client.catalog.batch_upsert(
+                idempotency_key=str(uuid.uuid4()),          # fresh key: network-retry safe
+                batches=[{"objects": [d]}],
+            )
+            errs = getattr(r, "errors", None)
+            if errs:
+                return False if _is_version_conflict(errs) else _raise_unavailable(errs)
+            return True
+        except SquareUnavailable:
+            raise
+        except Exception as e:                              # noqa: BLE001
+            if "version" in str(e).lower():
+                return False
+            raise SquareUnavailable(f"cas upsert failed: {e}") from e
+
+    def create(self, n: int) -> None:
+        client = self._client_or_make()
+        existing, _, _ = self._scan()                       # tolerate concurrent create
+        if existing is not None:
+            return
+        obj = {
+            "type": "ITEM", "id": "#rg-sku-counter", "present_at_all_locations": False,
+            "item_data": {
+                "name": format_counter_name(n),
+                "variations": [{
+                    "type": "ITEM_VARIATION", "id": "#rg-sku-counter-var",
+                    "present_at_all_locations": False,
+                    "item_variation_data": {"sku": SENTINEL_SKU, "pricing_type": "VARIABLE_PRICING"},
+                }],
+            },
+        }
+        try:
+            r = client.catalog.batch_upsert(
+                idempotency_key=f"rg-sku-counter-create-{uuid.uuid4()}",
+                batches=[{"objects": [obj]}],
+            )
+            if getattr(r, "errors", None):
+                raise SquareUnavailable(f"counter create errors: {r.errors}")
+        except SquareUnavailable:
+            raise
+        except Exception as e:                              # noqa: BLE001
+            raise SquareUnavailable(f"counter create failed: {e}") from e
+
+
+def _raise_unavailable(errs):
+    raise SquareUnavailable(f"catalog upsert errors: {errs}")
+
+
+def default_next_sku() -> str:
+    """Production allocator: construct a live Square-backed store and allocate."""
+    return allocate_sku(SquareCounterStore())
+
+
+def _main(argv=None) -> int:
+    import argparse
+    import json
+    p = argparse.ArgumentParser(description="RG SKU allocation authority (Square-backed).")
+    sub = p.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("peek", help="print current counter N")
+    b = sub.add_parser("bootstrap", help="create sentinel from max(Square, items dir)")
+    b.add_argument("--items-dir", default=None)
+    sub.add_parser("allocate", help="allocate and print one RG-XXXX (mutates Square!)")
+    args = p.parse_args(argv)
+    store = SquareCounterStore()
+    if args.cmd == "peek":
+        print(json.dumps({"n": peek(store)}))
+        return 0
+    if args.cmd == "bootstrap":
+        fs = 0
+        if args.items_dir:
+            fs = max([parse_rg_n(c.name) or 0 for c in Path(args.items_dir).glob("RG-*")] or [0])
+        print(json.dumps({"n": bootstrap(store, fs_max=fs)}))
+        return 0
+    if args.cmd == "allocate":
+        print(json.dumps({"sku": allocate_sku(store)}))
+        return 0
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

@@ -21,7 +21,7 @@ def find_photos_library():
 
 def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only=False,
                    limit=20, output_format='jpeg', quality=90, resize=None,
-                   album=None, keyword=None):
+                   album=None, keyword=None, uuids=None):
     """Extract photos from library to output directory."""
     # Constants
     COCOA_EPOCH_OFFSET = 978307200  # Seconds between Unix epoch (1970) and Cocoa epoch (2001)
@@ -42,7 +42,15 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
 
         conditions = ["a.ZTRASHEDSTATE = 0", "a.ZHIDDEN = 0", "a.ZKIND = 0"]
         params = []
-        
+
+        # --uuids selects by ZUUID membership (like --album, by identity not
+        # recency), so it bypasses the day window. Parameterize every UUID —
+        # never string-interpolate them into the SQL.
+        if uuids:
+            placeholders = ",".join("?" for _ in uuids)
+            conditions.append(f"a.ZUUID IN ({placeholders})")
+            params.extend(uuids)
+            days = None
         if days:
             conditions.append(f"a.ZDATECREATED > (strftime('%s', 'now') - {COCOA_EPOCH_OFFSET} - ? * {SECONDS_PER_DAY})")
             params.append(days)
@@ -81,28 +89,38 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
         cursor.execute(query, params)
         rows = cursor.fetchall()
 
+    # With --uuids, flag any requested UUID the DB returned no row for (typo /
+    # not in this library / trashed/hidden) so it's reported, never silently
+    # dropped. ZUUID is upper-case in Photos; compare case-insensitively.
+    not_found = []
+    if uuids:
+        seen = {r[0].lower() for r in rows}
+        not_found = [u for u in uuids if u.lower() not in seen]
+
     extracted = []
     offloaded = []  # originals not on disk (iCloud-offloaded) — reported, never silently skipped
     for row in rows:
         uuid, file_type, orig_name, width, height, created = row
 
-        ext = file_type.split('.')[-1] if file_type else "heic"
-        first_char = uuid[0].upper()
-        src_path = os.path.join(library_path, f"originals/{first_char}/{uuid}.{ext}")
+        # Path of the on-disk original (originals/<FIRST_CHAR>/<uuid>.<ext>) —
+        # shared helper keeps this layout DRY with intake_to_item.py.
+        src_path = os.path.join(library_path, photos_db.original_relpath(uuid, file_type))
 
         if not os.path.exists(src_path):
             # Original isn't on local disk — almost always iCloud-offloaded
             # ("Optimize Mac Storage"). Track it so we report the full set at
             # the end instead of silently skipping (which hid intake photos).
-            offloaded.append(orig_name or f"{uuid[:8]}.{ext}")
+            offloaded.append(orig_name or uuid[:8])
             print(f"☁︎ Offloaded (not on disk): {orig_name or uuid[:8]}")
             continue
 
-        # Determine output filename
-        if orig_name:
-            base_name = os.path.splitext(orig_name)[0]
-        else:
+        # Determine output filename. With --uuids, name by UUID prefix so the
+        # caller can map a file back to the asset it requested; otherwise keep
+        # the original filename's base (falling back to the UUID prefix).
+        if uuids or not orig_name:
             base_name = uuid[:8]
+        else:
+            base_name = os.path.splitext(orig_name)[0]
 
         out_name = f"{base_name}.{output_format}"
         dst_path = os.path.join(output_dir, out_name)
@@ -151,6 +169,13 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
         print('  Download via Photos (select → File ▸ "Download Originals"),')
         print("  or `osxphotos export --download-missing`, then re-run.")
 
+    # Requested UUIDs that matched no asset at all — surface, never silently drop.
+    if not_found:
+        print(f"\n⚠️  {len(not_found)} requested UUID(s) not found in this library "
+              f"(typo / trashed / hidden / different library):")
+        for u in not_found:
+            print(f"    - {u}")
+
     return extracted
 
 def main():
@@ -160,6 +185,7 @@ def main():
     parser.add_argument('--favorites', action='store_true', help='Only favorited photos')
     parser.add_argument('--album', type=str, help='Only photos in this album (matches album name, e.g. "Intake")')
     parser.add_argument('--keyword', '--tag', dest='keyword', type=str, help='Only photos with this keyword/tag')
+    parser.add_argument('--uuids', type=str, help='Comma-separated ZUUIDs to extract (selects by UUID, bypasses --days)')
     parser.add_argument('--limit', type=int, default=20, help='Max photos to extract')
     parser.add_argument('--output', '-o', type=str, required=True, help='Output directory')
     parser.add_argument('--format', type=str, default='jpeg', choices=['jpeg', 'png'], help='Output format')
@@ -188,10 +214,16 @@ def main():
             print("Error: --resize must be in format WxH (e.g., 800x800)")
             return 1
 
-    # If --favorites/--album/--keyword is used without an explicit --days, drop
-    # the day filter — these select by membership/tag, not recency.
+    # Parse --uuids into a clean list (drop blanks/whitespace from the CSV).
+    uuid_list = [u.strip() for u in args.uuids.split(',') if u.strip()] if args.uuids else None
+    if args.uuids and not uuid_list:
+        print("Error: --uuids was empty")
+        return 1
+
+    # If --favorites/--album/--keyword/--uuids is used without an explicit --days,
+    # drop the day filter — these select by membership/identity, not recency.
     days_filter = args.days
-    if (args.favorites or args.album or args.keyword) and '--days' not in ' '.join(os.sys.argv):
+    if (args.favorites or args.album or args.keyword or uuid_list) and '--days' not in ' '.join(os.sys.argv):
         days_filter = None
 
     library_path = args.library or find_photos_library()
@@ -222,7 +254,8 @@ def main():
         quality=args.quality,
         resize=args.resize,
         album=args.album,
-        keyword=args.keyword
+        keyword=args.keyword,
+        uuids=uuid_list
     )
 
     print(f"\nExtracted {len(extracted)} photos to {args.output}")

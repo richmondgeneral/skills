@@ -1,11 +1,31 @@
 ---
 name: photos-library
-description: Query and extract photos from macOS Photos Library. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, or pull images from Photos app for processing. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll".
+description: Query and extract photos from macOS Photos Library, and sort intake photos into per-SKU libraries. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, pull images from Photos app, sort the intake album into items, file photos into a SKU, clear the intake queue, or route downloaded photos into the right album. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll", "sort intake", "sort my intake photos", "file these into their SKU", "out of intake", "photos from downloads into the right album".
 metadata:
-  version: "1.6"
+  version: "1.7"
   author: scottybe
   updated: "2026-06-19"
   changelog: |
+    v1.7 - Intake photo sorter (agent loop) + downloads router:
+    - file_cluster.py: the ONE canonical filing step — mints (sku_authority) or
+      uses a SKU, exports a cluster's originals into items/RG-XXXX/ (hero +
+      detail-N, never clobbering an existing hero via sips), adds them to the
+      per-SKU Photos album (archive_to_album.scpt, idempotent), and tags them
+      rg-sorted + RG-XXXX. --plan dry-runs with zero mutations; offloaded
+      originals are reported, not filed.
+    - extract_photos.py --uuids: render one specific cluster for the agent to look
+      at (vision); original_relpath() in photos_db.py shares the on-disk path math.
+    - find_product_clusters.py --hide-sorted / --exclude-keyword
+      (exclude_keyword_condition in photos_db.py): the intake QUEUE excludes
+      rg-sorted photos, so once a cluster is filed it drops out of the sorter's
+      view. This is how "out of Intake" works — RELIABLY, with no album mutation.
+    - import_to_photos.scpt: import ~/Downloads files into a Photos album (creates
+      it under the "Richmond General" folder if needed).
+    - NOTE: a PhotoKit/AppleScript "rebuild the Intake album" approach was tried
+      and REJECTED — Photos' async album deletion creates duplicate albums and
+      breaks references. Keyword tag + --hide-sorted queue filter replaced it.
+      Physical photos stay in Intake until you mass-delete them by hand.
+
     v1.6 - Library-based intake helper (intake_to_item.py):
     - Given --sku + --album/--keyword, pulls matching originals via sips into
       items/RG-XXXX/ (hero.jpeg + detail-N.jpeg) and stubs label.json. Takes the
@@ -257,3 +277,59 @@ WHERE ZDATECREATED > (strftime('%s', 'now') - 978307200 - 7*24*60*60)
 sips -Z 800 photo.jpeg --out photo_medium.jpeg
 sips -Z 400 photo.jpeg --out photo_small.jpeg
 ```
+
+## Intake Photo Sorter (agent loop)
+
+Sort the "Richmond General Intake" album into each item's SKU lib — the per-SKU Photos
+album AND `items/RG-XXXX/` — as an agent loop: cluster → look → propose → confirm → file.
+
+1. **Cluster the queue** (already-sorted photos are excluded):
+   ```bash
+   python3 scripts/find_product_clusters.py --album "Richmond General Intake" --hide-sorted --json
+   ```
+   Item-by-item shooting → each time-gap cluster ≈ one item.
+
+2. **Look at each cluster** — extract small JPEGs and Read them (real vision):
+   ```bash
+   python3 scripts/extract_photos.py --uuids <uuid1,uuid2,…> --resize 1024x1024 -o /tmp/rg-cluster
+   ```
+   Offloaded originals are reported — offer to download them in Photos first.
+
+3. **Match + propose.** Cross-reference `items/RG-XXXX/` heroes + `label.json`. Per cluster,
+   propose *"matches RG-00NN → add as details"* or *"new item → mint next RG-XXXX"*, with a reason.
+
+4. **Confirm with the user** per cluster (accept / different SKU / skip).
+
+5. **File the cluster** — the ONE canonical step (dry-run first if unsure):
+   ```bash
+   python3 scripts/file_cluster.py --plan --uuids <uuids> [--sku RG-00NN | --mint]
+   python3 scripts/file_cluster.py --uuids <uuids> [--sku RG-00NN | --mint] \
+       [--role <uuid>=hero] [--role <uuid>=detail-back]
+   ```
+   Exports to `items/RG-XXXX/` (hero + detail-N, no clobber), adds to the per-SKU album, and tags
+   `rg-sorted` + `RG-XXXX`. Minting is atomic (Square-CAS) and hard-fails offline.
+
+**"Out of Intake" = the `rg-sorted` tag + `--hide-sorted` filter.** Once filed, a photo is tagged
+and the queue (step 1) excludes it, so it's done from the workflow's view. The physical photo stays
+visible in the Intake album until you periodically mass-delete sorted ones by hand — Photos can't
+reliably remove items from an album via scripting (a rebuild approach was tried and rejected; see
+changelog).
+
+## Downloads → Album (agent decides per photo)
+
+Route `~/Downloads` photos into the right Photos album.
+
+1. List `~/Downloads` images; convert HEIC to a temp JPEG so you can Read/look at each.
+2. Route per photo (vision): product shot → "Richmond General Intake" (or, if it clearly matches a
+   live SKU, that SKU's album); non-product → leave it alone.
+3. Confirm the routing with the user.
+4. Import:
+   ```bash
+   osascript scripts/import_to_photos.scpt "Richmond General Intake" <file1> <file2> …
+   ```
+   Product imports land in Intake → the Intake Photo Sorter above takes over.
+
+### Safety
+- All DB reads use `mode=ro&immutable=1` (never disturbs iCloud sync).
+- Irreversible steps (mint, import, file) run only after per-cluster confirmation.
+- Re-runs are safe: album membership dedupes; existing `items/` photos are never clobbered.

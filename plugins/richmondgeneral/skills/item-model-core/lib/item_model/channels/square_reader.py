@@ -42,6 +42,9 @@ def build_square_index(client=None, location_id: Optional[str] = None) -> Square
     while True:
         resp = client.catalog.search_items(cursor=cursor) if cursor \
             else client.catalog.search_items()
+        errors = getattr(resp, "errors", None)
+        if errors:
+            raise RuntimeError(f"Square catalog fetch failed: {errors}")
         for item in (resp.items or []):
             item_data = getattr(item, "item_data", None)
             if item_data is None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import argparse, json, os, sys
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 # Make the item-model-core sibling skill's lib importable when run as a script.
 # (Under pytest, conftest.py already injects this path; this makes the CLI work
@@ -11,7 +11,6 @@ sys.path.insert(0, os.path.join(
 
 from item_model.page_reader import read_page_record
 from item_model.diff import diff_item
-from item_model.models import Channel
 from item_model.channels.square_reader import observe_square, build_square_index
 from item_model.channels.whatnot_reader import observe_whatnot, build_whatnot_index
 
@@ -19,9 +18,11 @@ from item_model.channels.whatnot_reader import observe_whatnot, build_whatnot_in
 def run_reconcile(items_dir: str, square_index: Dict, whatnot_index: Dict) -> dict:
     """Pure orchestration over injected indexes. Returns the report dict."""
     findings = []
+    items_scanned = 0
     for child in sorted(Path(items_dir).glob("RG-*")):
         if not (child / "label.json").exists():
             continue
+        items_scanned += 1
         page = read_page_record(child)
         observations = [
             observe_square(page.sku, square_index),
@@ -33,7 +34,7 @@ def run_reconcile(items_dir: str, square_index: Dict, whatnot_index: Dict) -> di
     summary = {"critical": 0, "warning": 0, "info": 0}
     for f in findings:
         summary[f["severity"]] = summary.get(f["severity"], 0) + 1
-    return {"findings": findings, "summary": summary}
+    return {"findings": findings, "summary": summary, "items_scanned": items_scanned}
 
 
 def main(argv=None):
@@ -59,6 +60,7 @@ def main(argv=None):
     Path(out).write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     s = report["summary"]
+    print(f"Scanned {report['items_scanned']} items")
     print(f"Reconcile: {s['critical']} critical, {s['warning']} warning, {s['info']} info")
     for f in report["findings"]:
         print(f"  [{f['severity'].upper():8}] {f['sku']} {f['field']} on {f['channel']}: {f['message']}")

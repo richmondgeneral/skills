@@ -30,3 +30,4 @@ def test_run_reports_price_drift_and_sold_conflict(tmp_path):
     assert sev[("RG-0003", "sold_state")] == "critical"
     assert report["summary"]["critical"] == 1
     assert report["summary"]["warning"] == 1
+    assert report["items_scanned"] == 2

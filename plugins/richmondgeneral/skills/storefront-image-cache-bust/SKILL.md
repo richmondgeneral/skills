@@ -1,6 +1,11 @@
 ---
 name: storefront-image-cache-bust
 description: Fix product photos that show wrong/sideways/stale on the Square Online storefront even though the Square Catalog API holds correct, updated versions. Triggers when the user says "the photo on the website is wrong / sideways / out of date", "Square Online is showing the old picture", "I rotated the image in Square but the storefront still has the old one", "storefront image cache is stale", "the CDN is serving the wrong image", "fix the photos for this item" (when the API copy is fine), or any case where `items-images-production.s3.us-west-2.amazonaws.com` shows the right file but `150225383.cdn6.editmysite.com` (or similar Weebly CDN) shows the wrong one. Do NOT use for first-time uploads (use `square-image-upload-cowork`) or for items where the Catalog API itself has the wrong photo.
+allowed-tools: Read, Grep, Glob, Bash
+metadata:
+  version: "1.0"
+  author: scottybe
+  updated: "2026-06-19"
 ---
 
 # Storefront Image Cache Bust

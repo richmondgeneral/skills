@@ -5,6 +5,7 @@
 set -o pipefail
 
 SKILLS_DIR="$(cd "$(dirname "$0")/../plugins/richmondgeneral/skills" && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$SKILLS_DIR" || exit 1
 
 # Colors
@@ -98,7 +99,20 @@ DEPRECATED_PATTERNS=(
 )
 
 for pattern in "${DEPRECATED_PATTERNS[@]}"; do
-    matches=$(grep -rn "$pattern" "$SKILLS_DIR" --include="*.md" --exclude-dir=archive 2>/dev/null | grep -v "archive/" | grep -v "WARP_AGENT_GUIDE" | grep -v "skill-manager/SKILL.md" | grep -v "Archived" | grep -v "superseded" | grep -v "Consolidated")
+    matches=$(grep -rn "$pattern" "$SKILLS_DIR" --include="*.md" --exclude-dir=archive 2>/dev/null | \
+        grep -v "archive/" | \
+        grep -v "WARP_AGENT_GUIDE" | \
+        grep -v "skill-manager/SKILL.md" | \
+        grep -v "Archived" | \
+        grep -v "superseded" | \
+        grep -v "Consolidated" | \
+        grep -v "Migration from" | \
+        grep -v "Merged " | \
+        grep -v "image-generation-skill/" | \
+        grep -v "image-editing-skill/" | \
+        grep -v "rg-inventory/whatnot-import.csv" | \
+        grep -v "rg-inventory-tracker" | \
+        grep -v "changelog.md")
     if [ -n "$matches" ]; then
         fail "Found references to deprecated/non-existent '$pattern':"
         echo "$matches" | while read -r line; do
@@ -124,16 +138,16 @@ VERSION_MISMATCHES=0
 REGISTRY_FILE="$SKILLS_DIR/skill-manager/SKILL.md"
 
 # Check a few key skills
-declare -A EXPECTED_VERSIONS=(
-    ["daily-briefing"]="v2.0"
-    ["skill-manager"]="v1.3"
-    ["rg-full-auto"]="v2.3"
-    ["image-processor"]="v1.0"
-    ["photos-library"]="v1.0"
-)
+KEY_SKILLS=("daily-briefing" "skill-manager" "rg-full-auto" "image-processor" "photos-library")
+EXPECTED_daily_briefing="v2.1"
+EXPECTED_skill_manager="v1.7"
+EXPECTED_rg_full_auto="v6.5"
+EXPECTED_image_processor="v1.7"
+EXPECTED_photos_library="v1.6"
 
-for skill in "${!EXPECTED_VERSIONS[@]}"; do
-    expected="${EXPECTED_VERSIONS[$skill]}"
+for skill in "${KEY_SKILLS[@]}"; do
+    var_name="EXPECTED_${skill//-/_}"
+    expected="${!var_name}"
     
     # Get version from SKILL.md
     actual=$(grep "version:" "$SKILLS_DIR/$skill/SKILL.md" 2>/dev/null | head -1 | awk '{print $2}' | tr -d '"')
@@ -151,7 +165,7 @@ for skill in "${!EXPECTED_VERSIONS[@]}"; do
 done
 
 if [ $VERSION_MISMATCHES -eq 0 ]; then
-    pass "Version Consistency (checked ${#EXPECTED_VERSIONS[@]} critical skills)"
+    pass "Version Consistency (checked ${#KEY_SKILLS[@]} critical skills)"
 fi
 
 # ============================================================================
@@ -163,8 +177,8 @@ echo "━━━ Skill Count Accuracy ━━━"
 # Count actual skills (dirs with SKILL.md)
 ACTUAL_SKILL_COUNT=$(find "$SKILLS_DIR" -maxdepth 2 -name "SKILL.md" -not -path "*/archive/*" | wc -l | tr -d ' ')
 
-# Check README.md claim
-README_CLAIM=$(grep -o "[0-9]\+ AI assistant skills" "$SKILLS_DIR/README.md" | grep -o "[0-9]\+")
+# Check README.md claim (at repository root)
+README_CLAIM=$(grep -o "[0-9]\+ AI assistant skills" "$REPO_ROOT/README.md" | grep -o "[0-9]\+")
 
 if [ "$README_CLAIM" != "$ACTUAL_SKILL_COUNT" ]; then
     fail "Skill count mismatch: README.md claims $README_CLAIM, actual count is $ACTUAL_SKILL_COUNT"

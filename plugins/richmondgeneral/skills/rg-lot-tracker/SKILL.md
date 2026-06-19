@@ -186,7 +186,7 @@ User specifies exact cost. Use for direct purchases or standout pieces.
 
 **Free items** — cost is $0. Still track for volume and revenue reporting.
 
-### Update the lot file
+### Update the lot file for items
 
 Add a row to the Items table:
 
@@ -279,7 +279,7 @@ User tells you directly: "RG-0015 sold for $25.00" or "record sale".
 
 See `references/roi-formulas.md` for the complete fee schedule and formulas.
 
-### Update the lot file
+### Update the lot file for sales
 
 Change the item's row:
 ```
@@ -375,7 +375,7 @@ Aggregate all lots plus category performance breakdown:
 The automated bridge between Square and lot tracking. Instead of waiting for
 the user to manually report sales, proactively check Square for completed orders.
 
-### When to run
+### When to run reconciliation
 
 - **Automatically** before generating any lot report (Phase 4)
 - **On demand** when user says "what's sold", "reconcile sales", "check Square"
@@ -440,7 +440,7 @@ items have been listed and surfaces actionable recommendations.
 See `references/aging-rules.md` for complete thresholds, seasonal adjustments,
 and repricing strategy.
 
-### When to run
+### When to run aging reports
 
 - **Automatically** as part of any lot report (Phase 4)
 - **On demand** when user says "stale inventory", "aging report", "what needs repricing"

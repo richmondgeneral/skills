@@ -1,6 +1,6 @@
 # Richmond General Skills
 
-A comprehensive collection of AI assistant skills for managing Richmond General's vintage and antique inventory system. These skills integrate with Square Catalog, Apple ecosystem (iMessage, Contacts, Notes), and external identification databases to streamline operations.
+A comprehensive collection of 31 AI assistant skills for managing Richmond General's vintage and antique inventory system. These skills integrate with Square Catalog, Apple ecosystem (iMessage, Contacts, Notes), and external identification databases to streamline operations.
 
 **Repository:** `richmondgeneral/skills`
 **Current Version:** v2026.06.17

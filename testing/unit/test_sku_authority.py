@@ -2,9 +2,9 @@ import threading
 import pytest
 from sku_authority import (
     format_sku, format_counter_name, parse_counter_n, parse_rg_n,
-    SkuAllocationError,
+    allocate_sku, bootstrap, peek, CounterState,
+    SkuAllocationError, SquareUnavailable,
 )
-from sku_authority import allocate_sku, bootstrap, peek, CounterState, SquareUnavailable
 
 def test_format_sku_zero_pads():
     assert format_sku(31) == "RG-0031"
@@ -105,8 +105,13 @@ def test_bootstrap_is_idempotent_when_present():
     assert store.create_calls == 0
 
 
+def test_peek_returns_current_n_without_incrementing():
+    store = FakeStore(n=42, rg_max=42)
+    assert peek(store) == 42
+    assert store.cas_calls == 0
+
+
 def test_allocate_raises_when_retries_exhausted():
-    from sku_authority import SkuAllocationError
     store = FakeStore(n=30, rg_max=30, always_conflict=True)
     with pytest.raises(SkuAllocationError):
         allocate_sku(store, max_retries=3)
@@ -119,30 +124,59 @@ def test_allocate_hard_fails_when_square_unavailable():
         allocate_sku(store)
 
 
-class ThreadSafeFakeStore(FakeStore):
-    def __init__(self, n, rg_max):
+class ContendingFakeStore(FakeStore):
+    """Forces real version-CAS contention: a one-shot barrier makes every thread
+    read the SAME version before any thread does its first CAS, so conflicts
+    actually occur and allocate_sku's retry path is genuinely exercised.
+
+    The version is snapshotted by the barrier's action (which runs once, in a
+    single thread, the instant the last thread arrives) so every thread's first
+    read returns that identical pre-CAS version -- otherwise the GIL would let
+    each thread lazily read an already-advanced version and no conflict would
+    ever occur (making the test vacuous, the very failure mode it guards)."""
+    def __init__(self, n, rg_max, n_threads):
         super().__init__(n=n, rg_max=rg_max)
         self._lock = threading.Lock()
+        self._barrier = threading.Barrier(n_threads, action=self._snapshot_version)
+        self._first = threading.local()
+        self._snapshot = None
+        self.conflict_count = 0
+
+    def _snapshot_version(self):
+        self._snapshot = self.version     # frozen once, before any thread's first CAS
+
+    def read(self) -> CounterState:
+        if not getattr(self._first, "done", False):
+            self._first.done = True
+            self._barrier.wait()          # all threads start from the same version
+            return CounterState(n=self.n, version=self._snapshot, rg_max=self.rg_max)
+        return CounterState(n=self.n, version=self.version, rg_max=self.rg_max)
+
     def cas_set(self, expected_version, n):
-        with self._lock:                       # Square serializes the CAS
+        with self._lock:                  # Square serializes the CAS
             if expected_version != self.version:
+                self.conflict_count += 1
                 return False
             self.n = n
             self.version += 1
             return True
 
 
-def test_concurrent_allocations_are_unique():
-    store = ThreadSafeFakeStore(n=0, rg_max=0)
+def test_concurrent_allocations_are_unique_under_contention():
+    N = 20
+    store = ContendingFakeStore(n=0, rg_max=0, n_threads=N)
     results, errors = [], []
     def worker():
         try:
-            results.append(allocate_sku(store, max_retries=100))
-        except Exception as e:                 # noqa: BLE001
+            results.append(allocate_sku(store, max_retries=1000))
+        except Exception as e:            # noqa: BLE001
             errors.append(e)
-    threads = [threading.Thread(target=worker) for _ in range(20)]
-    for t in threads: t.start()
-    for t in threads: t.join()
+    threads = [threading.Thread(target=worker) for _ in range(N)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
     assert not errors
-    assert len(results) == 20
-    assert len(set(results)) == 20             # zero collisions
+    assert len(results) == N
+    assert len(set(results)) == N          # zero collisions
+    assert store.conflict_count > 0        # PROVES real contention occurred (retry path exercised)

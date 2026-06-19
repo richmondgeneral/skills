@@ -11,9 +11,7 @@ Design: docs/plans/2026-06-19-sku-allocation-design.md
 from __future__ import annotations
 
 import re
-import uuid
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional, Protocol
 
 SENTINEL_SKU = "__RG_SKU_COUNTER__"        # stable variation SKU used to locate the sentinel
@@ -64,6 +62,7 @@ class CounterStore(Protocol):
     def cas_set(self, expected_version: int, n: int) -> bool: ...
     # All three raise SquareUnavailable on I/O or auth failure.
     # cas_set returns False on a version conflict (someone else won).
+    # create() must tolerate a concurrent create (idempotent, or self-healing on the next read).
 
 
 def allocate_sku(store: CounterStore, max_retries: int = DEFAULT_MAX_RETRIES) -> str:
@@ -72,6 +71,9 @@ def allocate_sku(store: CounterStore, max_retries: int = DEFAULT_MAX_RETRIES) ->
     candidate = max(stored N, live Square RG max) + 1, so the result is always
     >= 1 (never negative) given non-negative inputs. CAS on the sentinel version
     guarantees exactly one winner per increment; conflicts retry.
+
+    A missing-sentinel self-heal consumes one retry iteration, so callers passing
+    a very small max_retries should account for it.
     """
     for _ in range(max_retries):
         st = store.read()                          # may raise SquareUnavailable -> propagate
@@ -96,4 +98,5 @@ def bootstrap(store: CounterStore, fs_max: int = 0) -> int:
 
 
 def peek(store: CounterStore) -> Optional[int]:
+    """Return the current counter N without allocating; None if the sentinel is absent. Propagates SquareUnavailable."""
     return store.read().n

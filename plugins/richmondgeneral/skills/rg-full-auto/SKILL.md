@@ -10,10 +10,17 @@ description: >
   "add to whatnot". NOT for simple edits to existing items -- use rg-item-update for price
   changes, description tweaks, or adding images.
 metadata:
-  version: "6.4"
+  version: "6.5"
   author: scottybe
   updated: "2026-06-19"
   changelog: |
+    v6.5 - Path migration + library-intake front door:
+    - Repointed the dead ~/workspace/square/{items,ops} paths to
+      ~/workspace/richmondgeneral/{items,ops} across SKILL.md, references, and the
+      scripts' DEFAULT_ITEMS_DIR (the items repo moved during the monorepo
+      consolidation; the workflow still targeted the old, non-existent location).
+    - Wired intake_to_item.py into Phase 0 as the library-based intake front door.
+
     v6.4 - Workflow docs aligned to current intake standards: definition of done
     (full real photo set + final pricing), dedupe-first, pricing-report step
     (ops/pricing/), and New Arrivals as the default tier across SKILL.md +
@@ -119,7 +126,7 @@ PR #3 plan (this one): `docs/plans/2026-05-13-v6-pr3-flip-default.md`
 | Merchant ID | 7MM9AFJAD0XHW |
 | SKU Prefix | RG-XXXX (sequential) |
 | GitHub Pages | https://richmondgeneral.github.io/items/ |
-| Working Directory | `/Users/scottybe/workspace/square/items/` |
+| Working Directory | `/Users/scottybe/workspace/richmondgeneral/items/` |
 
 ### Intake standards (definition of done)
 
@@ -181,8 +188,17 @@ Check for exact SKU match (not substring). If taken, increment and re-check. Do 
 ### Step 0.3: Create item folder
 
 ```applescript
-do shell script "mkdir -p /Users/scottybe/workspace/square/items/RG-XXXX"
+do shell script "mkdir -p /Users/scottybe/workspace/richmondgeneral/items/RG-XXXX"
 ```
+
+> **Library-based intake (preferred front door when the item has its own Intake album/tag).**
+> `intake_to_item.py` does Steps 0.3–0.4 + a `label.json` stub in one shot — it pulls the
+> album's on-disk originals via `sips` into the item folder (`hero` + `detail-N`) and reports
+> any iCloud-offloaded ones:
+> ```applescript
+> do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/photos-library/scripts/intake_to_item.py --sku RG-XXXX --album 'Intake RG-XXXX' --items-dir /Users/scottybe/workspace/richmondgeneral/items"
+> ```
+> The hero is the raw original — Step 0.7 background removal still applies. Otherwise use the cluster-discovery flow below.
 
 ### Step 0.4: Auto-discover product photo cluster (preferred)
 
@@ -192,7 +208,7 @@ do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROO
 
 If clusters found: confirm with user, copy best image by UUID:
 ```applescript
-do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/photos.py --copy 'PHOTO_UUID' --output '/Users/scottybe/workspace/square/items/RG-XXXX/source-original.EXT' 2>&1"
+do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/photos.py --copy 'PHOTO_UUID' --output '/Users/scottybe/workspace/richmondgeneral/items/RG-XXXX/source-original.EXT' 2>&1"
 ```
 
 If no cluster found, fall back to Step 0.5.
@@ -211,7 +227,7 @@ Check size (`stat -f%z`). If > 20MB, compress first: `sips -Z 3000 source --out 
 ### Step 0.7: Remove background
 
 ```applescript
-do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/process.py '/ABSOLUTE/REMOVE_BG_INPUT' --output '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' --quality premium --model removebg 2>&1"
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/process.py '/ABSOLUTE/REMOVE_BG_INPUT' --output '/Users/scottybe/workspace/richmondgeneral/items/RG-XXXX/hero.png' --quality premium --model removebg 2>&1"
 ```
 
 Prerequisites: `~/.env` must have `REMOVEBG_API_KEY`. Monitor credits -- alert user if <= 5. If bg removal fails, fall back to original image.
@@ -305,7 +321,7 @@ Do NOT include `catalog_object_type`. `quantity` is a STRING. `occurred_at` must
 Use `square-image-upload` skill script on user's Mac:
 
 ```applescript
-do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/square-image-upload/scripts/upload_image.py --image '/Users/scottybe/workspace/square/items/RG-XXXX/hero.png' --item-id 'CATALOG_ITEM_ID' --name 'RG-XXXX Hero' --caption 'Front view' --primary 2>&1"
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/square-image-upload/scripts/upload_image.py --image '/Users/scottybe/workspace/richmondgeneral/items/RG-XXXX/hero.png' --item-id 'CATALOG_ITEM_ID' --name 'RG-XXXX Hero' --caption 'Front view' --primary 2>&1"
 ```
 
 WebP not supported -- convert if needed: `sips -s format png image.webp --out hero.png`
@@ -344,7 +360,7 @@ See `references/api-payloads.md` for full JSON (shippable and pickup variants).
 
 ## Phase 6: Generate Label
 
-Append row to batch CSV at `/Users/scottybe/workspace/square/items/rg-labels-batch.csv`:
+Append row to batch CSV at `/Users/scottybe/workspace/richmondgeneral/items/rg-labels-batch.csv`:
 
 ```csv
 Product Name,Attributes,Price,Condition,Condition Notes,SKU,QR Code URL
@@ -357,13 +373,13 @@ Every item gets a QR code linking to the info card. See `references/label-format
 
 ## Phase 7: Info Card & Publishing
 
-Run only if item should be published to GitHub Pages. Site: https://richmondgeneral.github.io/items/ | Repo: `/Users/scottybe/workspace/square/items/`
+Run only if item should be published to GitHub Pages. Site: https://richmondgeneral.github.io/items/ | Repo: `/Users/scottybe/workspace/richmondgeneral/items/`
 
 ### Step 7.1: Write index.html (FLIP CARD TEMPLATE REQUIRED)
 
 Use the flip card template from `references/info-card-template.html`. Do NOT use detail-page layouts.
 
-Write populated template to `/Users/scottybe/workspace/square/items/RG-XXXX/index.html` via `Filesystem:write_file`.
+Write populated template to `/Users/scottybe/workspace/richmondgeneral/items/RG-XXXX/index.html` via `Filesystem:write_file`.
 
 **Requirements:** `.flip-card`/`.card-front`/`.card-back` structure, `aspect-ratio: 5 / 7`, CSS variables `--rg-gold`/`--rg-cream`/`--rg-charcoal`, flip animation, keyboard accessibility, ARIA, responsive breakpoints, print styles.
 
@@ -396,7 +412,7 @@ Run only if item should be listed on Whatnot.
 
 Look up in `whatnot-catalog`: Category/Sub Category, Shipping Profile (weight heuristic), Price via `ceil(square_price_cents / 100)`, Condition, Hazmat.
 
-Append to `/Users/scottybe/workspace/square/items/rg-inventory/whatnot-import.csv`. Create headers first if file doesn't exist.
+Append to `/Users/scottybe/workspace/richmondgeneral/items/rg-inventory/whatnot-import.csv`. Create headers first if file doesn't exist.
 
 ### Step 8.2: Upload CSV to Whatnot
 

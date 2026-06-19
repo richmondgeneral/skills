@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 from item_state import ItemState, ItemStatus, PhaseStatus  # type: ignore
 
 
-DEFAULT_QUEUE_PATH = "/Users/scottybe/workspace/square/ops/inventory/onboarding-queue.json"
+DEFAULT_QUEUE_PATH = "/Users/scottybe/workspace/richmondgeneral/ops/inventory/onboarding-queue.json"
 
 
 @dataclass

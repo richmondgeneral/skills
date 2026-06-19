@@ -45,7 +45,7 @@ except ImportError:  # pragma: no cover
     _remove_background = None  # type: ignore[assignment]
 
 
-DEFAULT_ITEMS_DIR = "/Users/scottybe/workspace/square/items"
+DEFAULT_ITEMS_DIR = "/Users/scottybe/workspace/richmondgeneral/items"
 
 PhaseRunner = Callable[[ItemState, str, str], Dict[str, Any]]
 """Phase runner contract. The callable returns exactly one of these shapes:

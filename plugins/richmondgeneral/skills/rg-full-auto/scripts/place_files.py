@@ -34,7 +34,7 @@ def place_files(
         sku: Item SKU (e.g., RG-0001)
         qr_base64: Base64-encoded QR code PNG data
         image_path: Path to hero image file to copy
-        repo_path: Path to GitHub repo items directory (default: ~/workspace/square/items)
+        repo_path: Path to GitHub repo items directory (default: ~/workspace/richmondgeneral/items)
     
     Returns:
         True if successful, False otherwise
@@ -119,7 +119,7 @@ def main():
     )
     parser.add_argument(
         '--repo-path',
-        help='Path to GitHub repo items directory (default: ~/workspace/square/items)'
+        help='Path to GitHub repo items directory (default: ~/workspace/richmondgeneral/items)'
     )
     
     args = parser.parse_args()

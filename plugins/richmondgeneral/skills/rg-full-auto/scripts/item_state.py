@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-DEFAULT_ITEMS_DIR = "/Users/scottybe/workspace/square/items"
+DEFAULT_ITEMS_DIR = "/Users/scottybe/workspace/richmondgeneral/items"
 
 
 class PhaseStatus(str, Enum):

@@ -13,7 +13,7 @@ Last updated: 2026-02-15
 | `list_directory` | Check folder contents |
 | `create_directory` | Make new folders |
 
-**Paths:** Absolute paths only: `/Users/scottybe/workspace/square/items/`
+**Paths:** Absolute paths only: `/Users/scottybe/workspace/richmondgeneral/items/`
 **DO NOT USE:** `~` tilde expansion (unreliable across sessions)
 
 **Works:** HTML, CSV, MD, JSON, Python scripts

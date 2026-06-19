@@ -12,7 +12,7 @@ Square Catalog
    Inventory: 1 in stock
 
 Image
-   Hero: /Users/scottybe/workspace/square/items/RG-XXXX/hero.png
+   Hero: /Users/scottybe/workspace/richmondgeneral/items/RG-XXXX/hero.png
    Square Image ID: {IMAGE_ID}
    Cache Sync: verified (SKU + image_ids)
 

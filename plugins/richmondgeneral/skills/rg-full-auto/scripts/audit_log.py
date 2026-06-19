@@ -10,7 +10,7 @@ Three append-only JSONL streams under <log_dir>:
   review_log.jsonl   — review-timing events (started, completed)
                        + outcomes, for L2 time tracking
 
-Default log_dir: /Users/scottybe/workspace/square/ops/inventory/
+Default log_dir: /Users/scottybe/workspace/richmondgeneral/ops/inventory/
 
 JSONL = one JSON object per line, append-only. Lets us grep/jq with
 zero parse overhead and never rewrite the whole file.
@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-DEFAULT_LOG_DIR = "/Users/scottybe/workspace/square/ops/inventory"
+DEFAULT_LOG_DIR = "/Users/scottybe/workspace/richmondgeneral/ops/inventory"
 
 
 class AuditLog:

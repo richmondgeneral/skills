@@ -569,7 +569,7 @@ def main() -> int:
     parser.add_argument(
         "--items-dir",
         default=None,
-        help="Override the items directory (default: /Users/scottybe/workspace/square/items)",
+        help="Override the items directory (default: /Users/scottybe/workspace/richmondgeneral/items)",
     )
 
     args = parser.parse_args()

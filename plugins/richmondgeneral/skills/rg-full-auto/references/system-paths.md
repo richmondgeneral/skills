@@ -11,14 +11,14 @@ updated: 2026-02-15
 ## Primary Working Directory
 
 ```
-/Users/scottybe/workspace/square/items/
+/Users/scottybe/workspace/richmondgeneral/items/
 ```
 
 **Purpose:** Richmond General item processing (images, HTML, QR codes)
 
 **Structure:**
 ```
-/Users/scottybe/workspace/square/items/
+/Users/scottybe/workspace/richmondgeneral/items/
 ├── RG-0001/
 │   ├── hero.png
 │   ├── qr.png
@@ -96,11 +96,11 @@ ${CLAUDE_PLUGIN_ROOT}/skills/rg-lot-tracker/
 ## Path Usage Rules
 
 ✅ **DO:**
-- Use absolute paths: `/Users/scottybe/workspace/square/items/`
+- Use absolute paths: `/Users/scottybe/workspace/richmondgeneral/items/`
 - Reference this file when unsure
 - Validate paths exist before operations
 
 ❌ **DON'T:**
-- Use `~` tilde: `~/workspace/square/items/` ❌
+- Use `~` tilde: `~/workspace/richmondgeneral/items/` ❌
 - Use relative paths: `../items/` ❌
 - Mix path formats within same workflow

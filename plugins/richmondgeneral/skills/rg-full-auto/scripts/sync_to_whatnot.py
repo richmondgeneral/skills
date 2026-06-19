@@ -239,7 +239,7 @@ def parse_args() -> argparse.Namespace:
         # machine and pointed at a stale qa-artifacts path.
         default=str(Path.home() / "workspace" / "square" / "items"
                     / "rg-inventory" / "whatnot-import.csv"),
-        help="Output Whatnot CSV path (default: ~/workspace/square/items/rg-inventory/whatnot-import.csv)",
+        help="Output Whatnot CSV path (default: ~/workspace/richmondgeneral/items/rg-inventory/whatnot-import.csv)",
     )
     parser.add_argument(
         "--category",

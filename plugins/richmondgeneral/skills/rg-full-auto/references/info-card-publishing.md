@@ -3,7 +3,7 @@
 ## Step 7.2: Generate QR code (payment link)
 
 ```applescript
-do shell script "source ~/.local/bin/env && cd /Users/scottybe/workspace/square/items/RG-XXXX && uv run --project ${CLAUDE_PLUGIN_ROOT} python -c \"import qrcode; qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=2); qr.add_data('https://square.link/u/XXXXXXXX'); qr.make(fit=True); img = qr.make_image(fill_color='#2C2C2C', back_color='white'); img.save('qr-code.png'); print('QR code saved')\""
+do shell script "source ~/.local/bin/env && cd /Users/scottybe/workspace/richmondgeneral/items/RG-XXXX && uv run --project ${CLAUDE_PLUGIN_ROOT} python -c \"import qrcode; qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=2); qr.add_data('https://square.link/u/XXXXXXXX'); qr.make(fit=True); img = qr.make_image(fill_color='#2C2C2C', back_color='white'); img.save('qr-code.png'); print('QR code saved')\""
 ```
 
 ## Step 7.3: Add to gallery index
@@ -34,7 +34,7 @@ do shell script "sed -i '' 's|<!-- Coming Soon Placeholder -->|<!-- RG-XXXX: Ite
                 </div>\\
             </a>\\
             \\
-            <!-- Coming Soon Placeholder -->|' /Users/scottybe/workspace/square/items/index.html"
+            <!-- Coming Soon Placeholder -->|' /Users/scottybe/workspace/richmondgeneral/items/index.html"
 ```
 
 **Categories for `data-category` filter on index card:**
@@ -49,17 +49,17 @@ do shell script "sed -i '' 's|<!-- Coming Soon Placeholder -->|<!-- RG-XXXX: Ite
 ## Step 7.4: Update item count
 
 ```applescript
-do shell script "sed -i '' 's|<div class=\"stat-number\" id=\"item-count\">[0-9]*</div>|<div class=\"stat-number\" id=\"item-count\">NEW_COUNT</div>|' /Users/scottybe/workspace/square/items/index.html"
+do shell script "sed -i '' 's|<div class=\"stat-number\" id=\"item-count\">[0-9]*</div>|<div class=\"stat-number\" id=\"item-count\">NEW_COUNT</div>|' /Users/scottybe/workspace/richmondgeneral/items/index.html"
 ```
 
 ## Step 7.5: Cleanup temp files
 
 ```applescript
-do shell script "rm -f /Users/scottybe/workspace/square/items/RG-XXXX/hero_temp.png 2>/dev/null; echo 'Cleanup complete'"
+do shell script "rm -f /Users/scottybe/workspace/richmondgeneral/items/RG-XXXX/hero_temp.png 2>/dev/null; echo 'Cleanup complete'"
 ```
 
 ## Step 7.6: Git commit and push
 
 ```applescript
-do shell script "cd /Users/scottybe/workspace/square/items && git add RG-XXXX/ index.html && git commit -m 'Add RG-XXXX: Item Title' && git push origin main 2>&1"
+do shell script "cd /Users/scottybe/workspace/richmondgeneral/items && git add RG-XXXX/ index.html && git commit -m 'Add RG-XXXX: Item Title' && git push origin main 2>&1"
 ```

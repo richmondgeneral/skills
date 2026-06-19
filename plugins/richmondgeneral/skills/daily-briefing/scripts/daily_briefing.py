@@ -143,7 +143,15 @@ def get_message_status_batch(phones):
         return {}
     
     results = {}
-    conn = sqlite3.connect(f"file:{DB}?mode=ro&immutable=1", uri=True)
+    try:
+        conn = sqlite3.connect(f"file:{DB}?mode=ro&immutable=1", uri=True)
+    except sqlite3.Error as e:
+        # chat.db needs Full Disk Access for the running process; launchd agents
+        # often lack it. Degrade gracefully — skip message status and keep the
+        # rest of the briefing instead of crashing the whole run.
+        log(f"chat.db unreadable ({e}); skipping message status "
+            f"(grant Full Disk Access to enable it).")
+        return {}
     c = conn.cursor()
     
     for phone in phones:

@@ -2,10 +2,18 @@
 name: photos-library
 description: Query and extract photos from macOS Photos Library. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, or pull images from Photos app for processing. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll".
 metadata:
-  version: "1.4"
+  version: "1.5"
   author: scottybe
-  updated: "2026-06-18"
+  updated: "2026-06-19"
   changelog: |
+    v1.5 - Album / keyword (tag) filtering for intake:
+    - query_photos.py, extract_photos.py, find_product_clusters.py gained
+      --album and --keyword/--tag, so intake can pull by the Intake album or a
+      tag instead of only recency. Join tables are discovered at runtime (shared
+      photos_db.py) so it survives Photos schema-version bumps.
+    - --album/--keyword drop the default day window (select by membership, not
+      recency); an unknown album/keyword warns with known-album hints.
+
     v1.4 - macOS-native extraction + offloaded reporting:
     - extract_photos.py converts with `sips` (built into macOS) instead of
       ImageMagick `convert`, which isn't installed (extraction returned 0).
@@ -80,12 +88,19 @@ List photos with metadata. Filters:
 - `--days N` - Photos from last N days
 - `--min-width N` - Minimum width in pixels
 - `--favorites` - Only favorited photos
+- `--album "NAME"` - Only photos in this album (e.g. an Intake album)
+- `--keyword/--tag "NAME"` - Only photos with this keyword/tag
 - `--limit N` - Max results (default 20)
+
+`--album`/`--keyword` select by membership, so they drop the default day window
+(pass `--days N` to re-narrow). The join tables are discovered at runtime, so
+this keeps working across Photos schema versions.
 
 ### `scripts/extract_photos.py`
 
 Extract and convert photos with macOS-native `sips` (no ImageMagick). Options:
 - `--days N` - Photos from last N days
+- `--album "NAME"` / `--keyword "NAME"` - Pull by album or tag (not just recency)
 - `--output PATH` - Destination folder
 - `--format jpeg|png` - Output format (default: jpeg)
 - `--quality N` - JPEG quality 1-100 (default: 90)
@@ -100,6 +115,7 @@ File ▸ "Download Originals") or `osxphotos export --download-missing`, then re
 Auto-group photos by shooting session and classify them:
 - `--days N` - Search last N days (default: 14)
 - `--type TYPE` - Filter: all, product, real_estate, screenshot, single, mixed
+- `--album "NAME"` / `--keyword "NAME"` - Cluster only photos in an album/tag
 - `--gap N` - Max seconds between photos in cluster (default: 300)
 - `--json` - Output as JSON
 

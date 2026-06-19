@@ -7,6 +7,8 @@ import os
 import json
 from pathlib import Path
 
+import photos_db
+
 def find_photos_db():
     """Find Photos Library database."""
     paths = [
@@ -17,7 +19,8 @@ def find_photos_db():
             return str(p)
     return None
 
-def query_photos(db_path, days=7, min_width=0, favorites_only=False, limit=20, output_format='table'):
+def query_photos(db_path, days=7, min_width=0, favorites_only=False, limit=20,
+                 album=None, keyword=None, output_format='table'):
     """Query photos from the database."""
     # Constants
     COCOA_EPOCH_OFFSET = 978307200  # Seconds between Unix epoch (1970) and Cocoa epoch (2001)
@@ -40,6 +43,14 @@ def query_photos(db_path, days=7, min_width=0, favorites_only=False, limit=20, o
             params.append(min_width)
         if favorites_only:
             conditions.append("a.ZFAVORITE = 1")
+        if album:
+            frag, frag_params = photos_db.album_condition(conn, album)
+            conditions.append(frag)
+            params.extend(frag_params)
+        if keyword:
+            frag, frag_params = photos_db.keyword_condition(conn, keyword)
+            conditions.append(frag)
+            params.extend(frag_params)
 
         where_clause = " AND ".join(conditions)
 
@@ -85,9 +96,11 @@ def query_photos(db_path, days=7, min_width=0, favorites_only=False, limit=20, o
 
 def main():
     parser = argparse.ArgumentParser(description='Query macOS Photos Library')
-    parser.add_argument('--days', type=int, default=7, help='Photos from last N days (ignored if --favorites without --days)')
+    parser.add_argument('--days', type=int, default=7, help='Photos from last N days (ignored if --favorites/--album/--keyword without --days)')
     parser.add_argument('--min-width', type=int, default=0, help='Minimum width in pixels')
     parser.add_argument('--favorites', action='store_true', help='Only favorited photos')
+    parser.add_argument('--album', type=str, help='Only photos in this album (matches album name, e.g. "Intake")')
+    parser.add_argument('--keyword', '--tag', dest='keyword', type=str, help='Only photos with this keyword/tag')
     parser.add_argument('--limit', type=int, default=20, help='Max results')
     parser.add_argument('--json', action='store_true', help='Output as JSON')
     parser.add_argument('--db', type=str, help='Path to Photos.sqlite (auto-detected if not specified)')
@@ -105,23 +118,34 @@ def main():
         print("Error: --days cannot be negative")
         return 1
 
-    # If --favorites is used without explicit --days, remove the day filter
-    # (check if --days was explicitly passed vs using default)
+    # If --favorites/--album/--keyword is used without an explicit --days, drop
+    # the day filter — these select by membership/tag, not recency.
     days_filter = args.days
-    if args.favorites and '--days' not in ' '.join(os.sys.argv):
-        days_filter = None  # No day restriction for favorites
+    if (args.favorites or args.album or args.keyword) and '--days' not in ' '.join(os.sys.argv):
+        days_filter = None
 
     db_path = args.db or find_photos_db()
     if not db_path:
         print("Error: Could not find Photos Library database")
         return 1
 
+    # Warn early if a named album/keyword doesn't exist (avoids a silent 0 result).
+    if args.album or args.keyword:
+        with sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True) as _c:
+            if args.album and not photos_db.album_exists(_c, args.album):
+                hint = ", ".join(photos_db.list_albums(_c, 15))
+                print(f"⚠️  Album '{args.album}' not found. Known albums: {hint}", file=os.sys.stderr)
+            if args.keyword and not photos_db.keyword_exists(_c, args.keyword):
+                print(f"⚠️  Keyword/tag '{args.keyword}' not found.", file=os.sys.stderr)
+
     photos = query_photos(
         db_path,
         days=days_filter,
         min_width=args.min_width,
         favorites_only=args.favorites,
-        limit=args.limit
+        limit=args.limit,
+        album=args.album,
+        keyword=args.keyword
     )
 
     if args.json:
@@ -129,7 +153,9 @@ def main():
     else:
         days_str = f"last {days_filter} days" if days_filter else "all time"
         fav_str = ", favorites only" if args.favorites else ""
-        print(f"Found {len(photos)} photos ({days_str}, min_width={args.min_width}{fav_str})\n")
+        alb_str = f", album='{args.album}'" if args.album else ""
+        kw_str = f", tag='{args.keyword}'" if args.keyword else ""
+        print(f"Found {len(photos)} photos ({days_str}, min_width={args.min_width}{fav_str}{alb_str}{kw_str})\n")
         print(f"{'Filename':<35} {'Created':<20} {'Size':<12} {'Type'}")
         print("-" * 80)
         for p in photos:

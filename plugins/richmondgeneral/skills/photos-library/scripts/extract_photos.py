@@ -7,6 +7,8 @@ import subprocess
 import os
 from pathlib import Path
 
+import photos_db
+
 def find_photos_library():
     """Find Photos Library path."""
     paths = [
@@ -18,7 +20,8 @@ def find_photos_library():
     return None
 
 def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only=False,
-                   limit=20, output_format='jpeg', quality=90, resize=None):
+                   limit=20, output_format='jpeg', quality=90, resize=None,
+                   album=None, keyword=None):
     """Extract photos from library to output directory."""
     # Constants
     COCOA_EPOCH_OFFSET = 978307200  # Seconds between Unix epoch (1970) and Cocoa epoch (2001)
@@ -48,6 +51,14 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
             params.append(min_width)
         if favorites_only:
             conditions.append("a.ZFAVORITE = 1")
+        if album:
+            frag, frag_params = photos_db.album_condition(conn, album)
+            conditions.append(frag)
+            params.extend(frag_params)
+        if keyword:
+            frag, frag_params = photos_db.keyword_condition(conn, keyword)
+            conditions.append(frag)
+            params.extend(frag_params)
 
         where_clause = " AND ".join(conditions)
 
@@ -144,9 +155,11 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
 
 def main():
     parser = argparse.ArgumentParser(description='Extract photos from macOS Photos Library')
-    parser.add_argument('--days', type=int, default=7, help='Photos from last N days (ignored if --favorites without --days)')
+    parser.add_argument('--days', type=int, default=7, help='Photos from last N days (ignored if --favorites/--album/--keyword without --days)')
     parser.add_argument('--min-width', type=int, default=0, help='Minimum width in pixels')
     parser.add_argument('--favorites', action='store_true', help='Only favorited photos')
+    parser.add_argument('--album', type=str, help='Only photos in this album (matches album name, e.g. "Intake")')
+    parser.add_argument('--keyword', '--tag', dest='keyword', type=str, help='Only photos with this keyword/tag')
     parser.add_argument('--limit', type=int, default=20, help='Max photos to extract')
     parser.add_argument('--output', '-o', type=str, required=True, help='Output directory')
     parser.add_argument('--format', type=str, default='jpeg', choices=['jpeg', 'png'], help='Output format')
@@ -175,15 +188,25 @@ def main():
             print("Error: --resize must be in format WxH (e.g., 800x800)")
             return 1
 
-    # If --favorites is used without explicit --days, remove the day filter
+    # If --favorites/--album/--keyword is used without an explicit --days, drop
+    # the day filter — these select by membership/tag, not recency.
     days_filter = args.days
-    if args.favorites and '--days' not in ' '.join(os.sys.argv):
-        days_filter = None  # No day restriction for favorites
+    if (args.favorites or args.album or args.keyword) and '--days' not in ' '.join(os.sys.argv):
+        days_filter = None
 
     library_path = args.library or find_photos_library()
     if not library_path:
         print("Error: Could not find Photos Library")
         return 1
+
+    # Warn early if a named album/keyword doesn't exist (avoids a silent 0).
+    if args.album or args.keyword:
+        _db = os.path.join(library_path, "database/Photos.sqlite")
+        with sqlite3.connect(f"file:{_db}?mode=ro&immutable=1", uri=True) as _c:
+            if args.album and not photos_db.album_exists(_c, args.album):
+                print(f"⚠️  Album '{args.album}' not found. Known: {', '.join(photos_db.list_albums(_c, 15))}", file=os.sys.stderr)
+            if args.keyword and not photos_db.keyword_exists(_c, args.keyword):
+                print(f"⚠️  Keyword/tag '{args.keyword}' not found.", file=os.sys.stderr)
 
     print(f"Extracting from: {library_path}")
     print(f"Output to: {args.output}\n")
@@ -197,7 +220,9 @@ def main():
         limit=args.limit,
         output_format=args.format,
         quality=args.quality,
-        resize=args.resize
+        resize=args.resize,
+        album=args.album,
+        keyword=args.keyword
     )
 
     print(f"\nExtracted {len(extracted)} photos to {args.output}")

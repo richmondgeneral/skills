@@ -32,6 +32,7 @@ The script's stdout (pass `--json` where the script supports it) comes back as t
 |---|---|
 | Discover runnable scripts | `rg-skill.sh --list` |
 | Recent photos from the library | `rg-skill.sh photos-library query_photos.py --days 7 --limit 10 --json` |
+| Pull an intake album by name | `rg-skill.sh photos-library query_photos.py --album "Intake" --json` |
 | Find product-photo clusters | `rg-skill.sh photos-library find_product_clusters.py --days 14 --json` |
 | Clean an image (Gemini) | `rg-skill.sh image-processor clean.py --input '<in>' --output '<out>' --remove 'price tag'` |
 

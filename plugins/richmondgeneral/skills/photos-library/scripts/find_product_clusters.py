@@ -8,6 +8,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import photos_db
+
 COCOA_EPOCH_OFFSET = 978307200
 SECONDS_PER_DAY = 86400
 
@@ -71,7 +73,8 @@ def classify_cluster(cluster):
         return 'mixed'
 
 
-def find_product_clusters(db_path, days=14, min_width=2000, cluster_gap=300):
+def find_product_clusters(db_path, days=14, min_width=2000, cluster_gap=300,
+                          album=None, keyword=None):
     """Find photo clusters that are likely product photos."""
     # Open the live Photos library read-only AND immutable so we never take
     # locks or touch the WAL — anything less can disrupt cloudphotod's sync
@@ -93,6 +96,14 @@ def find_product_clusters(db_path, days=14, min_width=2000, cluster_gap=300):
         if min_width:
             conditions.append("a.ZWIDTH >= ?")
             params.append(min_width)
+        if album:
+            frag, frag_params = photos_db.album_condition(conn, album)
+            conditions.append(frag)
+            params.extend(frag_params)
+        if keyword:
+            frag, frag_params = photos_db.keyword_condition(conn, keyword)
+            conditions.append(frag)
+            params.extend(frag_params)
 
         where_clause = " AND ".join(conditions)
 
@@ -160,6 +171,8 @@ def main():
     parser.add_argument('--gap', type=int, default=300, help='Max seconds between photos in cluster')
     parser.add_argument('--type', type=str, choices=['all', 'product', 'real_estate', 'screenshot', 'single', 'mixed'],
                         default='all', help='Filter by cluster type')
+    parser.add_argument('--album', type=str, help='Only photos in this album (matches album name, e.g. "Intake")')
+    parser.add_argument('--keyword', '--tag', dest='keyword', type=str, help='Only photos with this keyword/tag')
     parser.add_argument('--json', action='store_true', help='Output as JSON')
     parser.add_argument('--db', type=str, help='Path to Photos.sqlite')
 
@@ -182,7 +195,22 @@ def main():
         return 1
 
     days_filter = args.days if args.days > 0 else None
-    clusters = find_product_clusters(db_path, days=days_filter, min_width=args.min_width, cluster_gap=args.gap)
+    # When pulling by album/keyword, don't also gate on the high default min-width
+    # (intake albums include tag/label/serial close-ups under 2000px) unless the
+    # user explicitly passed --min-width.
+    min_width = args.min_width
+    if (args.album or args.keyword) and '--min-width' not in ' '.join(os.sys.argv):
+        min_width = 0
+
+    if args.album or args.keyword:
+        with sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True) as _c:
+            if args.album and not photos_db.album_exists(_c, args.album):
+                print(f"⚠️  Album '{args.album}' not found. Known: {', '.join(photos_db.list_albums(_c, 15))}", file=os.sys.stderr)
+            if args.keyword and not photos_db.keyword_exists(_c, args.keyword):
+                print(f"⚠️  Keyword/tag '{args.keyword}' not found.", file=os.sys.stderr)
+
+    clusters = find_product_clusters(db_path, days=days_filter, min_width=min_width,
+                                     cluster_gap=args.gap, album=args.album, keyword=args.keyword)
 
     # Filter by type if specified
     if args.type != 'all':
@@ -192,7 +220,8 @@ def main():
         print(json.dumps(clusters, indent=2))
     else:
         days_str = f"last {args.days} days" if args.days else "all time"
-        print(f"Found {len(clusters)} clusters ({days_str}, min_width={args.min_width})\n")
+        scope = f", album='{args.album}'" if args.album else (f", tag='{args.keyword}'" if args.keyword else "")
+        print(f"Found {len(clusters)} clusters ({days_str}, min_width={min_width}{scope})\n")
 
         print(f"{'#':>3} {'Type':<12} {'Count':>5} {'Date':<12} {'Time':<6} {'First Photo'}")
         print("-" * 70)

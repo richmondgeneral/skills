@@ -13,7 +13,7 @@ from pathlib import Path
 from PIL import Image
 
 
-_REPO = Path(__file__).resolve().parent.parent.parent
+_REPO = Path(__file__).resolve().parent.parent.parent / "plugins" / "richmondgeneral" / "skills"
 _MODELS_DIR = _REPO / "image-processor" / "lib" / "models"
 if str(_MODELS_DIR) not in sys.path:
     sys.path.insert(0, str(_MODELS_DIR))

@@ -34,5 +34,16 @@ def diff_item(page: PageRecord, observations: List[ChannelObservation]) -> List[
                     message=(f"{obs.channel.value} price {obs.price} != {kind} {target}"),
                 ))
 
+    # 3) presence (INFO): page declares a channel in listed_on but the item is
+    #    not observed present there (lost listing / sold elsewhere / unverified).
+    present_channels = {o.channel for o in observations if o.present}
+    for ch in page.listed_on:
+        if ch not in present_channels:
+            findings.append(DriftFinding(
+                sku=page.sku, field="presence", channel=ch,
+                severity=Severity.INFO, expected=True, actual=False,
+                message=f"page lists {ch.value} but item not found on that channel",
+            ))
+
     findings.sort(key=lambda f: _SEVERITY_ORDER[f.severity])
     return findings

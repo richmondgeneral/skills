@@ -13,6 +13,7 @@ import importlib.util
 from pathlib import Path
 
 _LIB_PHOTOS = (Path(__file__).resolve().parent.parent.parent
+               / "plugins" / "richmondgeneral" / "skills"
                / "image-processor" / "lib" / "photos.py")
 _spec = importlib.util.spec_from_file_location("_lib_photos", _LIB_PHOTOS)
 _lib_photos = importlib.util.module_from_spec(_spec)

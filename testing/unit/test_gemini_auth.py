@@ -17,7 +17,7 @@ from unittest.mock import patch
 import pytest
 
 
-_REPO = Path(__file__).resolve().parent.parent.parent
+_REPO = Path(__file__).resolve().parent.parent.parent / "plugins" / "richmondgeneral" / "skills"
 # Provider modules use `from base import ...` as their absolute-import fallback
 # (the `from .base import ...` relative form fails when we load by file path
 # rather than as a package).

@@ -58,3 +58,32 @@ def test_zero_intended_override_is_honored():
     page = _page(reference_price=7.0, intended_channel_prices={Channel.WHATNOT: 0.0})
     obs = [ChannelObservation(Channel.WHATNOT, present=True, price=0.0, sold=False)]
     assert diff_item(page, obs) == []
+
+
+def test_listed_on_channel_absent_is_info():
+    page = _page(listed_on=[Channel.SQUARE, Channel.WHATNOT])
+    obs = [ChannelObservation(Channel.SQUARE, present=True, price=10.0, sold=False),
+           ChannelObservation(Channel.WHATNOT, present=False)]
+    presence = [f for f in diff_item(page, obs) if f.field == "presence"]
+    assert len(presence) == 1
+    assert presence[0].channel is Channel.WHATNOT
+    assert presence[0].severity is Severity.INFO
+
+
+def test_listed_on_all_present_no_presence_finding():
+    page = _page(listed_on=[Channel.SQUARE])
+    obs = [ChannelObservation(Channel.SQUARE, present=True, price=10.0, sold=False)]
+    assert all(f.field != "presence" for f in diff_item(page, obs))
+
+
+def test_empty_listed_on_no_presence_finding():
+    page = _page(listed_on=[])
+    obs = [ChannelObservation(Channel.SQUARE, present=False)]
+    assert all(f.field != "presence" for f in diff_item(page, obs))
+
+
+def test_listed_channel_with_no_observation_is_flagged():
+    page = _page(listed_on=[Channel.EBAY])
+    obs = [ChannelObservation(Channel.SQUARE, present=True, price=10.0, sold=False)]
+    assert any(f.field == "presence" and f.channel is Channel.EBAY
+               for f in diff_item(page, obs))

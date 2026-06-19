@@ -30,9 +30,9 @@ from PIL.PngImagePlugin import PngInfo
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROCESS_PY = os.path.join(SCRIPT_DIR, "process.py")
 
-OVERRIDE_FILE = "standardize.json"
+OVERRIDE_FILE = "label.json"
 
-# Maps standardize.json keys → (argparse dest, coerce fn).
+# Maps photo_overrides keys → (argparse dest, coerce fn).
 # Fields listed here are the only ones the JSON file may influence.
 # "notes" is intentionally omitted — it's documentation-only.
 OVERRIDE_FIELDS: Dict[str, tuple] = {
@@ -45,6 +45,7 @@ OVERRIDE_FIELDS: Dict[str, tuple] = {
     "size":           ("size",           int),
     "copyright":      ("copyright",      str),
     "sku":            ("sku",            str),
+    "wb":             ("wb",             str),
 }
 DEFAULT_LOGO = os.path.expanduser("~/workspace/richmondgeneral/brand/assets/richmond-general-logo.png")
 
@@ -54,17 +55,16 @@ DEFAULT_LOGO = os.path.expanduser("~/workspace/richmondgeneral/brand/assets/rich
 # ---------------------------------------------------------------------------
 
 def load_item_overrides(item_dir) -> Dict[str, Any]:
-    """Load standardize.json from item_dir, returning {} on missing or invalid.
-
-    The file is purely additive: it only supplies defaults for fields the
-    caller left unset.  Unknown keys (e.g. "notes") are silently ignored.
+    """Load the `photo_overrides` block from label.json in item_dir.
+    Returns {} on missing or invalid.
     """
     path = Path(item_dir) / OVERRIDE_FILE
     if not path.exists():
         return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
+        overrides = data.get("photo_overrides", {})
+        return overrides if isinstance(overrides, dict) else {}
     except Exception as exc:
         print(f"warning: {path}: {exc}", file=sys.stderr)
         return {}
@@ -346,6 +346,7 @@ def _run_batch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Non
                 watermark_logo=item_args.watermark_logo,
                 model=item_args.model,
                 allow_rect_mask=item_args.allow_rect_mask,
+                wb=item_args.wb,
             )
             entry: Dict[str, Any] = {"item": item_dir.name, "status": "ok",
                                      "output": str(output)}
@@ -402,6 +403,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # ---- pipeline stages ----
     p.add_argument("--no-color", action="store_true", help="skip color correction")
+    p.add_argument("--wb", choices=["background", "grayworld", "none"], default="background",
+                   help="white balance method (default: background reference)")
     p.add_argument("--no-bg", action="store_true",
                    help="skip background removal (input already transparent)")
     p.add_argument("--fill", type=float, default=0.85,
@@ -490,6 +493,7 @@ def main() -> None:
         watermark_logo=args.watermark_logo,
         model=args.model,
         allow_rect_mask=args.allow_rect_mask,
+        wb=args.wb,
     )
     print(out)
 

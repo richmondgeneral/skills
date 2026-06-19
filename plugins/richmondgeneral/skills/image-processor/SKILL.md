@@ -2,10 +2,17 @@
 name: image-processor
 description: Unified image processing with background removal, generation, editing, listing-photo standardization, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "standardize listing photos", "make photos professional/catalog-quality", "square crop / center / color-correct photo", "transparent hero", "photos library", "get from photos", or when rg-full-auto needs image processing.
 metadata:
-  version: "1.9"
+  version: "1.10"
   author: scottybe
   updated: "2026-06-19"
   changelog: |
+    v1.10 - Patina-safe WB and Batch Overrides:
+    - Patina-safe WB is the new default: samples the backdrop border as the neutral reference,
+      so brass/Bakelite keeps its true color (falls back to gray-world if border is unusable).
+    - Added `--wb {background,grayworld,none}` CLI flag.
+    - Added per-item overrides via `label.json`'s `photo_overrides` block to bypass
+      bg-removal/color-correction dynamically per item for batch mode.
+
     v1.9 - Standardizer premium polish (gallery-tier pipeline):
     - --fill (default 0.85): object's longest side fills a fixed fraction of the
       canvas on every item -> uniform storefront grid (replaced the raw margin).
@@ -128,8 +135,8 @@ Unified image processing skill combining background removal, image generation, i
 [`ops/docs/RG-listing-SOP.md`](../../../../../ops/docs/RG-listing-SOP.md) — the "thematic thread"
 that makes every public photo look cohesive:
 
-- **Color-corrected** toward real-life color (gray-world white balance + mild auto-contrast — undoes
-  the intake area's lighting cast)
+- **Color-corrected** toward real-life color (backdrop-referenced white balance preserves
+  patina on brass/Bakelite, falls back to gray-world)
 - **Background removed**, **hero always transparent** (reuses `process.py` routing/fallbacks)
 - **Standardized scale** — `--fill 0.85` makes the object's longest side fill the same fraction of the
   canvas on every item, so the storefront grid looks uniform

@@ -65,13 +65,13 @@ def test_color_correct_preserves_transparency():
 # ---------------------------------------------------------------------------
 
 def test_load_item_overrides_missing(tmp_path):
-    """No standardize.json → empty dict, no error."""
+    """No label.json → empty dict, no error."""
     assert st.load_item_overrides(tmp_path) == {}
 
 
 def test_load_item_overrides_valid(tmp_path):
-    (tmp_path / "standardize.json").write_text(
-        json.dumps({"no_color": True, "fill": 0.7, "notes": "antique brass"})
+    (tmp_path / "label.json").write_text(
+        json.dumps({"photo_overrides": {"no_color": True, "fill": 0.7, "notes": "antique brass"}})
     )
     result = st.load_item_overrides(tmp_path)
     assert result == {"no_color": True, "fill": 0.7, "notes": "antique brass"}
@@ -79,7 +79,7 @@ def test_load_item_overrides_valid(tmp_path):
 
 def test_load_item_overrides_invalid_json(tmp_path, capsys):
     """Malformed JSON → empty dict + warning on stderr."""
-    (tmp_path / "standardize.json").write_text("{not valid json")
+    (tmp_path / "label.json").write_text("{not valid json")
     result = st.load_item_overrides(tmp_path)
     assert result == {}
     assert "warning" in capsys.readouterr().err
@@ -87,7 +87,7 @@ def test_load_item_overrides_invalid_json(tmp_path, capsys):
 
 def test_load_item_overrides_non_dict(tmp_path):
     """JSON that isn't an object → empty dict."""
-    (tmp_path / "standardize.json").write_text("[1, 2, 3]")
+    (tmp_path / "label.json").write_text("[1, 2, 3]")
     assert st.load_item_overrides(tmp_path) == {}
 
 
@@ -166,3 +166,26 @@ def test_apply_watermark_composites_bottom_right(tmp_path):
     assert out.size == (200, 200)
     assert out.getpixel((198, 198))[3] > 0   # watermark landed bottom-right
     assert out.getpixel((0, 0))[3] == 0       # top-left untouched
+
+def test_background_reference_white_balance_preserves_patina():
+    # A warm object on a neutral gray background.
+    # We want to make sure the object STAYS warm (patina preserved).
+    img = Image.new("RGBA", (100, 100), (128, 128, 128, 255))
+    # Paste a warm amber object in the center
+    img.paste(Image.new("RGBA", (40, 40), (200, 140, 40, 255)), (30, 30))
+    out = st.background_reference_white_balance(img)
+    # The center should still be warm (R > G > B)
+    r, g, b, a = out.getpixel((50, 50))
+    assert r > g and g > b
+    assert r > 150 # Still distinctly warm
+
+def test_background_reference_white_balance_falls_back():
+    # A warm object on a completely black background.
+    # The dark background should trigger the fallback to gray-world.
+    img = Image.new("RGBA", (100, 100), (0, 0, 0, 255))
+    img.paste(Image.new("RGBA", (40, 40), (200, 140, 40, 255)), (30, 30))
+    out = st.background_reference_white_balance(img)
+    # Because it falls back to gray world, the whole image is treated, 
+    # so the 200,140,40 is flattened toward gray.
+    r, g, b, a = out.getpixel((50, 50))
+    assert r < 200 # It got flattened

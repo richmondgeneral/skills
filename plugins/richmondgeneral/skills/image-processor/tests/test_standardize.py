@@ -1,5 +1,10 @@
+import argparse
+import json
 import os
 import sys
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
@@ -53,6 +58,104 @@ def test_color_correct_preserves_transparency():
     assert out.mode == "RGBA"
     assert out.getpixel((0, 0))[3] == 0      # transparent border stays transparent
     assert out.getpixel((20, 20))[3] == 255  # object stays opaque
+
+
+# ---------------------------------------------------------------------------
+# load_item_overrides
+# ---------------------------------------------------------------------------
+
+def test_load_item_overrides_missing(tmp_path):
+    """No standardize.json → empty dict, no error."""
+    assert st.load_item_overrides(tmp_path) == {}
+
+
+def test_load_item_overrides_valid(tmp_path):
+    (tmp_path / "standardize.json").write_text(
+        json.dumps({"no_color": True, "fill": 0.7, "notes": "antique brass"})
+    )
+    result = st.load_item_overrides(tmp_path)
+    assert result == {"no_color": True, "fill": 0.7, "notes": "antique brass"}
+
+
+def test_load_item_overrides_invalid_json(tmp_path, capsys):
+    """Malformed JSON → empty dict + warning on stderr."""
+    (tmp_path / "standardize.json").write_text("{not valid json")
+    result = st.load_item_overrides(tmp_path)
+    assert result == {}
+    assert "warning" in capsys.readouterr().err
+
+
+def test_load_item_overrides_non_dict(tmp_path):
+    """JSON that isn't an object → empty dict."""
+    (tmp_path / "standardize.json").write_text("[1, 2, 3]")
+    assert st.load_item_overrides(tmp_path) == {}
+
+
+# ---------------------------------------------------------------------------
+# apply_overrides
+# ---------------------------------------------------------------------------
+
+def _make_parser_and_defaults():
+    """Return (parser, args-at-defaults) for override tests."""
+    p = st._build_parser()
+    args = p.parse_args(["dummy_input.png", "-o", "out.png"])
+    return p, args
+
+
+def test_apply_overrides_fills_defaults():
+    """JSON values apply when CLI left the arg at its default."""
+    p, args = _make_parser_and_defaults()
+    changed = st.apply_overrides(args, {"no_color": True, "fill": 0.7}, p)
+    assert args.no_color is True
+    assert abs(args.fill - 0.7) < 1e-9
+    assert set(changed) == {"no_color", "fill"}
+
+
+def test_apply_overrides_cli_wins():
+    """An arg set explicitly on the CLI is not overridden by JSON."""
+    p = st._build_parser()
+    # Simulate user passing --fill 0.9 on CLI
+    args = p.parse_args(["dummy_input.png", "-o", "out.png", "--fill", "0.9"])
+    changed = st.apply_overrides(args, {"fill": 0.5}, p)
+    assert abs(args.fill - 0.9) < 1e-9  # CLI value preserved
+    assert "fill" not in changed
+
+
+def test_apply_overrides_ignores_unknown_keys():
+    """Keys not in OVERRIDE_FIELDS (like 'notes') are silently ignored."""
+    p, args = _make_parser_and_defaults()
+    changed = st.apply_overrides(args, {"notes": "some text", "no_color": True}, p)
+    assert "notes" not in changed
+    assert "no_color" in changed
+
+
+def test_apply_overrides_bad_value_warns(capsys):
+    """A JSON value that can't be coerced emits a warning and skips the field."""
+    p, args = _make_parser_and_defaults()
+    original_fill = args.fill
+    st.apply_overrides(args, {"fill": "not-a-float"}, p)
+    assert args.fill == original_fill  # unchanged
+    assert "warning" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# _find_hero
+# ---------------------------------------------------------------------------
+
+def test_find_hero_returns_match(tmp_path):
+    hero = tmp_path / "hero.jpeg"
+    hero.write_bytes(b"fake")
+    result = st._find_hero(tmp_path, "hero.*")
+    assert result == hero
+
+
+def test_find_hero_returns_none_when_missing(tmp_path):
+    assert st._find_hero(tmp_path, "hero.*") is None
+
+
+def test_find_hero_ignores_unsupported_extension(tmp_path):
+    (tmp_path / "hero.svg").write_bytes(b"fake")
+    assert st._find_hero(tmp_path, "hero.*") is None
 
 
 def test_apply_watermark_composites_bottom_right(tmp_path):

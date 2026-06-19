@@ -6,6 +6,12 @@ metadata:
   author: scottybe
   updated: "2026-06-19"
   changelog: |
+    v1.11 - Agentic Image Evaluation Loop (Anti-Hallucination):
+    - Added `--agentic` flag to `clean.py` for a Best-of-3 generation loop.
+    - Added `AgentJudge` powered by `gemini-2.5-pro` using native Google GenAI SDK (structured output) to validate candidate images.
+    - Hallucinations (fake backstamps, altered compositions) are automatically rejected.
+    - Auto-escalates to `gemini-3-pro-image-preview` if Flash candidates repeatedly fail the judge.
+
     v1.10 - Patina-safe WB and Batch Overrides:
     - Patina-safe WB is the new default: samples the backdrop border as the neutral reference,
       so brass/Bakelite keeps its true color (falls back to gray-world if border is unusable).
@@ -86,8 +92,7 @@ metadata:
       pair. `--remove "freeform"` for one-off custom direction.
     - Model upgrade: default endpoint bumped to `gemini-3.1-flash-image-preview`
       (4K output capable, was `gemini-2.5-flash-image` at 1K). `--pro` flag
-      forces `gemini-3-pro-image-preview` for hard cases (~$2.13/call vs
-      ~$0.57/call for Flash). Old preset-detection auto-escalation removed:
+      forces `gemini-3-pro-image-preview` for hard cases. Old preset-detection auto-escalation removed:
       model choice is now driven only by `GEMINI_IMAGE_MODEL` env, the
       explicit `quality_hint`, and `num_refs >= 8` (no more prompt-content
       heuristic — that produced silent 4× cost surprises).
@@ -209,8 +214,11 @@ python scripts/clean.py -i photo.jpg -o cleaned.jpg --fix-damage
 python scripts/clean.py -i photo.jpg -o cleaned.jpg --both
 # → cleaned-preserved.jpg + cleaned-fixed.jpg
 
-# Use the heavier Gemini 3 Pro model (~$2.13 vs ~$0.57):
+# Use the heavier Gemini 3 Pro model for complex generations:
 python scripts/clean.py -i photo.jpg -o cleaned.jpg --pro
+
+# Use the Agentic Loop (Best-of-3 + AI Judge) to strictly prevent hallucinations:
+python scripts/clean.py -i photo.jpg -o cleaned.jpg --agentic
 
 # Freeform additional direction layered onto the universal prompt:
 python scripts/clean.py -i photo.jpg -o cleaned.jpg --remove "the dust on the rim"

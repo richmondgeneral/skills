@@ -49,3 +49,51 @@ def parse_counter_n(name: str) -> int:
 def parse_rg_n(sku: Optional[str]) -> Optional[int]:
     m = _SKU_RE.match(sku or "")
     return int(m.group(1)) if m else None
+
+
+@dataclass(frozen=True)
+class CounterState:
+    n: Optional[int]        # current counter value; None if sentinel absent
+    version: Optional[int]  # sentinel object version for CAS; None if absent
+    rg_max: int             # max RG-#### across the live catalog (0 if none)
+
+
+class CounterStore(Protocol):
+    def read(self) -> CounterState: ...
+    def create(self, n: int) -> None: ...
+    def cas_set(self, expected_version: int, n: int) -> bool: ...
+    # All three raise SquareUnavailable on I/O or auth failure.
+    # cas_set returns False on a version conflict (someone else won).
+
+
+def allocate_sku(store: CounterStore, max_retries: int = DEFAULT_MAX_RETRIES) -> str:
+    """Return a fresh RG-XXXX, reserved on Square. Raises on hard failure.
+
+    candidate = max(stored N, live Square RG max) + 1, so the result is always
+    >= 1 (never negative) given non-negative inputs. CAS on the sentinel version
+    guarantees exactly one winner per increment; conflicts retry.
+    """
+    for _ in range(max_retries):
+        st = store.read()                          # may raise SquareUnavailable -> propagate
+        if st.n is None:                           # sentinel missing -> self-heal
+            store.create(st.rg_max)
+            continue
+        candidate = max(st.n, st.rg_max) + 1       # forward-only reconcile
+        if store.cas_set(st.version, candidate):   # CAS on sentinel version
+            return format_sku(candidate)
+        # version conflict -> retry
+    raise SkuAllocationError(f"could not allocate after {max_retries} attempts")
+
+
+def bootstrap(store: CounterStore, fs_max: int = 0) -> int:
+    """Idempotently ensure the sentinel exists; return its value N."""
+    st = store.read()
+    if st.n is not None:
+        return st.n
+    initial = max(st.rg_max, fs_max)
+    store.create(initial)
+    return initial
+
+
+def peek(store: CounterStore) -> Optional[int]:
+    return store.read().n

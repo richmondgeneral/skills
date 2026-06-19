@@ -1,5 +1,4 @@
 from __future__ import annotations
-import os
 from typing import Dict, Optional, Tuple
 from ..models import Channel, ChannelObservation
 
@@ -32,10 +31,10 @@ def build_square_index(client=None, location_id: Optional[str] = None) -> Square
     to skip any non-ITEM union member defensively.
     """
     from square.client import Square  # lazy import so unit tests need no SDK/network
+    from ..instance import resolve_square_token, load_instance_config  # lazy: keep observe_square import-light
     if client is None:
-        token = os.environ.get("SQUARE_ACCESS_TOKEN") or os.environ.get("SQUARE_TOKEN")
-        client = Square(token=token)
-    location_id = location_id or os.environ.get("SQUARE_LOCATION_ID")
+        client = Square(token=resolve_square_token())
+    location_id = location_id or load_instance_config().location_id
 
     index: SquareIndex = {}
     cursor = None

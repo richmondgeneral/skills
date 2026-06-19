@@ -14,6 +14,7 @@ from item_model.diff import diff_item
 from item_model.catalog_state import build_catalog_state
 from item_model.channels.square_reader import observe_square, build_square_index
 from item_model.channels.whatnot_reader import observe_whatnot, build_whatnot_index
+from item_model.instance import load_instance_config  # import-safe: no network
 
 
 def gather_records_and_obs(items_dir, square_index, whatnot_index):
@@ -56,8 +57,7 @@ def heal_guidance(finding: dict) -> str:
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Read-only drift reconcile (pages vs channels).")
-    ap.add_argument("--items-dir", default=os.environ.get(
-        "RG_ITEMS_DIR", str(Path.home() / "workspace" / "richmondgeneral" / "items")))
+    ap.add_argument("--items-dir", default=load_instance_config().items_dir)
     ap.add_argument("--whatnot-csv", default=None)
     ap.add_argument("--json-out", default=None)
     ap.add_argument("--heal", action="store_true",

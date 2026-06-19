@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "rg-item-
 from item_model.page_reader import read_page_record
 from item_model.page_writer import write_page_record
 from item_model.write_path import plan_channel_pushes
+from item_model.instance import load_instance_config  # import-safe: no network
 
 
 def apply_set_price(item_dir, new_price, *, apply: bool = False, square_client=None) -> dict:
@@ -42,12 +43,13 @@ def apply_set_price(item_dir, new_price, *, apply: bool = False, square_client=N
 
     api_pushes = [p for p in pushes if p["mode"] == "api"]
     if api_pushes and apply:
-        from safe_batch_reprice import safe_batch_update   # live edge — import only on --apply
-        client = square_client
-        if client is None:
-            from square.client import Square
-            client = Square(token=os.environ.get("SQUARE_ACCESS_TOKEN")
-                            or os.environ.get("SQUARE_TOKEN"))
+        # live edge — these imports + the token resolver run ONLY on --apply.
+        # resolve_square_token() touches Keychain/.env, so it must never be reached
+        # on the dry-run (apply=False) path.
+        from safe_batch_reprice import safe_batch_update
+        from square.client import Square
+        from item_model.instance import resolve_square_token
+        client = square_client or Square(token=resolve_square_token())
         updates = {p["variation_id"]: p["amount_cents"] for p in api_pushes}
         safe_batch_update(client, updates, dry_run=False)
     return {"sku": rec.sku, "page_updated": True, "pushes": pushes, "applied": bool(apply)}
@@ -58,8 +60,7 @@ def main(argv=None):
         description="Reprice an item: page reference + Square push + manual checklist for other channels.")
     ap.add_argument("sku")
     ap.add_argument("price", type=float)
-    ap.add_argument("--items-dir", default=os.environ.get(
-        "RG_ITEMS_DIR", str(Path.home() / "workspace" / "richmondgeneral" / "items")))
+    ap.add_argument("--items-dir", default=load_instance_config().items_dir)
     ap.add_argument("--apply", action="store_true",
                     help="Execute the Square price write (else dry-run).")
     args = ap.parse_args(argv)

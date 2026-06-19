@@ -43,7 +43,18 @@ def test_channel_sold_but_page_active_is_critical():
                for f in findings)
 
 def test_findings_sorted_critical_first():
-    page = _page(reference_price=95.0, sold=True)
-    obs = [ChannelObservation(Channel.SQUARE, present=True, price=45.0, sold=False)]
+    page = _page(reference_price=95.0, sold=False)
+    obs = [
+        ChannelObservation(Channel.SQUARE, present=True, price=45.0, sold=False),   # price WARNING (45 != 95)
+        ChannelObservation(Channel.WHATNOT, present=True, price=95.0, sold=True),    # sold_state CRITICAL
+    ]
     findings = diff_item(page, obs)
+    assert len(findings) == 2
     assert findings[0].severity is Severity.CRITICAL
+    assert findings[-1].severity is Severity.WARNING
+
+
+def test_zero_intended_override_is_honored():
+    page = _page(reference_price=7.0, intended_channel_prices={Channel.WHATNOT: 0.0})
+    obs = [ChannelObservation(Channel.WHATNOT, present=True, price=0.0, sold=False)]
+    assert diff_item(page, obs) == []

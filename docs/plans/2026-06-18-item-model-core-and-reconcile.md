@@ -52,7 +52,6 @@ SKILL_DIRS = [
     "rg-full-auto/scripts",
     "product-labeler/scripts",
     "photos-library/scripts",
-    "alpaca-market-data/scripts",
     "item-model-core/lib",        # added by this plan
 ]
 
@@ -74,7 +73,7 @@ git add testing/conftest.py
 git commit -m "fix(testing): repoint conftest sys.path at plugin-nested skill dirs"
 ```
 
-> Note: `alpaca-market-data` stays for now; it's removed when trading relocates to AlphaTrade (separate task).
+> Note: trading skills (`alpha-trader`, `alpaca-market-data`) have already been relocated to AlphaTrade and removed here, so they're absent from the list above.
 
 ---
 

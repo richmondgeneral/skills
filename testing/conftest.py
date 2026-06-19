@@ -17,8 +17,7 @@ SKILL_DIRS = [
     "square-crm/scripts",
     "rg-full-auto/scripts",
     "product-labeler/scripts",
-    "photos-library/scripts",
-    "alpaca-market-data/scripts"
+    "photos-library/scripts"
 ]
 
 for skill_dir in SKILL_DIRS:

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 
-SCRIPT = Path(__file__).resolve().parents[2] / "rg-full-auto" / "scripts" / "process_new_item.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "plugins" / "richmondgeneral" / "skills" / "rg-full-auto" / "scripts" / "process_new_item.py"
 
 
 def test_help_lists_autonomous_flag():

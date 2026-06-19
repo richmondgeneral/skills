@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 
-SCRIPT = Path(__file__).resolve().parents[2] / "rg-full-auto" / "scripts" / "audit_log.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "plugins" / "richmondgeneral" / "skills" / "rg-full-auto" / "scripts" / "audit_log.py"
 
 
 def _seed(log_dir: Path):

@@ -1,11 +1,26 @@
 ---
 name: image-processor
-description: Unified image processing with background removal, generation, editing, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "photos library", "get from photos", or when rg-full-auto needs image processing.
+description: Unified image processing with background removal, generation, editing, listing-photo standardization, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "standardize listing photos", "make photos professional/catalog-quality", "square crop / center / color-correct photo", "transparent hero", "photos library", "get from photos", or when rg-full-auto needs image processing.
 metadata:
-  version: "1.7"
+  version: "1.8"
   author: scottybe
   updated: "2026-06-19"
   changelog: |
+    v1.8 - Listing photo standardizer (RG public-photo SOP enforcement):
+    - standardize.py turns a raw documentation photo into a catalog-quality PUBLIC
+      image per ops/docs/RG-listing-SOP.md: color-correct (gray-world white balance
+      + mild auto-contrast, toward real-life vs intake lighting) -> background
+      removal (reuses process.py routing) -> square 1:1, object centered on a
+      transparent canvas -> resize. Output is a transparent PNG; the HERO is always
+      transparent. COLOR + GEOMETRY ONLY — never edits content, so chips/crazing/wear
+      stay visible (honesty rule). Raw archive is never touched (input -> --output).
+    - Deterministic + offline color & square steps (unit-tested); bg removal is the
+      existing AI path. Flags: --no-bg (re-square an already-transparent hero, no API),
+      --no-color, --model {removebg|nano-banana|gemini25|auto}, --allow-rect-mask
+      (cluttered shots), --margin, --size. bg-removal errors are surfaced (rect-mask /
+      credits), not swallowed. --straighten is a documented no-op (reliable auto-deskew
+      needs opencv, absent — shoot straight; the square crop never rotates).
+
     v1.7 - Key bootstrap actually reached + billing-aware 429 (RG-0030 fix):
     - create_default_router() now calls bootstrap_keys() itself. The CLI
       scripts put lib/ on sys.path and import router/models TOP-LEVEL, so
@@ -91,7 +106,34 @@ metadata:
 
 # Image Processor
 
-Unified image processing skill combining background removal, image generation, image editing, and Photos.app library access.
+Unified image processing skill combining background removal, image generation, image editing, listing-photo standardization, and Photos.app library access.
+
+## Listing Photo Standardizer (public-photo SOP)
+
+`standardize.py` turns a raw documentation photo into a **catalog-quality public image** per
+[`ops/docs/RG-listing-SOP.md`](../../../../../ops/docs/RG-listing-SOP.md) — the "thematic thread"
+that makes every public photo look cohesive:
+
+- **Color-corrected** toward real-life color (gray-world white balance + mild auto-contrast — undoes
+  the intake area's lighting cast)
+- **Background removed**, **hero always transparent** (reuses `process.py` routing/fallbacks)
+- **Square 1:1**, object **centered** on a transparent canvas with margin, resized
+- **Honesty preserved** — color + geometry ONLY; never edits content, so chips/crazing/wear stay visible
+
+```bash
+# Full pipeline (color -> bg-remove -> square 1:1 centered transparent):
+uv run python scripts/standardize.py raw.jpg -o public-hero.png --size 2000
+# Re-square an already-transparent hero with no API call:
+uv run python scripts/standardize.py items/RG-0028/hero.png -o hero-square.png --no-bg
+# Cleaner cutout / cluttered fallback:
+uv run python scripts/standardize.py raw.jpg -o out.png --model removebg      # best cutout
+uv run python scripts/standardize.py raw.jpg -o out.png --allow-rect-mask     # accept rough mask
+```
+
+Apply only to the **curated public subset**; the raw archive (Photos library, tagged by SKU) and the
+`items/RG-XXXX/` originals stay untouched (input → `--output`). `--straighten` is a documented no-op
+(reliable auto-deskew needs opencv, which isn't installed — shoot straight; the square crop never rotates).
+Clean single-object shots cut out best; multi-object layouts produce rough masks.
 
 ## Quick Start
 

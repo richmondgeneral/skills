@@ -219,6 +219,8 @@ def main():
                    help="uuid=role (hero|detail-<slug>); repeatable")
     p.add_argument("--items-dir", default=DEFAULT_ITEMS_DIR)
     p.add_argument("--plan", action="store_true", help="dry-run: print intent, mutate nothing")
+    p.add_argument("--tag-only", action="store_true",
+                   help="just tag rg-sorted + SKU (no export/album) — for photos of an already-handled item")
     args = p.parse_args()
 
     uuids = [u.strip() for u in args.uuids.split(",") if u.strip()]
@@ -227,6 +229,15 @@ def main():
     for u in uuids:
         if not UUID_RE.match(u):
             p.error(f"bad uuid {u!r}")
+
+    if args.tag_only:
+        if not args.sku or not RG_RE.match(args.sku):
+            p.error("--tag-only requires --sku RG-XXXX")
+        result = tag_sorted(args.sku, uuids)
+        print(json.dumps({"mode": "tag-only", "sku": args.sku,
+                          "tagged": len(uuids), "result": result}, indent=2))
+        return
+
     roles = {}
     for r in args.role:
         k, _, v = r.partition("=")

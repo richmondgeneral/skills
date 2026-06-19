@@ -313,6 +313,12 @@ as: sweep → look → propose → confirm → file.
    Exports to `items/RG-XXXX/` (hero + detail-N, no clobber), adds to the per-SKU album, and tags
    `rg-sorted` + `RG-XXXX`. Minting is atomic (Square-CAS) and hard-fails offline.
 
+   For a cluster that belongs to an **already-photographed** item (just clear it from the queue and
+   label it by SKU — no new `items/` photos), tag without exporting:
+   ```bash
+   python3 scripts/file_cluster.py --tag-only --sku RG-00NN --uuids <uuids>
+   ```
+
 **"Out of the queue" = the `rg-sorted` tag + `--hide-sorted` filter.** Filing tags each photo
 `rg-sorted` + `RG-XXXX`, and the sweep (step 1) excludes `rg-sorted`, so a filed photo instantly
 drops out of the queue — no album to empty, no structural mutation. The photos just stay in your

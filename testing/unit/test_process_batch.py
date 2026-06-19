@@ -580,3 +580,10 @@ def test_orchestrator_mirrors_decisions_to_audit_log(tmp_path):
         r.get("sku") == sku and r.get("phase") == "phase_1" and r.get("type") == "price"
         for r in records
     ), f"phase_1 price decision not mirrored to audit_log. Records: {records}"
+
+
+def test_orchestrator_default_next_sku_uses_authority(monkeypatch, tmp_path):
+    import process_batch
+    monkeypatch.setattr(process_batch, "default_next_sku", lambda: "RG-7777", raising=True)
+    orch = process_batch.BatchOrchestrator(items_dir=str(tmp_path), queue_path=str(tmp_path / "q.json"))
+    assert orch.next_sku() == "RG-7777"

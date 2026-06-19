@@ -84,6 +84,10 @@ def stub_label(sku):
         "price": "",
         "condition": "",
         "condition_notes": "",
+        "eye_color": "",
+        "measurements_in": {},     # {"l":.., "w":.., "h":..} when known; drives oversize
+        "buyer_questions": [],     # [{"q":.., "a":.., "posted_to":[..]}]
+        "oversize": False,         # recompute from measurements_in via compute_oversize
         "state": "Intake",
         "target_channels": [],
         "channels": {
@@ -95,6 +99,18 @@ def stub_label(sku):
         },
         "qr_code_url": f"{PAGES_BASE}/{sku}/",
     }
+
+
+def resolve_staging_dir(items_dir, sku, staging_dir=None):
+    """Compute where intake scratch is staged — OUTSIDE the item folder.
+
+    Default: ``<items_dir>/../rg-pending/<sku>`` (a sibling of ``items/``, never
+    inside ``items/<sku>/``, so scratch can't contaminate another item's folder).
+    With ``staging_dir`` set, returns ``<staging_dir>/<sku>``. Pure path logic.
+    """
+    # NOTE: --staging-dir / --promote CLI wiring is a deferred follow-up.
+    base = staging_dir if staging_dir is not None else os.path.join(items_dir, "..", "rg-pending")
+    return os.path.normpath(os.path.join(base, sku))
 
 
 def main():

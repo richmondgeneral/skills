@@ -1,7 +1,9 @@
+import os
 import pytest
 from unittest.mock import MagicMock
+import env
 from models import TaskConfig, TaskType, ProcessingResult, BaseModel
-from router import ModelRouter
+from router import ModelRouter, create_default_router
 
 class MockModel(BaseModel):
     def __init__(self, name, tasks, quality=0.9, cost='free', health=True):
@@ -95,5 +97,56 @@ def test_generation_model_selection():
     
     config = TaskConfig.for_generate("A cat")
     selected = router.select_model(config)
-    
+
     assert selected.name == "Gen"
+
+
+_KEY_VARS = ("GEMINI_API_KEY", "NANO_BANANA_API_KEY", "GOOGLE_API_KEY",
+             "REMOVE_BG_API_KEY", "REMOVEBG_API_KEY")
+
+
+def test_create_default_router_bootstraps_keys_in_bare_shell(monkeypatch):
+    """Regression for the RG-0030 'All models failed' incident.
+
+    The CLI scripts (clean.py etc.) put image-processor/lib on sys.path and
+    import `router`/`models` as TOP-LEVEL modules, so lib/__init__.py — where
+    v1.6 placed the bootstrap_keys() call — never runs. Over the bare
+    mac-bridge shell (~/.zshrc never sourced) the key is therefore never
+    resolved, every model's health_check() is False, the fallback chain is
+    empty, and the router returns "All models failed" without one HTTP call.
+
+    create_default_router() must resolve keys itself so the CLI path works.
+    """
+    # Simulate the bare bridge shell: no API keys exported.
+    for var in _KEY_VARS:
+        monkeypatch.delenv(var, raising=False)
+    # Make the Keychain step deterministic (no dependency on the real `security`).
+    fake = "AIza" + "x" * 35
+    monkeypatch.setattr(
+        env, "_from_keychain",
+        lambda name: fake if name in ("GEMINI_API_KEY", "NANO_BANANA_API_KEY") else None,
+    )
+
+    router = create_default_router()
+    gemini = next(m for m in router.models
+                  if m.__class__.__name__ == "GeminiImageModel")
+
+    # Before the fix this is False (api_key=None → health_check False).
+    assert gemini.health_check() is True
+    assert os.environ.get("GEMINI_API_KEY") == fake
+
+
+def test_empty_fallback_chain_reports_missing_key():
+    """An empty fallback chain (no healthy model) must say WHY, not just
+    'All models failed' — the vague message is what got the 429 misdiagnosis.
+    """
+    dead = MockModel("Dead", [TaskType.EDIT], quality=0.96, cost='free', health=False)
+    router = ModelRouter([dead])
+
+    result = router.process_with_fallback(
+        "x.jpg", TaskConfig.for_edit(instruction="noop"))
+
+    assert result.success is False
+    msg = (result.error or "").lower()
+    assert "no healthy model" in msg
+    assert "gemini_api_key" in msg

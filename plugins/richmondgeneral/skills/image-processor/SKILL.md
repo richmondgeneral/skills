@@ -2,10 +2,28 @@
 name: image-processor
 description: Unified image processing with background removal, generation, editing, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "photos library", "get from photos", or when rg-full-auto needs image processing.
 metadata:
-  version: "1.6"
+  version: "1.7"
   author: scottybe
   updated: "2026-06-19"
   changelog: |
+    v1.7 - Key bootstrap actually reached + billing-aware 429 (RG-0030 fix):
+    - create_default_router() now calls bootstrap_keys() itself. The CLI
+      scripts put lib/ on sys.path and import router/models TOP-LEVEL, so
+      lib/__init__.py (where v1.6 placed the bootstrap) never ran on that path
+      — over the bare mac-bridge shell every model got api_key=None,
+      health_check() was False, the fallback chain was empty, and edits died
+      with "All models failed" before a single HTTP call. v1.6's env.py was
+      correct but UNREACHABLE from the CLI path; this makes it reachable.
+    - router.process_with_fallback() now returns a specific "No healthy model
+      ... missing API key (GEMINI_API_KEY)" error when the chain is empty,
+      instead of the vague "All models failed" that got this misread as a 429.
+    - gemini_image._post_with_retry() fails FAST on a depleted-credits 429
+      (RESOURCE_EXHAUSTED / "prepayment credits are depleted") with an
+      actionable https://ai.studio/projects billing message, instead of 5x
+      backoff (~70s) then a vague "Too Many Requests". Transient rate-limit
+      429s still retry as before.
+    - Tests: testing/unit/test_image_router.py (bootstrap + empty-chain),
+      testing/unit/test_image_gemini_retry.py (billing vs transient 429).
     v1.6 - Bridge key resolution + anti-hallucination guard:
     - lib/env.py resolves GEMINI_API_KEY / NANO_BANANA_API_KEY (env -> Keychain
       -> workspace .env) into os.environ on lib import, so clean.py works over

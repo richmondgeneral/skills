@@ -172,6 +172,28 @@ class ModelRouter:
         """
         models_to_try = self._build_fallback_chain(task_config)
 
+        if not models_to_try:
+            # No model passed health_check(). For Gemini/remove.bg that means
+            # api_key is None — almost always a missing/unresolved key, NOT a
+            # model outage or rate limit. Say so explicitly: a bare "All models
+            # failed" here is what led the RG-0030 onboard to misdiagnose this
+            # as a Gemini 429 (no HTTP call was ever made).
+            task_name = getattr(task_config.task_type, 'value', task_config.task_type)
+            msg = (f"No healthy model available for task '{task_name}'. "
+                   f"This usually means an API key is missing or unresolved "
+                   f"(checked process env, macOS Keychain, and workspace .env "
+                   f"for GEMINI_API_KEY).")
+            return ProcessingResult(
+                model_used='None',
+                confidence=0.0,
+                processing_time=0.0,
+                cost=0.0,
+                output_path='',
+                metadata={'error': msg},
+                success=False,
+                error=msg
+            )
+
         last_error = None
         for model in models_to_try:
             try:
@@ -238,6 +260,21 @@ class ModelRouter:
 
 def create_default_router(prefer_free: bool = True) -> ModelRouter:
     """Create router with all available models."""
+    # Resolve API keys (process env -> macOS Keychain -> workspace .env) BEFORE
+    # constructing any model. The CLI scripts (clean.py, process.py, edit.py,
+    # generate.py, process_group.py, status.py) put image-processor/lib on
+    # sys.path and import this module top-level, so lib/__init__.py — which is
+    # the *only* other place that calls bootstrap_keys() — never runs on that
+    # path. Without this call, over the bare mac-bridge shell (~/.zshrc not
+    # sourced) every model is built with api_key=None, health_check() is False,
+    # the fallback chain is empty, and edits fail with "All models failed"
+    # before a single request. Idempotent; never overwrites an exported key.
+    try:
+        from .env import bootstrap_keys
+    except ImportError:
+        from env import bootstrap_keys
+    bootstrap_keys()
+
     try:
         from .models import (
             NanaBananaModel,

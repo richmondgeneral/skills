@@ -19,6 +19,34 @@ class GeminiAPIError(Exception):
     pass
 
 
+def _is_billing_exhausted(resp: requests.Response) -> bool:
+    """True when a 429 is a depleted-credits / billing problem, not a rate limit.
+
+    Gemini returns 429 RESOURCE_EXHAUSTED for BOTH transient rate limits and
+    "your prepayment credits are depleted" billing states. The latter is not
+    retryable — backing off 5x just wastes ~70s and then surfaces a vague
+    "Too Many Requests". Distinguish them by the message body. (RG-0030.)
+    """
+    if resp.status_code != 429:
+        return False
+    try:
+        msg = (resp.json().get("error", {}).get("message", "") or "")
+    except Exception:
+        msg = resp.text or ""
+    m = msg.lower()
+    return any(k in m for k in ("prepayment", "credit", "billing"))
+
+
+def _billing_message(resp: requests.Response) -> str:
+    try:
+        detail = (resp.json().get("error", {}).get("message", "") or "").strip()
+    except Exception:
+        detail = (resp.text or "").strip()
+    return ("Gemini billing/credits exhausted (429 RESOURCE_EXHAUSTED) — this is "
+            "NOT a transient rate limit, so retries won't help. Top up credits / "
+            "enable billing at https://ai.studio/projects . Detail: " + detail)
+
+
 def _post_with_retry(url: str, payload: dict, timeout: int,
                      max_retries: int = 5, base_delay: float = 2.0,
                      headers: Optional[Dict[str, str]] = None) -> requests.Response:
@@ -37,6 +65,10 @@ def _post_with_retry(url: str, payload: dict, timeout: int,
         last_resp = resp
         if resp.status_code < 400:
             return resp
+        # Depleted-credits 429 is terminal — fail fast with an actionable message
+        # instead of backing off 5x against a wall.
+        if _is_billing_exhausted(resp):
+            raise GeminiAPIError(_billing_message(resp))
         # Retryable: rate-limit or transient server-side
         if resp.status_code in (429,) or 500 <= resp.status_code < 600:
             if attempt == max_retries:

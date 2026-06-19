@@ -2,9 +2,14 @@
 name: square-catalog-ops
 description: Govern Square catalog taxonomy and channel visibility with version-locked API checks. Use when merging categories, auditing cleanup state, validating site/channel assignment, or proving API-version compliance before/after catalog mutations. Triggers on "catalog cleanup", "merge categories", "audit categories", "site assignment", "compliance check", "Square-Version", or "hidden from all sites".
 metadata:
-  version: "1.1"
+  version: "1.2"
   author: scottybe
-  updated: "2026-02-17"
+  updated: "2026-06-19"
+  changelog: |
+    v1.2 - Audit repointed to the New Arrivals tier (intake default), was The New
+      Finds; arg renamed --expect-new-finds-count -> --expect-new-arrivals-count
+      (audit + catalog_ops + docs in lockstep). Added generate_catalog_index.py to
+      rebuild the RG dedup index (catalog_index.jsonl) from live Square.
   runtime_tier: "LOCAL_STANDARD"
   required_capabilities:
     - filesystem_full_access
@@ -93,7 +98,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py a
 | Flag | Default | Purpose |
 |------|---------|---------|
 | `--fail-on-issues` | off | Exit non-zero if issues found |
-| `--expect-new-finds-count` | `10` | Expected item count in The New Finds |
+| `--expect-new-arrivals-count` | `10` | Expected item count in New Arrivals (intake default tier) |
 | `--json-out` | _(none)_ | Save audit results to a JSON file |
 
 The audit verifies:
@@ -101,7 +106,17 @@ The audit verifies:
 - required categories exist (`Food & Pantry`, `The General Store`, `The Vintage Market`, `New Arrivals`)
 - legacy food categories are empty + hidden
 - categories with items are visible and assigned to active site/POS channels
-- `The New Finds` count matches expected intake cap
+- `New Arrivals` count matches expected intake cap
+
+### 5) Rebuild Catalog Index (dedup)
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/generate_catalog_index.py
+```
+
+Rebuilds `catalog_index.jsonl` (the RG-SKU dedup index) from **live Square**, not the
+local snapshot. Run after each intake batch — it's the Square layer of the dedupe-first
+SOP. `--root` overrides the workspace dir; `--sku-pattern` the SKU regex.
 
 ## Post-Mutation Workflow (Required)
 

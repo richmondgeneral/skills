@@ -141,10 +141,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     audit.add_argument("--fail-on-issues", action="store_true", help="Exit non-zero if issues exist.")
     audit.add_argument(
-        "--expect-new-finds-count",
+        "--expect-new-arrivals-count",
         default=10,
         type=int,
-        help="Expected legacy New Finds tier count (note: New Arrivals is now the intake default tier).",
+        help="Expected item count in New Arrivals (the intake default tier).",
     )
     audit.add_argument("--json-out", default="", help="Optional path to save audit JSON.")
 
@@ -170,7 +170,7 @@ def main() -> int:
 
     if args.command == "audit-cleanup":
         script = scripts_dir / "catalog_cleanup_audit.py"
-        script_args = ["--expect-new-finds-count", str(args.expect_new_finds_count)]
+        script_args = ["--expect-new-arrivals-count", str(args.expect_new_arrivals_count)]
         if args.fail_on_issues:
             script_args.append("--fail-on-issues")
         if args.json_out:

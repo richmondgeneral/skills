@@ -74,7 +74,7 @@ def classify_cluster(cluster):
 
 
 def find_product_clusters(db_path, days=14, min_width=2000, cluster_gap=300,
-                          album=None, keyword=None):
+                          album=None, keyword=None, exclude_keyword=None):
     """Find photo clusters that are likely product photos."""
     # Open the live Photos library read-only AND immutable so we never take
     # locks or touch the WAL — anything less can disrupt cloudphotod's sync
@@ -102,6 +102,12 @@ def find_product_clusters(db_path, days=14, min_width=2000, cluster_gap=300,
             params.extend(frag_params)
         if keyword:
             frag, frag_params = photos_db.keyword_condition(conn, keyword)
+            conditions.append(frag)
+            params.extend(frag_params)
+            
+        # Add support for excluding keywords
+        if exclude_keyword:
+            frag, frag_params = photos_db.exclude_keyword_condition(conn, exclude_keyword)
             conditions.append(frag)
             params.extend(frag_params)
 
@@ -173,6 +179,8 @@ def main():
                         default='all', help='Filter by cluster type')
     parser.add_argument('--album', type=str, help='Only photos in this album (matches album name, e.g. "Intake")')
     parser.add_argument('--keyword', '--tag', dest='keyword', type=str, help='Only photos with this keyword/tag')
+    parser.add_argument('--exclude-keyword', type=str, help='Exclude photos with this keyword/tag')
+    parser.add_argument('--hide-sorted', action='store_true', help='Convenience flag to exclude photos tagged rg-sorted')
     parser.add_argument('--json', action='store_true', help='Output as JSON')
     parser.add_argument('--db', type=str, help='Path to Photos.sqlite')
 
@@ -202,15 +210,24 @@ def main():
     if (args.album or args.keyword) and '--min-width' not in ' '.join(os.sys.argv):
         min_width = 0
 
-    if args.album or args.keyword:
+    if args.album or args.keyword or args.exclude_keyword or args.hide_sorted:
         with sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True) as _c:
             if args.album and not photos_db.album_exists(_c, args.album):
                 print(f"⚠️  Album '{args.album}' not found. Known: {', '.join(photos_db.list_albums(_c, 15))}", file=os.sys.stderr)
             if args.keyword and not photos_db.keyword_exists(_c, args.keyword):
                 print(f"⚠️  Keyword/tag '{args.keyword}' not found.", file=os.sys.stderr)
+            exclude = args.exclude_keyword
+            if args.hide_sorted:
+                exclude = 'rg-sorted'
+            if exclude and not photos_db.keyword_exists(_c, exclude):
+                print(f"⚠️  Exclude keyword/tag '{exclude}' not found in DB.", file=os.sys.stderr)
+
+    exclude_keyword = args.exclude_keyword
+    if args.hide_sorted:
+        exclude_keyword = 'rg-sorted'
 
     clusters = find_product_clusters(db_path, days=days_filter, min_width=min_width,
-                                     cluster_gap=args.gap, album=args.album, keyword=args.keyword)
+                                     cluster_gap=args.gap, album=args.album, keyword=args.keyword, exclude_keyword=exclude_keyword)
 
     # Filter by type if specified
     if args.type != 'all':

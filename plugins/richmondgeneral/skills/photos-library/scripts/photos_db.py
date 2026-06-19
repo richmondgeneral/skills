@@ -82,6 +82,20 @@ def keyword_condition(conn, keyword):
     return frag, [keyword.strip()]
 
 
+def exclude_keyword_condition(conn, keyword):
+    """(fragment, params) excluding ZASSET rows (alias ``a``) tagged ``keyword``."""
+    info = discover_keyword_join(conn)
+    if not info:
+        return "1=1", [] # if we can't find the keyword table, don't exclude anything
+    jtable, attr_col, kw_col = info
+    frag = (
+        f"a.ZADDITIONALATTRIBUTES NOT IN (SELECT j.{attr_col} FROM {jtable} j "
+        f"JOIN ZKEYWORD kw ON kw.Z_PK = j.{kw_col} "
+        f"WHERE lower(kw.ZTITLE) = lower(?))"
+    )
+    return frag, [keyword.strip()]
+
+
 def album_exists(conn, album_name):
     row = conn.execute(
         "SELECT 1 FROM ZGENERICALBUM WHERE ZKIND = 2 AND lower(ZTITLE) = lower(?) LIMIT 1",
@@ -106,3 +120,13 @@ def list_albums(conn, limit=40):
         (limit,),
     ).fetchall()
     return [r[0] for r in rows]
+
+
+_UTI_EXT = {"public.jpeg": "jpeg", "public.heic": "heic", "public.png": "png",
+            "public.tiff": "tiff", "com.compuserve.gif": "gif"}
+
+def original_relpath(uuid, uti):
+    """Path of an original inside a .photoslibrary, e.g. originals/A/<uuid>.jpeg.
+    Mirrors the layout used by extract_photos.py / intake_to_item.py."""
+    ext = _UTI_EXT.get((uti or "").lower(), "jpeg")
+    return f"originals/{uuid[0].upper()}/{uuid}.{ext}"

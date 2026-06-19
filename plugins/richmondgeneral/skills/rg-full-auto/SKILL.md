@@ -171,19 +171,19 @@ All scripts use **uv**: `uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_
 
 **All image processing runs on USER'S MAC via osascript.** Binary files cannot transfer between environments.
 
-### Step 0.1: Get next SKU from cache
+### Step 0.1: Allocate the SKU (authority = Square)
 
-```
-square_cache_mcp:square_cache_search with sku_pattern: "RG-"
-```
-Find highest RG-XXXX and increment.
+SKUs are allocated atomically by `sku_authority.allocate_sku()`, which reserves the next `RG-XXXX` on Square via a hidden `__RG_SKU_COUNTER__` sentinel object using catalog-object **version compare-and-set**. This is the single source of truth for allocation and is safe across concurrent, multi-machine writers.
 
-### Step 0.2: Verify SKU not taken
+- In the batch/auto flow the scripts call it for you (`process_batch.py` / `process_new_item.py` → `default_next_sku()`), so you do **not** allocate a SKU by hand.
+- To mint one manually:
+  ```
+  uv run --project plugins/richmondgeneral python plugins/richmondgeneral/skills/rg-full-auto/scripts/sku_authority.py allocate
+  ```
 
-```
-square_cache_mcp:square_cache_search with sku_pattern: "RG-XXXX"
-```
-Check for exact SKU match (not substring). If taken, increment and re-check. Do NOT use `searchItems` with `text_filter`.
+Do **NOT** look up the next SKU from the Square cache or by globbing the items dir — those lag and reintroduce the cross-machine collision this replaced. The returned SKU is already reserved, so there is **no separate "verify not taken" step**. If Square is unreachable the call raises `SkuAllocationError` and intake stops by design (no colliding local fallback).
+
+> One-time setup: the sentinel is created once via `… sku_authority.py bootstrap --items-dir /Users/scottybe/workspace/richmondgeneral/items`. `… sku_authority.py peek` prints the current high-water N without allocating.
 
 ### Step 0.3: Create item folder
 

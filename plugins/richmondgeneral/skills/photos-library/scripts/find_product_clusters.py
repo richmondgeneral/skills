@@ -73,7 +73,7 @@ def classify_cluster(cluster):
         return 'mixed'
 
 
-def find_product_clusters(db_path, days=14, min_width=2000, cluster_gap=300,
+def find_product_clusters(db_path, days=3, min_width=2000, cluster_gap=300,
                           album=None, keyword=None, exclude_keyword=None):
     """Find photo clusters that are likely product photos."""
     # Open the live Photos library read-only AND immutable so we never take
@@ -172,7 +172,7 @@ def find_product_clusters(db_path, days=14, min_width=2000, cluster_gap=300,
 
 def main():
     parser = argparse.ArgumentParser(description='Find product photo clusters in Photos Library')
-    parser.add_argument('--days', type=int, default=14, help='Search last N days (0 for all)')
+    parser.add_argument('--days', type=int, default=3, help='Search last N days (0 for all; default 3 — the library-wide intake sweep window)')
     parser.add_argument('--min-width', type=int, default=2000, help='Minimum width in pixels')
     parser.add_argument('--gap', type=int, default=300, help='Max seconds between photos in cluster')
     parser.add_argument('--type', type=str, choices=['all', 'product', 'real_estate', 'screenshot', 'single', 'mixed'],

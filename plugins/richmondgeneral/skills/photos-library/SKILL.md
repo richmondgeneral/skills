@@ -278,16 +278,20 @@ sips -Z 800 photo.jpeg --out photo_medium.jpeg
 sips -Z 400 photo.jpeg --out photo_small.jpeg
 ```
 
-## Intake Photo Sorter (agent loop)
+## Intake Photo Sorter (agent loop — library-wide tag sweep, NO album)
 
-Sort the "Richmond General Intake" album into each item's SKU lib — the per-SKU Photos
-album AND `items/RG-XXXX/` — as an agent loop: cluster → look → propose → confirm → file.
+**No Intake album to manage.** Shoot product photos normally with the Camera app; the sorter sweeps
+the recent library, finds product shots, and tags them on filing so they vanish from the queue.
+The loop files each item's photos into its SKU lib — the per-SKU Photos album AND `items/RG-XXXX/` —
+as: sweep → look → propose → confirm → file.
 
-1. **Cluster the queue** (already-sorted photos are excluded):
+1. **Sweep the queue** — last **3 days** of the library (default), product shots only, already-sorted excluded:
    ```bash
-   python3 scripts/find_product_clusters.py --album "Richmond General Intake" --hide-sorted --json
+   python3 scripts/find_product_clusters.py --hide-sorted --type product --json
    ```
-   Item-by-item shooting → each time-gap cluster ≈ one item.
+   No `--album` needed. Item-by-item shooting → each time-gap cluster ≈ one item. Add `--days N`
+   to widen the window. (The only risk: the ML heuristic occasionally grabs a personal photo that
+   looks like a product — you confirm each cluster before filing, so it's caught there.)
 
 2. **Look at each cluster** — extract small JPEGs and Read them (real vision):
    ```bash
@@ -309,11 +313,11 @@ album AND `items/RG-XXXX/` — as an agent loop: cluster → look → propose �
    Exports to `items/RG-XXXX/` (hero + detail-N, no clobber), adds to the per-SKU album, and tags
    `rg-sorted` + `RG-XXXX`. Minting is atomic (Square-CAS) and hard-fails offline.
 
-**"Out of Intake" = the `rg-sorted` tag + `--hide-sorted` filter.** Once filed, a photo is tagged
-and the queue (step 1) excludes it, so it's done from the workflow's view. The physical photo stays
-visible in the Intake album until you periodically mass-delete sorted ones by hand — Photos can't
-reliably remove items from an album via scripting (a rebuild approach was tried and rejected; see
-changelog).
+**"Out of the queue" = the `rg-sorted` tag + `--hide-sorted` filter.** Filing tags each photo
+`rg-sorted` + `RG-XXXX`, and the sweep (step 1) excludes `rg-sorted`, so a filed photo instantly
+drops out of the queue — no album to empty, no structural mutation. The photos just stay in your
+library, now carrying their SKU in keywords (searchable by `RG-XXXX`). This additive tag-sweep model
+replaced the rejected album-rebuild approach (Photos' async album deletion is unreliable — see changelog).
 
 ## Downloads → Album (agent decides per photo)
 

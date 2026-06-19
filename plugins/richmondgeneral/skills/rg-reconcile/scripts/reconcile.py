@@ -11,30 +11,35 @@ sys.path.insert(0, os.path.join(
 
 from item_model.page_reader import read_page_record
 from item_model.diff import diff_item
+from item_model.catalog_state import build_catalog_state
 from item_model.channels.square_reader import observe_square, build_square_index
 from item_model.channels.whatnot_reader import observe_whatnot, build_whatnot_index
+
+
+def gather_records_and_obs(items_dir, square_index, whatnot_index):
+    """Walk items/RG-* pages -> [(PageRecord, [ChannelObservation])]. Skips dirs without label.json."""
+    out = []
+    for child in sorted(Path(items_dir).glob("RG-*")):
+        if not (child / "label.json").exists():
+            continue
+        page = read_page_record(child)
+        obs = [observe_square(page.sku, square_index), observe_whatnot(page.sku, whatnot_index)]
+        out.append((page, obs))
+    return out
 
 
 def run_reconcile(items_dir: str, square_index: Dict, whatnot_index: Dict) -> dict:
     """Pure orchestration over injected indexes. Returns the report dict."""
     findings = []
-    items_scanned = 0
-    for child in sorted(Path(items_dir).glob("RG-*")):
-        if not (child / "label.json").exists():
-            continue
-        items_scanned += 1
-        page = read_page_record(child)
-        observations = [
-            observe_square(page.sku, square_index),
-            observe_whatnot(page.sku, whatnot_index),
-        ]
+    records = gather_records_and_obs(items_dir, square_index, whatnot_index)
+    for page, observations in records:
         for f in diff_item(page, observations):
             findings.append(f.to_dict())
 
     summary = {"critical": 0, "warning": 0, "info": 0}
     for f in findings:
         summary[f["severity"]] = summary.get(f["severity"], 0) + 1
-    return {"findings": findings, "summary": summary, "items_scanned": items_scanned}
+    return {"findings": findings, "summary": summary, "items_scanned": len(records)}
 
 
 def main(argv=None):
@@ -58,6 +63,11 @@ def main(argv=None):
         ops_reports.mkdir(parents=True, exist_ok=True)
         out = str(ops_reports / "reconcile-latest.json")
     Path(out).write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    state = build_catalog_state(gather_records_and_obs(args.items_dir, square_index, whatnot_index))
+    state_path = Path(args.items_dir).parent / "catalog_state.json"
+    state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    print(f"Snapshot: {state_path} ({state['item_count']} items)")
 
     s = report["summary"]
     print(f"Scanned {report['items_scanned']} items")

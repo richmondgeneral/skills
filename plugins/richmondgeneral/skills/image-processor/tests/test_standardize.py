@@ -64,31 +64,31 @@ def test_color_correct_preserves_transparency():
 # load_label_json
 # ---------------------------------------------------------------------------
 
-def test_load_label_json_missing(tmp_path):
+def test_load_item_metadata_missing(tmp_path):
     """No label.json → empty dict, no error."""
-    assert st.load_label_json(tmp_path) == {}
+    assert st.load_item_metadata(tmp_path) == {}
 
 
-def test_load_label_json_valid(tmp_path):
+def test_load_item_metadata_valid(tmp_path):
     (tmp_path / "label.json").write_text(
         json.dumps({"photo_overrides": {"no_color": True, "fill": 0.7, "notes": "antique brass"}})
     )
-    result = st.load_label_json(tmp_path)
+    result = st.load_item_metadata(tmp_path)
     assert result == {"photo_overrides": {"no_color": True, "fill": 0.7, "notes": "antique brass"}}
 
 
-def test_load_label_json_invalid_json(tmp_path, capsys):
+def test_load_item_metadata_invalid_json(tmp_path, capsys):
     """Malformed JSON → empty dict + warning on stderr."""
     (tmp_path / "label.json").write_text("{not valid json")
-    result = st.load_label_json(tmp_path)
+    result = st.load_item_metadata(tmp_path)
     assert result == {}
     assert "warning" in capsys.readouterr().err
 
 
-def test_load_label_json_non_dict(tmp_path):
+def test_load_item_metadata_non_dict(tmp_path):
     """JSON that isn't an object → empty dict."""
     (tmp_path / "label.json").write_text("[1, 2, 3]")
-    assert st.load_label_json(tmp_path) == {}
+    assert st.load_item_metadata(tmp_path) == {}
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ def _make_parser_and_defaults():
 def test_apply_overrides_fills_defaults():
     """JSON values apply when CLI left the arg at its default."""
     p, args = _make_parser_and_defaults()
-    changed = st.apply_overrides(args, {}, {"no_color": True, "fill": 0.7}, p)
+    changed = st.apply_overrides(args, {}, {"no_color": True, "fill": 0.7}, p, sys_args=[])
     assert args.no_color is True
     assert abs(args.fill - 0.7) < 1e-9
     assert set(changed) == {"no_color", "fill"}
@@ -116,7 +116,7 @@ def test_apply_overrides_cli_wins():
     p = st._build_parser()
     # Simulate user passing --fill 0.9 on CLI
     args = p.parse_args(["dummy_input.png", "-o", "out.png", "--fill", "0.9"])
-    changed = st.apply_overrides(args, {}, {"fill": 0.5}, p)
+    changed = st.apply_overrides(args, {}, {"fill": 0.5}, p, sys_args=["--fill", "0.9"])
     assert abs(args.fill - 0.9) < 1e-9  # CLI value preserved
     assert "fill" not in changed
 
@@ -124,7 +124,7 @@ def test_apply_overrides_cli_wins():
 def test_apply_overrides_ignores_unknown_keys():
     """Keys not in OVERRIDE_FIELDS (like 'notes') are silently ignored."""
     p, args = _make_parser_and_defaults()
-    changed = st.apply_overrides(args, {}, {"notes": "some text", "no_color": True}, p)
+    changed = st.apply_overrides(args, {}, {"notes": "some text", "no_color": True}, p, sys_args=[])
     assert "notes" not in changed
     assert "no_color" in changed
 
@@ -133,7 +133,7 @@ def test_apply_overrides_bad_value_warns(capsys):
     """A JSON value that can't be coerced emits a warning and skips the field."""
     p, args = _make_parser_and_defaults()
     original_fill = args.fill
-    st.apply_overrides(args, {}, {"fill": "not-a-float"}, p)
+    st.apply_overrides(args, {}, {"fill": "not-a-float"}, p, sys_args=[])
     assert args.fill == original_fill  # unchanged
     assert "warning" in capsys.readouterr().err
 
@@ -195,12 +195,12 @@ def test_background_reference_white_balance_falls_back():
 # ---------------------------------------------------------------------------
 
 def test_resolve_profile_override_wins():
-    label_data = {"photo_overrides": {"profile": "keep-bg"}, "material": "brass"}
+    label_data = {"photo_overrides": {"profile": "keep-bg"}, "attributes": "solid brass"}
     profiles_json = {"material_to_profile": {"brass": "true-color"}}
     assert st.resolve_profile(label_data, profiles_json) == "keep-bg"
 
 def test_resolve_profile_material_over_category():
-    label_data = {"material": "brass", "category": "Art"}
+    label_data = {"attributes": "solid brass object", "category": "Art"}
     profiles_json = {
         "material_to_profile": {"brass": "true-color"},
         "category_fallback": {"Art": "manual"},
@@ -219,3 +219,31 @@ def test_resolve_profile_default():
     label_data = {"category": "Unknown"}
     profiles_json = {"default_profile": "standard"}
     assert st.resolve_profile(label_data, profiles_json) == "standard"
+
+# ---------------------------------------------------------------------------
+# evaluate_mask_gate
+# ---------------------------------------------------------------------------
+
+def test_evaluate_mask_gate_no_rules():
+    assert st.evaluate_mask_gate({"occupancy_ratio": 0.99}, "standard", {}) is None
+
+def test_evaluate_mask_gate_skip_profile():
+    profiles_json = {"mask_gate": {"skip_gate_for_profiles": ["keep-bg"], "force_manual_if_any": [{"field": "suspicious_rect_mask", "op": "is_true"}]}}
+    assert st.evaluate_mask_gate({"suspicious_rect_mask": True}, "keep-bg", profiles_json) is None
+
+def test_evaluate_mask_gate_trips():
+    profiles_json = {"mask_gate": {"force_manual_if_any": [
+        {"field": "occupancy_ratio", "op": "gte", "value": 0.98},
+        {"field": "unique_alpha_values", "op": "lte", "value": 2}
+    ]}}
+    assert st.evaluate_mask_gate({"occupancy_ratio": 0.99}, "standard", profiles_json) == "occupancy_ratio"
+    assert st.evaluate_mask_gate({"occupancy_ratio": 0.50, "unique_alpha_values": 1}, "standard", profiles_json) == "unique_alpha_values"
+    assert st.evaluate_mask_gate({"occupancy_ratio": 0.50, "unique_alpha_values": 10}, "standard", profiles_json) is None
+
+def test_evaluate_mask_gate_unless_profile():
+    profiles_json = {"mask_gate": {"force_manual_if_any": [
+        {"field": "unique_alpha_values", "op": "lte", "value": 2, "unless_profile": "keep-bg"}
+    ]}}
+    assert st.evaluate_mask_gate({"unique_alpha_values": 1}, "keep-bg", profiles_json) is None
+    assert st.evaluate_mask_gate({"unique_alpha_values": 1}, "standard", profiles_json) == "unique_alpha_values"
+

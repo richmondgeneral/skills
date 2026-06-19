@@ -56,8 +56,8 @@ DEFAULT_LOGO = os.path.expanduser("~/workspace/richmondgeneral/brand/assets/rich
 # Per-item override helpers
 # ---------------------------------------------------------------------------
 
-def load_label_json(item_dir) -> Dict[str, Any]:
-    """Load label.json from item_dir.
+def load_item_metadata(item_dir) -> Dict[str, Any]:
+    """Load metadata (label.json) from item_dir.
     Returns {} on missing or invalid.
     """
     path = Path(item_dir) / OVERRIDE_FILE
@@ -96,6 +96,24 @@ def load_photo_profiles() -> Dict[str, Any]:
         return {}
 
 
+def infer_material(label_data: Dict[str, Any], profiles_json: Dict[str, Any]) -> Optional[str]:
+    search_fields = profiles_json.get("material_source", {}).get("search_fields", ["attributes", "product_name"])
+    
+    text_to_search = ""
+    for field in search_fields:
+        val = label_data.get(field)
+        if val and isinstance(val, str):
+            text_to_search += " " + val.lower()
+            
+    if not text_to_search:
+        return None
+        
+    for material in profiles_json.get("material_to_profile", {}).keys():
+        if material.lower() in text_to_search:
+            return material
+            
+    return None
+
 def resolve_profile(label_data: Dict[str, Any], profiles_json: Dict[str, Any]) -> str:
     if not profiles_json:
         return "standard"
@@ -104,7 +122,7 @@ def resolve_profile(label_data: Dict[str, Any], profiles_json: Dict[str, Any]) -
     if "profile" in overrides:
         return overrides["profile"]
     
-    material = label_data.get("material")
+    material = infer_material(label_data, profiles_json)
     if material and material in profiles_json.get("material_to_profile", {}):
         return profiles_json["material_to_profile"][material]
     
@@ -115,26 +133,62 @@ def resolve_profile(label_data: Dict[str, Any], profiles_json: Dict[str, Any]) -
     return profiles_json.get("default_profile", "standard")
 
 
+def evaluate_mask_gate(mask_quality: Dict[str, Any], profile: str, profiles_json: Dict[str, Any]) -> Optional[str]:
+    """Evaluate mask quality against gate rules. Returns trip reason if gated, else None."""
+    gate_rules = profiles_json.get("mask_gate", {})
+    if profile in gate_rules.get("skip_gate_for_profiles", []):
+        return None
+        
+    for rule in gate_rules.get("force_manual_if_any", []):
+        if "unless_profile" in rule and rule["unless_profile"] == profile:
+            continue
+            
+        field = rule.get("field")
+        op = rule.get("op")
+        val = mask_quality.get(field)
+        
+        if val is None:
+            continue
+            
+        if op == "is_true" and val:
+            return field
+        elif op == "gte" and val >= rule.get("value", float('inf')):
+            return field
+        elif op == "lte" and val <= rule.get("value", -float('inf')):
+            return field
+            
+    return None
+
+
 def apply_overrides(
     args: argparse.Namespace,
     profile_flags: Dict[str, Any],
     overrides: Dict[str, Any],
     parser: argparse.ArgumentParser,
+    sys_args: Optional[List[str]] = None
 ) -> List[str]:
     """Merge JSON overrides into already-parsed args; CLI-explicit values win.
 
     Defaults < profile_flags < photo_overrides < CLI explicit args.
     """
-    defaults = {a.dest: a.default for a in parser._actions if hasattr(a, "dest")}
     changed: List[str] = []
     
     combined = dict(profile_flags)
     combined.update(overrides)
     
+    if sys_args is None:
+        sys_args = sys.argv[1:]
+        
+    cli_args_set = set()
+    for arg in sys_args:
+        if arg.startswith("--"):
+            clean_arg = arg.lstrip("-").split("=")[0]
+            cli_args_set.add(clean_arg.replace("-", "_"))
+
     for json_key, (dest, coerce) in OVERRIDE_FIELDS.items():
         if json_key not in combined:
             continue
-        if getattr(args, dest, None) != defaults.get(dest):
+        if dest in cli_args_set:
             continue  # user set this explicitly on CLI — respect it
         try:
             setattr(args, dest, coerce(combined[json_key]))
@@ -394,7 +448,7 @@ def _run_batch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Non
         # Clone the parsed args so per-item overrides don't bleed between items
         item_args = argparse.Namespace(**vars(args))
         
-        label_data = load_label_json(item_dir)
+        label_data = load_item_metadata(item_dir)
         overrides = label_data.get("photo_overrides", {})
         notes = overrides.pop("notes", "")  # documentation-only; not passed to pipeline
         
@@ -435,18 +489,8 @@ def _run_batch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Non
             
             # Mask Gate Check
             tripped_gate = None
-            if mask_quality and profile not in profiles_json.get("mask_gate", {}).get("skip_gate_for_profiles", []):
-                gate_rules = profiles_json.get("mask_gate", {}).get("force_manual_if", {})
-                if gate_rules.get("rect_mask") and mask_quality.get("suspicious_rect_mask"):
-                    tripped_gate = "rect_mask"
-                elif "occupancy_gte" in gate_rules and mask_quality.get("occupancy_ratio", 0) >= gate_rules["occupancy_gte"]:
-                    tripped_gate = "occupancy"
-                elif "transparent_ratio_gte" in gate_rules and mask_quality.get("transparent_ratio", 0) >= gate_rules["transparent_ratio_gte"]:
-                    tripped_gate = "transparent_ratio"
-                elif "binary_alpha_and_not_keep_bg" in gate_rules:
-                    lte_val = gate_rules["binary_alpha_and_not_keep_bg"].get("unique_alpha_values_lte", 2)
-                    if mask_quality.get("unique_alpha_values", 999) <= lte_val:
-                        tripped_gate = "binary_alpha"
+            if mask_quality:
+                tripped_gate = evaluate_mask_gate(mask_quality, profile, profiles_json)
 
             if tripped_gate:
                 print(f"  \u26a0 {item_dir.name}  -> gate tripped ({tripped_gate}); sent to manual queue", file=sys.stderr)
@@ -584,7 +628,7 @@ def main() -> None:
     # Auto-load label.json from the input's parent directory.
     # JSON values only fill in what the CLI left at its default; explicit
     # flags always win.  Log applied overrides so the caller can audit them.
-    label_data = load_label_json(Path(args.input).parent)
+    label_data = load_item_metadata(Path(args.input).parent)
     overrides = label_data.get("photo_overrides", {})
     overrides.pop("notes", None)  # documentation-only key
     

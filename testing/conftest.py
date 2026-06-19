@@ -20,6 +20,7 @@ SKILL_DIRS = [
     "product-labeler/scripts",
     "photos-library/scripts",
     "item-model-core/lib",
+    "rg-reconcile/scripts",
 ]
 
 for skill_dir in SKILL_DIRS:

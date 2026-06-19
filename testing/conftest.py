@@ -5,6 +5,7 @@ from pathlib import Path
 # Add all skill script directories to Python path immediately
 # This must happen at top level so imports work during test collection
 SKILLS_ROOT = Path(__file__).parent.parent
+PLUGIN_SKILLS = SKILLS_ROOT / "plugins" / "richmondgeneral" / "skills"
 
 SKILL_DIRS = [
     "imessage-core/scripts",
@@ -17,10 +18,11 @@ SKILL_DIRS = [
     "square-crm/scripts",
     "rg-full-auto/scripts",
     "product-labeler/scripts",
-    "photos-library/scripts"
+    "photos-library/scripts",
+    "item-model-core/lib",
 ]
 
 for skill_dir in SKILL_DIRS:
-    path = SKILLS_ROOT / skill_dir
+    path = PLUGIN_SKILLS / skill_dir
     if path.exists():
         sys.path.insert(0, str(path))

@@ -148,13 +148,6 @@ rg -n "^name:|^description:|^metadata:|version:|author:|updated:" ${CLAUDE_PLUGI
 | `alpha-trader` | 2.0 | — |
 | `alpaca-market-data` | 1.0 | 2026-02-14 |
 
-### Deprecated
-
-| Skill | Superseded By |
-|-------|--------------|
-| `rg-inventory-legacy` | `rg-full-auto` |
-| `rg-new-item-legacy` | `rg-full-auto` |
-
 ## Maintenance Workflow
 
 1. Run metadata snapshot command.

@@ -236,6 +236,8 @@ Prerequisites: `~/.env` must have `REMOVEBG_API_KEY`. Monitor credits -- alert u
 
 ## Phase 1: Appraisal & Research
 
+Run `pricing_preflight.ensure_fresh_cache()` before reading any cached price.
+
 ### Step 1.0: View image for appraisal
 
 Compress on Mac (`sips -Z 1500`), transfer via `Filesystem:copy_file_user_to_claude`, view with `view` tool.

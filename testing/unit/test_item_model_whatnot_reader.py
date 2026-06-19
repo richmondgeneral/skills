@@ -29,8 +29,10 @@ def test_prod_schema_price_parses_and_sold_is_none(tmp_path):
     assert o16.price == 7.0
     assert o16.sold is None
 
-    # Absent SKU -> present False.
-    assert observe_whatnot("RG-9999", index).present is False
+    # Absent SKU -> None: the CSV is positive-only (it can affirm a listing, not deny
+    # one — items listed via the Whatnot UI never appear in the import CSV), so absence
+    # yields no observation rather than a false present=False.
+    assert observe_whatnot("RG-9999", index) is None
 
 
 def test_status_column_present_sets_bool_sold(tmp_path):

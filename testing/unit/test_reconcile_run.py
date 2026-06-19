@@ -48,3 +48,15 @@ def test_heal_guidance_routes_to_right_tool():
 
     other = heal_guidance({"sku": "RG-0005", "channel": "ebay", "field": "title"})
     assert "RG-0005" in other and "ebay" in other and "title" in other
+
+
+def test_whatnot_listed_but_absent_from_csv_is_not_flagged(tmp_path):
+    # Regression: the Whatnot CSV is positive-only. An item the page lists on Whatnot but
+    # that isn't in the import CSV (listed directly via the Whatnot UI — e.g. RG-0022/RG-0027)
+    # must NOT produce a presence finding: "not in the CSV" != "absent from Whatnot".
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    _item(items_dir, "RG-0022", "32.00",
+          label_extra={"channels": {"whatnot": {"status": "listed"}}})
+    report = run_reconcile(items_dir=str(items_dir), square_index={}, whatnot_index={})
+    assert all(f["field"] != "presence" for f in report["findings"])
+    assert report["summary"] == {"critical": 0, "warning": 0, "info": 0}

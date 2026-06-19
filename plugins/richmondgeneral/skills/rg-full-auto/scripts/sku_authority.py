@@ -10,7 +10,9 @@ Design: docs/plans/2026-06-19-sku-allocation-design.md
 """
 from __future__ import annotations
 
+import os
 import re
+import subprocess
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -113,6 +115,39 @@ def _is_version_conflict(errors) -> bool:
     return False
 
 
+def _resolve_square_token() -> Optional[str]:
+    """Resolve the Square access token with NO cross-skill import, so this works
+    standalone, from the orchestrator, and over the osascript bridge's bare shell.
+    Order: env (SQUARE_ACCESS_TOKEN/SQUARE_TOKEN) -> macOS Keychain -> workspace .env."""
+    for name in ("SQUARE_ACCESS_TOKEN", "SQUARE_TOKEN"):
+        v = os.environ.get(name)
+        if v:
+            return v
+    try:
+        r = subprocess.run(
+            ["security", "find-generic-password", "-a", os.environ.get("USER", ""),
+             "-s", "SQUARE_ACCESS_TOKEN", "-w"],
+            capture_output=True, text=True,
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip()
+    except Exception:  # noqa: BLE001
+        pass
+    env_path = Path.home() / "workspace" / "richmondgeneral" / ".env"
+    try:
+        if env_path.exists():
+            for raw in env_path.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                if key.strip() in ("SQUARE_ACCESS_TOKEN", "SQUARE_TOKEN"):
+                    return val.strip().strip('"').strip("'") or None
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
 class SquareCounterStore:
     """CounterStore backed by the live Square catalog via the official SDK.
 
@@ -128,8 +163,7 @@ class SquareCounterStore:
         if self._client is None:
             try:
                 from square.client import Square
-                from item_model.instance import resolve_square_token
-                token = resolve_square_token()
+                token = _resolve_square_token()
                 if not token:
                     raise SquareUnavailable("no Square access token resolved")
                 self._client = Square(token=token)

@@ -203,3 +203,18 @@ def test_process_new_item_has_no_cwd_glob():
     import process_new_item
     src = pathlib.Path(process_new_item.__file__).read_text()
     assert "glob('RG-*')" not in src and 'glob("RG-*")' not in src
+
+
+def test_resolve_square_token_prefers_env(monkeypatch):
+    from sku_authority import _resolve_square_token
+    monkeypatch.setenv("SQUARE_ACCESS_TOKEN", "tok-abc")
+    assert _resolve_square_token() == "tok-abc"
+
+
+def test_sku_authority_has_no_item_model_dependency():
+    # Token resolution must be self-contained: standalone / osascript-bridge runs
+    # cannot import item_model (it is only on sys.path under tests via conftest).
+    # This locks the regression the live integration check surfaced.
+    import inspect
+    import sku_authority
+    assert "item_model" not in inspect.getsource(sku_authority)

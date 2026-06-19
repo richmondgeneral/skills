@@ -82,8 +82,18 @@ def test_empty_listed_on_no_presence_finding():
     assert all(f.field != "presence" for f in diff_item(page, obs))
 
 
-def test_listed_channel_with_no_observation_is_flagged():
+def test_listed_channel_with_no_observation_is_not_flagged():
+    # No adapter observed EBAY (we have no ebay reader), so "not checked" must NOT be
+    # reported as "absent" — otherwise every marketplace/ebay-listed item flags forever.
     page = _page(listed_on=[Channel.EBAY])
     obs = [ChannelObservation(Channel.SQUARE, present=True, price=10.0, sold=False)]
-    assert any(f.field == "presence" and f.channel is Channel.EBAY
-               for f in diff_item(page, obs))
+    assert all(f.field != "presence" for f in diff_item(page, obs))
+
+
+def test_listed_channel_observed_absent_is_flagged():
+    # We DO have a whatnot adapter; if it's listed there but the adapter sees it absent,
+    # that's real, verifiable drift → flag it.
+    page = _page(listed_on=[Channel.WHATNOT])
+    obs = [ChannelObservation(Channel.WHATNOT, present=False)]
+    presence = [f for f in diff_item(page, obs) if f.field == "presence"]
+    assert len(presence) == 1 and presence[0].channel is Channel.WHATNOT

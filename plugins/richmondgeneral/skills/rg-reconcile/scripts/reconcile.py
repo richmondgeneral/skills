@@ -42,12 +42,27 @@ def run_reconcile(items_dir: str, square_index: Dict, whatnot_index: Dict) -> di
     return {"findings": findings, "summary": summary, "items_scanned": len(records)}
 
 
+def heal_guidance(finding: dict) -> str:
+    sku, ch = finding["sku"], finding["channel"]
+    field = finding["field"]
+    if field == "price":
+        return f"{sku}: price drift on {ch} — run `rg-set-price {sku} <reference>` to push, or record the {ch} price as an intended override on the page."
+    if field == "sold_state":
+        return f"{sku}: sold-state conflict on {ch} — run `rg-item-mark-sold {sku}` (propagates sold across channels + deletes the payment link)."
+    if field == "presence":
+        return f"{sku}: page lists {ch} but it wasn't confirmed there — verify the {ch} listing."
+    return f"{sku}: {field} drift on {ch} — review."
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Read-only drift reconcile (pages vs channels).")
     ap.add_argument("--items-dir", default=os.environ.get(
         "RG_ITEMS_DIR", str(Path.home() / "workspace" / "richmondgeneral" / "items")))
     ap.add_argument("--whatnot-csv", default=None)
     ap.add_argument("--json-out", default=None)
+    ap.add_argument("--heal", action="store_true",
+                    help="Safe page-side heal: (re)write catalog_state.json and print "
+                         "per-finding guidance. No production channel writes.")
     args = ap.parse_args(argv)
 
     square_index = build_square_index()
@@ -75,6 +90,18 @@ def main(argv=None):
     for f in report["findings"]:
         print(f"  [{f['severity'].upper():8}] {f['sku']} {f['field']} on {f['channel']}: {f['message']}")
     print(f"Report: {out}")
+
+    if args.heal:
+        # SAFE, page-side only: catalog_state.json was already (re)written above;
+        # here we just announce it and route each finding to the right confirmed
+        # tool. No production channel writes happen — guidance is print-only.
+        print("HEAL (safe, page-side — no channel writes)")
+        print(f"  Snapshot confirmed: {state_path}")
+        if not report["findings"]:
+            print("  No findings — channels match the pages. Nothing to heal.")
+        for f in report["findings"]:
+            print(f"  {heal_guidance(f)}")
+
     return 0
 
 

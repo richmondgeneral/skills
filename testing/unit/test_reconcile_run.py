@@ -1,5 +1,5 @@
 import json
-from reconcile import run_reconcile
+from reconcile import run_reconcile, heal_guidance
 
 
 def _item(items_dir, sku, price, status=None, label_extra=None):
@@ -31,3 +31,20 @@ def test_run_reports_price_drift_and_sold_conflict(tmp_path):
     assert report["summary"]["critical"] == 1
     assert report["summary"]["warning"] == 1
     assert report["items_scanned"] == 2
+
+
+def test_heal_guidance_routes_to_right_tool():
+    price = heal_guidance({"sku": "RG-0009", "channel": "square", "field": "price"})
+    assert "RG-0009" in price and "square" in price
+    assert "rg-set-price" in price
+
+    sold = heal_guidance({"sku": "RG-0003", "channel": "square", "field": "sold_state"})
+    assert "RG-0003" in sold and "square" in sold
+    assert "rg-item-mark-sold" in sold
+
+    presence = heal_guidance({"sku": "RG-0007", "channel": "whatnot", "field": "presence"})
+    assert "RG-0007" in presence and "whatnot" in presence
+    assert "verify" in presence
+
+    other = heal_guidance({"sku": "RG-0005", "channel": "ebay", "field": "title"})
+    assert "RG-0005" in other and "ebay" in other and "title" in other

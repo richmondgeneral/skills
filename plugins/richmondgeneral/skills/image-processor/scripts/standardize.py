@@ -21,6 +21,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -31,6 +32,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROCESS_PY = os.path.join(SCRIPT_DIR, "process.py")
 
 OVERRIDE_FILE = "label.json"
+PHOTO_PROFILES_FILE = os.path.expanduser("~/workspace/richmondgeneral/ops/docs/photo-profiles.json")
 
 # Maps photo_overrides keys → (argparse dest, coerce fn).
 # Fields listed here are the only ones the JSON file may influence.
@@ -54,8 +56,8 @@ DEFAULT_LOGO = os.path.expanduser("~/workspace/richmondgeneral/brand/assets/rich
 # Per-item override helpers
 # ---------------------------------------------------------------------------
 
-def load_item_overrides(item_dir) -> Dict[str, Any]:
-    """Load the `photo_overrides` block from label.json in item_dir.
+def load_label_json(item_dir) -> Dict[str, Any]:
+    """Load label.json from item_dir.
     Returns {} on missing or invalid.
     """
     path = Path(item_dir) / OVERRIDE_FILE
@@ -63,37 +65,83 @@ def load_item_overrides(item_dir) -> Dict[str, Any]:
         return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        overrides = data.get("photo_overrides", {})
-        return overrides if isinstance(overrides, dict) else {}
+        return data if isinstance(data, dict) else {}
     except Exception as exc:
         print(f"warning: {path}: {exc}", file=sys.stderr)
         return {}
 
 
+def update_label_json_status(item_dir, status: str):
+    path = Path(item_dir) / OVERRIDE_FILE
+    if not path.exists():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if "photo_overrides" not in data:
+            data["photo_overrides"] = {}
+        data["photo_overrides"]["status"] = status
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except Exception as exc:
+        print(f"warning: failed to update {path}: {exc}", file=sys.stderr)
+
+
+def load_photo_profiles() -> Dict[str, Any]:
+    path = Path(PHOTO_PROFILES_FILE)
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"warning: {path}: {exc}", file=sys.stderr)
+        return {}
+
+
+def resolve_profile(label_data: Dict[str, Any], profiles_json: Dict[str, Any]) -> str:
+    if not profiles_json:
+        return "standard"
+    
+    overrides = label_data.get("photo_overrides", {})
+    if "profile" in overrides:
+        return overrides["profile"]
+    
+    material = label_data.get("material")
+    if material and material in profiles_json.get("material_to_profile", {}):
+        return profiles_json["material_to_profile"][material]
+    
+    category = label_data.get("category")
+    if category and category in profiles_json.get("category_fallback", {}):
+        return profiles_json["category_fallback"][category]
+    
+    return profiles_json.get("default_profile", "standard")
+
+
 def apply_overrides(
     args: argparse.Namespace,
+    profile_flags: Dict[str, Any],
     overrides: Dict[str, Any],
     parser: argparse.ArgumentParser,
 ) -> List[str]:
     """Merge JSON overrides into already-parsed args; CLI-explicit values win.
 
-    For every field in OVERRIDE_FIELDS: if the arg's current value still
-    matches the argparse default (i.e. the user did not set it on the CLI),
-    replace it with the JSON value.  Returns the list of field names changed.
+    Defaults < profile_flags < photo_overrides < CLI explicit args.
     """
     defaults = {a.dest: a.default for a in parser._actions if hasattr(a, "dest")}
     changed: List[str] = []
+    
+    combined = dict(profile_flags)
+    combined.update(overrides)
+    
     for json_key, (dest, coerce) in OVERRIDE_FIELDS.items():
-        if json_key not in overrides:
+        if json_key not in combined:
             continue
         if getattr(args, dest, None) != defaults.get(dest):
             continue  # user set this explicitly on CLI — respect it
         try:
-            setattr(args, dest, coerce(overrides[json_key]))
+            setattr(args, dest, coerce(combined[json_key]))
             changed.append(json_key)
         except (ValueError, TypeError):
             print(
-                f"warning: {OVERRIDE_FILE}: invalid value for '{json_key}'",
+                f"warning: invalid value for '{json_key}'",
                 file=sys.stderr,
             )
     return changed
@@ -226,22 +274,42 @@ def apply_watermark(img, logo_path=DEFAULT_LOGO, opacity=0.45, scale=0.16, margi
     return base
 
 
-def remove_background(src, dst, model=None, allow_rect_mask=False):
+def remove_background(src, dst, model=None, allow_rect_mask=False) -> Optional[Dict[str, Any]]:
     """Reuse process.py's routing/fallbacks for the transparent cutout (same interpreter).
-    Surfaces process.py's own error (rect-mask / credits / etc.) instead of swallowing it."""
-    cmd = [sys.executable, PROCESS_PY, src, "-o", dst, "--task", "remove-bg"]
+    Surfaces process.py's own error (rect-mask / credits / etc.) instead of swallowing it.
+    Returns mask_quality dictionary if available."""
+    cmd = [sys.executable, PROCESS_PY, src, "-o", dst, "--task", "remove-bg", "--json"]
     if model:
         cmd += ["--model", model]
     if allow_rect_mask:
         cmd += ["--allow-rect-mask"]
     r = subprocess.run(cmd, capture_output=True, text=True, cwd=SCRIPT_DIR)
+    
+    mask_quality = None
+    if r.stdout:
+        try:
+            data = json.loads(r.stdout)
+            mask_quality = data.get("metadata", {}).get("mask_quality")
+        except Exception:
+            pass
+            
     if r.returncode != 0:
-        raise RuntimeError("background removal failed:\n" + (r.stderr.strip() or r.stdout.strip()))
+        err_msg = r.stderr.strip() or r.stdout.strip()
+        try:
+            data = json.loads(r.stdout)
+            if "error" in data:
+                err_msg = data["error"]
+        except Exception:
+            pass
+        raise RuntimeError("background removal failed:\n" + err_msg)
+        
+    return mask_quality
 
 
 def standardize(input_path, output_path, do_color=True, do_bg=True, fill=0.85, size=2000,
                 shadow=False, copyright_text=None, sku=None, watermark=False,
                 watermark_logo=DEFAULT_LOGO, wb="background", model=None, allow_rect_mask=False):
+    mask_quality = None
     with tempfile.TemporaryDirectory() as td:
         cur = input_path
         if do_color:
@@ -250,7 +318,7 @@ def standardize(input_path, output_path, do_color=True, do_bg=True, fill=0.85, s
             cur = cc
         if do_bg:
             transp = os.path.join(td, "transp.png")
-            remove_background(cur, transp, model=model, allow_rect_mask=allow_rect_mask)
+            mask_quality = remove_background(cur, transp, model=model, allow_rect_mask=allow_rect_mask)
             cur = transp
             
         final_img = square_pad_centered(Image.open(cur), fill=fill, size=size, shadow=shadow)
@@ -266,7 +334,7 @@ def standardize(input_path, output_path, do_color=True, do_bg=True, fill=0.85, s
             metadata.add_text("Title", sku)
             
         final_img.save(output_path, "PNG", pnginfo=metadata)
-    return output_path
+    return output_path, mask_quality
 
 
 # ---------------------------------------------------------------------------
@@ -305,6 +373,8 @@ def _run_batch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Non
     suffix: str = args.suffix
     results: List[Dict[str, Any]] = []
 
+    profiles_json = load_photo_profiles()
+
     item_dirs = sorted(d for d in items_dir.iterdir() if d.is_dir())
     if not item_dirs:
         print("No item subdirectories found.", file=sys.stderr)
@@ -323,17 +393,31 @@ def _run_batch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Non
 
         # Clone the parsed args so per-item overrides don't bleed between items
         item_args = argparse.Namespace(**vars(args))
-        overrides = load_item_overrides(item_dir)
+        
+        label_data = load_label_json(item_dir)
+        overrides = label_data.get("photo_overrides", {})
         notes = overrides.pop("notes", "")  # documentation-only; not passed to pipeline
-        changed = apply_overrides(item_args, overrides, parser) if overrides else []
+        
+        profile = resolve_profile(label_data, profiles_json)
+        profile_config = profiles_json.get("profiles", {}).get(profile, {})
+        profile_flags = profile_config.get("flags", {})
+        
+        changed = apply_overrides(item_args, profile_flags, overrides, parser) if (overrides or profile_flags) else []
         if changed and args.verbose:
-            print(f"  [{item_dir.name}] overrides: {', '.join(changed)}", file=sys.stderr)
+            print(f"  [{item_dir.name}] overrides (profile: {profile}): {', '.join(changed)}", file=sys.stderr)
+
+        # Skip logic if manual
+        if profile_config.get("ship") is False:
+            print(f"  \u26a0 {item_dir.name}  -> skipped (profile: {profile})")
+            update_label_json_status(item_dir, "needs_manual")
+            results.append({"item": item_dir.name, "status": "skipped", "reason": f"profile_{profile}"})
+            continue
 
         # Default the embedded SKU to the item directory name (e.g. "RG-0001")
         effective_sku = item_args.sku or item_dir.name
 
         try:
-            standardize(
+            out_path, mask_quality = standardize(
                 str(hero), str(output),
                 do_color=not item_args.no_color,
                 do_bg=not item_args.no_bg,
@@ -348,6 +432,36 @@ def _run_batch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Non
                 allow_rect_mask=item_args.allow_rect_mask,
                 wb=item_args.wb,
             )
+            
+            # Mask Gate Check
+            tripped_gate = None
+            if mask_quality and profile not in profiles_json.get("mask_gate", {}).get("skip_gate_for_profiles", []):
+                gate_rules = profiles_json.get("mask_gate", {}).get("force_manual_if", {})
+                if gate_rules.get("rect_mask") and mask_quality.get("suspicious_rect_mask"):
+                    tripped_gate = "rect_mask"
+                elif "occupancy_gte" in gate_rules and mask_quality.get("occupancy_ratio", 0) >= gate_rules["occupancy_gte"]:
+                    tripped_gate = "occupancy"
+                elif "transparent_ratio_gte" in gate_rules and mask_quality.get("transparent_ratio", 0) >= gate_rules["transparent_ratio_gte"]:
+                    tripped_gate = "transparent_ratio"
+                elif "binary_alpha_and_not_keep_bg" in gate_rules:
+                    lte_val = gate_rules["binary_alpha_and_not_keep_bg"].get("unique_alpha_values_lte", 2)
+                    if mask_quality.get("unique_alpha_values", 999) <= lte_val:
+                        tripped_gate = "binary_alpha"
+
+            if tripped_gate:
+                print(f"  \u26a0 {item_dir.name}  -> gate tripped ({tripped_gate}); sent to manual queue", file=sys.stderr)
+                update_label_json_status(item_dir, "needs_manual")
+                
+                # Append to queue
+                queue_path = os.path.expanduser("~/workspace/richmondgeneral/" + profiles_json.get("manual_queue", {}).get("report_path", "ops/reports/photo-manual-queue.jsonl"))
+                os.makedirs(os.path.dirname(queue_path), exist_ok=True)
+                with open(queue_path, "a", encoding="utf-8") as f:
+                    ts = datetime.datetime.utcnow().isoformat() + "Z"
+                    f.write(json.dumps({"sku": effective_sku, "reason": f"gate_{tripped_gate}", "src": str(hero), "ts": ts}) + "\n")
+                    
+                results.append({"item": item_dir.name, "status": "needs_manual", "reason": f"gate_{tripped_gate}", "output": str(output)})
+                continue
+
             entry: Dict[str, Any] = {"item": item_dir.name, "status": "ok",
                                      "output": str(output)}
             if notes:
@@ -467,20 +581,26 @@ def main() -> None:
     if not args.output:
         p.error("-o/--output is required in single-image mode")
 
-    # Auto-load standardize.json from the input's parent directory.
+    # Auto-load label.json from the input's parent directory.
     # JSON values only fill in what the CLI left at its default; explicit
     # flags always win.  Log applied overrides so the caller can audit them.
-    overrides = load_item_overrides(Path(args.input).parent)
+    label_data = load_label_json(Path(args.input).parent)
+    overrides = label_data.get("photo_overrides", {})
     overrides.pop("notes", None)  # documentation-only key
-    if overrides:
-        changed = apply_overrides(args, overrides, p)
+    
+    profiles_json = load_photo_profiles()
+    profile = resolve_profile(label_data, profiles_json)
+    profile_flags = profiles_json.get("profiles", {}).get(profile, {}).get("flags", {})
+    
+    if overrides or profile_flags:
+        changed = apply_overrides(args, profile_flags, overrides, p)
         if changed:
             print(
-                f"info: applied overrides from {OVERRIDE_FILE}: {', '.join(changed)}",
+                f"info: applied overrides (profile: {profile}): {', '.join(changed)}",
                 file=sys.stderr,
             )
 
-    out = standardize(
+    out, _ = standardize(
         args.input, args.output,
         do_color=not args.no_color,
         do_bg=not args.no_bg,

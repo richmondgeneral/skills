@@ -1,11 +1,9 @@
 import os
 import pydantic
-import asyncio
-import json
 from typing import List, Optional, Tuple
 
-from google.antigravity import Agent, LocalAgentConfig
-from google.antigravity.types import Image
+from google import genai
+from google.genai import types
 
 class Evaluation(pydantic.BaseModel):
     candidate_index: int
@@ -24,8 +22,10 @@ class AgentJudge:
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is required for the AgentJudge.")
         
-        # Configure the agent
-        prompt = """You are an expert catalog reviewer. I have provided an ORIGINAL product photo, followed by CANDIDATE photos.
+        self.client = genai.Client(api_key=self.api_key)
+        self.model = "gemini-2.5-pro"
+        
+        self.prompt = """You are an expert catalog reviewer. I have provided an ORIGINAL product photo, followed by CANDIDATE photos.
 The candidates are supposed to have the background removed, but the generative model sometimes hallucinates.
 
 Your task is to evaluate each CANDIDATE against the ORIGINAL. 
@@ -37,46 +37,39 @@ CRITICAL FAILURE CRITERIA:
 You must be extremely strict. If a candidate alters the object's physical appearance or adds fake text, it MUST be rejected.
 The best candidate index should be 0-indexed relative to the candidate images provided. If no candidates are acceptable, return null.
 """
-        os.environ["GEMINI_API_KEY"] = self.api_key # Antigravity will pick this up automatically
-        self.config = LocalAgentConfig(
-            model="gemini-2.5-pro",
-            system_instructions=prompt,
-            response_schema=JudgeResult,
-        )
 
     def evaluate_candidates(self, original_path: str, candidate_paths: List[str]) -> Tuple[Optional[int], str]:
-        """
-        Evaluates candidate images against the original.
-        Returns (best_index, reasoning_log). best_index is 0-indexed relative to candidate_paths list.
-        """
-        # Antigravity agents are async, so we wrap the call.
-        return asyncio.run(self._evaluate_async(original_path, candidate_paths))
+        from PIL import Image
         
-    async def _evaluate_async(self, original_path: str, candidate_paths: List[str]) -> Tuple[Optional[int], str]:
         payload = ["ORIGINAL:"]
-        payload.append(Image.from_file(original_path))
+        payload.append(Image.open(original_path))
         
         for i, cand_path in enumerate(candidate_paths):
             payload.append(f"CANDIDATE {i}:")
-            payload.append(Image.from_file(cand_path))
+            payload.append(Image.open(cand_path))
             
-        async with Agent(self.config) as agent:
-            try:
-                response = await agent.chat(payload)
-                data = await response.structured_output()
+        try:
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=payload,
+                config=types.GenerateContentConfig(
+                    system_instruction=self.prompt,
+                    response_mime_type="application/json",
+                    response_schema=JudgeResult,
+                    temperature=0.1,
+                )
+            )
+            
+            data = response.parsed
+            if not data:
+                return None, "Failed to parse structured output."
                 
-                if not data:
-                    return None, "Failed to parse structured output."
+            reasoning = data.model_dump_json(indent=2)
+            best_idx = data.best_candidate_index
+            
+            if best_idx is not None and (best_idx < 0 or best_idx >= len(candidate_paths)):
+                best_idx = None
                 
-                # data is a dict because response.structured_output() returns a dict, 
-                # so we can parse it into our pydantic model to be safe or just use it directly.
-                parsed_data = JudgeResult.model_validate(data)
-                reasoning = parsed_data.model_dump_json(indent=2)
-                best_idx = parsed_data.best_candidate_index
-                
-                if best_idx is not None and (best_idx < 0 or best_idx >= len(candidate_paths)):
-                    best_idx = None
-                    
-                return best_idx, reasoning
-            except Exception as e:
-                return None, f"Judge failed: {str(e)}"
+            return best_idx, reasoning
+        except Exception as e:
+            return None, f"Judge failed: {str(e)}"

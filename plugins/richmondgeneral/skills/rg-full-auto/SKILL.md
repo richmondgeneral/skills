@@ -10,10 +10,14 @@ description: >
   "add to whatnot". NOT for simple edits to existing items -- use rg-item-update for price
   changes, description tweaks, or adding images.
 metadata:
-  version: "6.0"
+  version: "6.1"
   author: scottybe
-  updated: "2026-05-14"
+  updated: "2026-06-18"
   changelog: |
+    v6.1 - Fix: generated item-card .sku-badge now has z-index:2 so the SKU
+    chip stays above the hero image. Raw/un-removed-background heroes were
+    painting over the badge (first seen on RG-0021). Mirrors the items-repo fix.
+
     v6.0 - Autonomous batch mode is now the default.
     - process_batch.py orchestrates multi-item runs end-to-end
     - audit_log.py captures every decision + correction + review timing

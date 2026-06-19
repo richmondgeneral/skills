@@ -53,3 +53,13 @@ def test_color_correct_preserves_transparency():
     assert out.mode == "RGBA"
     assert out.getpixel((0, 0))[3] == 0      # transparent border stays transparent
     assert out.getpixel((20, 20))[3] == 255  # object stays opaque
+
+
+def test_apply_watermark_composites_bottom_right(tmp_path):
+    logo = tmp_path / "logo.png"
+    Image.new("RGBA", (50, 50), (255, 0, 0, 255)).save(logo)
+    base = Image.new("RGBA", (200, 200), (0, 0, 0, 0))
+    out = st.apply_watermark(base, logo_path=str(logo), opacity=1.0, scale=0.2, margin=0.0)
+    assert out.size == (200, 200)
+    assert out.getpixel((198, 198))[3] > 0   # watermark landed bottom-right
+    assert out.getpixel((0, 0))[3] == 0       # top-left untouched

@@ -2,10 +2,24 @@
 name: image-processor
 description: Unified image processing with background removal, generation, editing, listing-photo standardization, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "standardize listing photos", "make photos professional/catalog-quality", "square crop / center / color-correct photo", "transparent hero", "photos library", "get from photos", or when rg-full-auto needs image processing.
 metadata:
-  version: "1.8"
+  version: "1.9"
   author: scottybe
   updated: "2026-06-19"
   changelog: |
+    v1.9 - Standardizer premium polish (gallery-tier pipeline):
+    - --fill (default 0.85): object's longest side fills a fixed fraction of the
+      canvas on every item -> uniform storefront grid (replaced the raw margin).
+    - --shadow: subtle, SIZE-PROPORTIONAL soft drop shadow (grounds the cutout so it
+      isn't a floating sticker; blur/offset scale with the canvas, not a fixed 10px).
+    - --copyright / --sku: embed provenance in PNG text chunks; GPS/EXIF already
+      dropped on save (privacy). Framed as attribution/anti-theft, not an SEO boost.
+    - --watermark / --watermark-logo: composite the RG logo bottom-right for SOCIAL
+      share variants only (NOT the eBay/Square hero — eBay restricts added artwork).
+      Canonical logo saved to brand/assets/richmond-general-logo.{png,jpg}.
+    - router.py: --model now actually restricts to the requested model (removebg was
+      silently ignored by the quality-score sort before).
+    - --straighten remains a documented no-op (auto-deskew needs opencv, absent).
+
     v1.8 - Listing photo standardizer (RG public-photo SOP enforcement):
     - standardize.py turns a raw documentation photo into a catalog-quality PUBLIC
       image per ops/docs/RG-listing-SOP.md: color-correct (gray-world white balance
@@ -117,12 +131,23 @@ that makes every public photo look cohesive:
 - **Color-corrected** toward real-life color (gray-world white balance + mild auto-contrast — undoes
   the intake area's lighting cast)
 - **Background removed**, **hero always transparent** (reuses `process.py` routing/fallbacks)
-- **Square 1:1**, object **centered** on a transparent canvas with margin, resized
+- **Standardized scale** — `--fill 0.85` makes the object's longest side fill the same fraction of the
+  canvas on every item, so the storefront grid looks uniform
+- **Grounding** — `--shadow` bakes a subtle, size-proportional soft drop shadow so the cutout isn't a
+  "floating sticker" (assumes a light display surface — your card/Square are light)
+- **Privacy + provenance** — GPS/EXIF is dropped automatically; `--copyright "Richmond General"` and
+  `--sku RG-XXXX` embed provenance in PNG text chunks (attribution/anti-theft, not an SEO boost)
+- **Brand watermark** — `--watermark` composites the RG logo (`brand/assets/richmond-general-logo.png`)
+  bottom-right for **SOCIAL/share variants only** (FB/Pinterest) — NOT the eBay/Square hero (eBay
+  restricts added artwork on the primary image)
 - **Honesty preserved** — color + geometry ONLY; never edits content, so chips/crazing/wear stay visible
 
 ```bash
-# Full pipeline (color -> bg-remove -> square 1:1 centered transparent):
-uv run python scripts/standardize.py raw.jpg -o public-hero.png --size 2000
+# Full public hero (color -> bg-remove -> square 1:1 @85% fill -> grounded -> provenance):
+uv run python scripts/standardize.py raw.jpg -o public-hero.png --size 2000 --shadow \
+    --copyright "Richmond General" --sku RG-0031
+# Social-share variant (adds the watermark):
+uv run python scripts/standardize.py raw.jpg -o social.png --shadow --watermark --sku RG-0031
 # Re-square an already-transparent hero with no API call:
 uv run python scripts/standardize.py items/RG-0028/hero.png -o hero-square.png --no-bg
 # Cleaner cutout / cluttered fallback:
@@ -133,7 +158,8 @@ uv run python scripts/standardize.py raw.jpg -o out.png --allow-rect-mask     # 
 Apply only to the **curated public subset**; the raw archive (Photos library, tagged by SKU) and the
 `items/RG-XXXX/` originals stay untouched (input → `--output`). `--straighten` is a documented no-op
 (reliable auto-deskew needs opencv, which isn't installed — shoot straight; the square crop never rotates).
-Clean single-object shots cut out best; multi-object layouts produce rough masks.
+Clean single-object shots cut out best; multi-object layouts produce rough masks. The canonical logo
+lives at `brand/assets/richmond-general-logo.{png,jpg}` (transparent PNG + original).
 
 ## Quick Start
 

@@ -26,6 +26,7 @@ from PIL.PngImagePlugin import PngInfo
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROCESS_PY = os.path.join(SCRIPT_DIR, "process.py")
+DEFAULT_LOGO = os.path.expanduser("~/workspace/richmondgeneral/brand/assets/richmond-general-logo.png")
 
 
 def _split_alpha(img):
@@ -86,20 +87,37 @@ def square_pad_centered(img, fill=0.85, size=2000, shadow=False, bg=(0, 0, 0, 0)
     paste_x = (side - w) // 2
     paste_y = (side - h) // 2
     
-    # Apply grounding shadow if requested
+    # Apply grounding shadow if requested (blur/offset scale with size so it reads the
+    # same on a 400px and a 4000px source — a fixed 10px blur vanishes on big objects).
     if shadow:
-        # 40% opacity shadow, blurred
+        blur = max(6, int(side * 0.012))
+        drop = max(4, int(side * 0.02))
         shadow_mask = obj.getchannel("A").point(lambda a: int(a * 0.4))
         shadow_img = Image.new("RGBA", obj.size, (0, 0, 0, 0))
         shadow_img.putalpha(shadow_mask)
-        shadow_img = shadow_img.filter(ImageFilter.GaussianBlur(10))
-        # Drop it 15 pixels downwards
-        canvas.paste(shadow_img, (paste_x, paste_y + 15), shadow_img)
+        shadow_img = shadow_img.filter(ImageFilter.GaussianBlur(blur))
+        canvas.paste(shadow_img, (paste_x, paste_y + drop), shadow_img)
 
     canvas.paste(obj, (paste_x, paste_y), obj)
     if size and side != size:
         canvas = canvas.resize((size, size), Image.LANCZOS)
     return canvas
+
+
+def apply_watermark(img, logo_path=DEFAULT_LOGO, opacity=0.45, scale=0.16, margin=0.03):
+    """Composite a subtle, semi-transparent logo into the bottom-right corner.
+
+    For SOCIAL / share variants (Facebook, Pinterest, Marketplace) — NOT the eBay or
+    Square catalog hero, where added artwork on the primary image hurts listing quality.
+    """
+    base = img.convert("RGBA")
+    logo = Image.open(logo_path).convert("RGBA")
+    target_w = max(1, int(base.width * scale))
+    logo = logo.resize((target_w, max(1, round(logo.height * target_w / logo.width))), Image.LANCZOS)
+    logo.putalpha(logo.getchannel("A").point(lambda v: int(v * opacity)))
+    m = int(base.width * margin)
+    base.alpha_composite(logo, (base.width - logo.width - m, base.height - logo.height - m))
+    return base
 
 
 def remove_background(src, dst, model=None, allow_rect_mask=False):
@@ -116,7 +134,8 @@ def remove_background(src, dst, model=None, allow_rect_mask=False):
 
 
 def standardize(input_path, output_path, do_color=True, do_bg=True, fill=0.85, size=2000,
-                shadow=False, copyright_text=None, sku=None, model=None, allow_rect_mask=False):
+                shadow=False, copyright_text=None, sku=None, watermark=False,
+                watermark_logo=DEFAULT_LOGO, model=None, allow_rect_mask=False):
     with tempfile.TemporaryDirectory() as td:
         cur = input_path
         if do_color:
@@ -129,7 +148,9 @@ def standardize(input_path, output_path, do_color=True, do_bg=True, fill=0.85, s
             cur = transp
             
         final_img = square_pad_centered(Image.open(cur), fill=fill, size=size, shadow=shadow)
-        
+        if watermark:
+            final_img = apply_watermark(final_img, logo_path=watermark_logo)
+
         # PIL drops GPS and device EXIF automatically when saving without `exif` kwarg.
         # We explicitly inject our provenance metadata here.
         metadata = PngInfo()
@@ -152,6 +173,9 @@ def main():
     p.add_argument("--shadow", action="store_true", help="add a grounding drop shadow")
     p.add_argument("--copyright", type=str, help="embed copyright metadata (e.g. 'Richmond General')")
     p.add_argument("--sku", type=str, help="embed SKU metadata")
+    p.add_argument("--watermark", action="store_true",
+                   help="composite the RG logo bottom-right (SOCIAL/share variant — NOT the eBay/Square hero)")
+    p.add_argument("--watermark-logo", default=DEFAULT_LOGO, help="logo PNG for --watermark")
     p.add_argument("--size", type=int, default=2000, help="output square side in px (0 = keep native)")
     p.add_argument("--model", choices=["nano-banana", "gemini25", "removebg", "auto"],
                    help="bg-removal model (default auto; removebg is best for clean cutouts)")
@@ -165,6 +189,7 @@ def main():
     out = standardize(args.input, args.output, do_color=not args.no_color,
                       do_bg=not args.no_bg, fill=args.fill, size=args.size, shadow=args.shadow,
                       copyright_text=args.copyright, sku=args.sku,
+                      watermark=args.watermark, watermark_logo=args.watermark_logo,
                       model=args.model, allow_rect_mask=args.allow_rect_mask)
     print(out)
 

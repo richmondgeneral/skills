@@ -228,6 +228,22 @@ class ModelRouter:
         # 3. remove.bg (100%, paid, 2.8s)
 
         capable = [m for m in self.models if m.supports_task(task_config.task_type)]
+
+        # If a specific model was requested (not 'auto'), restrict to that model
+        # so --model removebg actually routes to remove.bg instead of being
+        # silently ignored by the quality-score sort.
+        pref = getattr(task_config, 'model_preference', 'auto')
+        if pref and pref != 'auto':
+            _PREF_TO_CLASS = {
+                'nano-banana': 'NanaBananaModel',
+                'gemini25':    'Gemini25FlashModel',
+                'removebg':    'RemoveBgModel',
+            }
+            preferred_class = _PREF_TO_CLASS.get(pref)
+            if preferred_class:
+                capable = [m for m in capable
+                           if m.__class__.__name__ == preferred_class]
+
         healthy = [m for m in capable if m.health_check()]
 
         def sort_key(model):

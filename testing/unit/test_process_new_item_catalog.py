@@ -88,8 +88,8 @@ def test_unknown_type_emits_warning_and_ships_with_just_type_and_tier(
     assert "not in ROOM_BY_TYPE" in captured.out
     cat_ids = [c["id"] for c in obj["item_data"]["categories"]]
     assert "UNKNOWN_FAKE_ID_NEVER_REAL_XX" in cat_ids
-    # Tier should still be present.
-    assert processor.categories["new_finds"] in cat_ids
+    # Tier should still be present (default intake tier = New Arrivals per CLAUDE.md).
+    assert processor.categories["new_arrivals"] in cat_ids
 
 
 def test_no_type_category_falls_back_to_tier_only(processor, base_item_data, capsys):
@@ -99,4 +99,4 @@ def test_no_type_category_falls_back_to_tier_only(processor, base_item_data, cap
     captured = capsys.readouterr()
     assert "no type_category_id provided" in captured.out
     cat_ids = [c["id"] for c in obj["item_data"]["categories"]]
-    assert cat_ids == [processor.categories["new_finds"]]
+    assert cat_ids == [processor.categories["new_arrivals"]]

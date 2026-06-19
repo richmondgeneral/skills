@@ -33,3 +33,19 @@ def test_optional_listed_on_and_intended_prices(tmp_path):
     rec = read_page_record(tmp_path / "RG-0016")
     assert Channel.WHATNOT in rec.listed_on
     assert rec.intended_channel_prices[Channel.WHATNOT] == 6.0
+
+def test_reader_derives_listed_on_from_channels_registry(tmp_path):
+    _write_item(tmp_path, "RG-0100", {
+        "sku": "RG-0100", "price": "10.00",
+        "channels": {"square": {"status": "listed"}, "whatnot": {"status": "not_listed"}},
+    })
+    rec = read_page_record(tmp_path / "RG-0100")
+    assert rec.listed_on == [Channel.SQUARE]
+
+def test_reader_state_sold_sets_sold(tmp_path):
+    _write_item(tmp_path, "RG-0101", {"sku": "RG-0101", "price": "5.00", "state": "Sold"})
+    assert read_page_record(tmp_path / "RG-0101").sold is True
+
+def test_reader_legacy_listed_on_still_honored(tmp_path):
+    _write_item(tmp_path, "RG-0102", {"sku": "RG-0102", "price": "5.00", "listed_on": ["square"]})
+    assert read_page_record(tmp_path / "RG-0102").listed_on == [Channel.SQUARE]

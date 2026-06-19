@@ -114,6 +114,30 @@ Dust jackets are graded separately and can significantly impact value.
 - **Rebacked**: Spine replaced
 - **Recased**: Cover re-attached to text block
 
+## Specific Anomaly Classifications & Value Impact
+
+Certain classifications override standard grading because of their specific impact on collectibility and market value.
+
+### 1. Ex-Library Copies (Ex-Lib)
+- **Identification**: Card pockets pasted on endpapers, barcode stickers on the cover/jacket, ink stamps on the title page or text block edges, cataloging numbers written or taped to the spine, and embossed seals.
+- **Valuation Impact**: **50% to 70% reduction** from standard trade pricing. Ex-library copies are generally rejected by collectors unless the title is exceptionally scarce, in which case they serve as "placeholder" copies.
+- **Grading Note**: A book in otherwise Near Fine condition becomes at best **Good** due to ex-library markings.
+
+### 2. Remainder Marks
+- **Identification**: A colored felt-tip pen line, mark, or dot stamped on the bottom, top, or side edge of the text block. Occurs when publishers sell off unsold inventory. Sometimes marked by a small clipped notch in the cover or jacket.
+- **Valuation Impact**: **10% to 30% reduction** for modern or collectible first editions. Less impact on non-collectible reading copies.
+- **Grading Note**: A remainder mark must be explicitly disclosed. It generally prevents a book from being graded higher than **Very Good**.
+
+### 3. Book Club Editions (BCE)
+- **Identification**: 
+  - No price listed on the front dust jacket flap (price-clipped is different; BCEs typically have no price printed at all).
+  - A small blind-stamped debossed shape (square, circle, dot) on the lower right corner of the back cover near the spine.
+  - A distinct "Book Club Edition" statement on the copyright page or jacket flap.
+  - An alternate, shorter number line or lack of printing statement compared to trade editions.
+  - Slightly smaller physical dimensions or lighter-weight paper stock.
+- **Valuation Impact**: **80% to 95%+ reduction** for rare first editions where the trade edition commands a premium. BCEs are printed in high volume with lower-quality materials and are rarely sought by collectors.
+- **Grading Note**: BCE status must always be stated in the description and pricing adjusted accordingly.
+
 ## Grading Examples
 
 ### Example 1: 1930s Children's Book

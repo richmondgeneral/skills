@@ -3,10 +3,15 @@ name: book-appraiser
 description: Antiquarian and antique book appraisal, identification, and valuation. Use when the user presents a book from before 1970, asks about old/antique/vintage books, rare books, first editions, signed copies, needs help identifying publisher/edition/printing, wants to research book value, or asks about Library of Congress holdings or public domain status.
 allowed-tools: Read, Grep, Glob, WebFetch, WebSearch
 metadata:
-  version: "1.1"
+  version: "1.2"
   author: scottybe
-  updated: "2025-12-21"
+  updated: "2026-06-19"
   changelog: |
+    v1.2 - Publisher, grading, and search enhancement:
+    - Expanded publisher first edition markers table
+    - Added comprehensive publisher-points.md reference file
+    - Added specific grading rules for Ex-Lib, Remainder, and BCE to condition-grading.md
+    - Added instructions for reading LOC MARC records and using Stanford Copyright database
     v1.1 - Anthropic skills update:
     - Added allowed-tools (read + web research)
     - Enhanced triggers: "rare books", "first editions", "signed copies"
@@ -59,7 +64,15 @@ Specialized appraisal workflow for books, with Library of Congress cross-referen
 | **Little, Brown** | "First Edition" stated |
 | **Harper** | Date on title page matches copyright |
 | **Doubleday** | "First Edition" stated |
+| **Macmillan** | "Published [Month, Year]" with no subsequent printings |
+| **Houghton Mifflin** | Title page date matches copyright date with no reprint history |
+| **Viking Press** | "First Published in [Year]" or "First Published by..." |
+| **Knopf** | "First Edition" stated on copyright page |
+| **Grosset & Dunlap** | Reprint publisher - Nancy Drew/Hardy Boys series list check |
+| **A.L. Burt** | Reprint publisher - cheap cloth/reprint list check |
 | **Dover** | Reprint publisher - note original publication |
+
+For a more comprehensive list and specialized detection rules, see the [publisher-points.md](file:///Users/scottybe/workspace/richmondgeneral/skills/plugins/richmondgeneral/skills/book-appraiser/references/publisher-points.md) reference.
 
 **Number line guide:**
 - `10 9 8 7 6 5 4 3 2 1` → First printing
@@ -81,6 +94,13 @@ Specialized appraisal workflow for books, with Library of Congress cross-referen
 2. Note LOC call number (for research visits)
 3. Check for digital copy availability
 4. Compare publication details to confirm edition
+
+**Reading LOC MARC Records:**
+When viewing the "LCCN Permalink" or detailed record, use the MARC tags (or the labeled fields) to confirm bibliographical details:
+- **Field 050**: Library of Congress Call Number (useful for physical location and classification verification).
+- **Field 245**: Title Statement (contains the exact transcription of the title, subtitle, and statement of responsibility).
+- **Field 260 / 264**: Publication, Distribution, etc. (Imprint) — check subfield `$b` for publisher and subfield `$c` for date. Compare this date and publisher with the specimen in hand.
+- **Field 300**: Physical Description (indicates page count, plates, illustrations, and size in centimeters). Useful for detecting if pages or plates are missing from the appraised copy.
 
 **LOC record provides:**
 - Authoritative publication date
@@ -107,8 +127,11 @@ Specialized appraisal workflow for books, with Library of Congress cross-referen
 
 **Copyright renewal check:**
 - Stanford Copyright Renewal Database: https://exhibits.stanford.edu/copyrightrenewals
-- Search by title, author, or registration number
-- No renewal found (1929-1963) = public domain
+- **Search Strategy**: 
+  1. Search for the book's exact title (use quotation marks for exact phrases).
+  2. Search by the author's last name.
+  3. Look for entries corresponding to the original publication year. 
+  4. Note that copyright renewals had to be filed in the 28th year after original publication. If no renewal record is found in the Stanford database for a book published between 1929 and 1963, it entered the public domain.
 
 **Why this matters for Richmond General:**
 - Public domain books can be reproduced/quoted freely

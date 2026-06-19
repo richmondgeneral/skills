@@ -76,3 +76,32 @@ def test_apply_set_price_dry_run_updates_page_and_plans_square_push(tmp_path):
     square = [p for p in result["pushes"] if p["channel"] == "square"]
     assert square == [{"channel": "square", "mode": "api", "variation_id": "WJ7", "amount_cents": 8000}]
     assert any(p["channel"] == "whatnot" and p["mode"] == "manual" for p in result["pushes"])
+
+
+def test_apply_set_price_dry_run_never_calls_resolve_square_token(tmp_path, monkeypatch):
+    """SAFETY INVARIANT: the dry-run (apply=False) path must touch NO Keychain/.env/network.
+    resolve_square_token() is the seam's only Keychain/.env reader, so we monkeypatch it to
+    raise — if the dry-run path reached it, apply_set_price would blow up. It must not, even
+    when the plan contains an actionable Square api push (variation_id present)."""
+    import item_model.instance as inst
+    from set_price import apply_set_price
+
+    def _boom():  # pragma: no cover - must never be invoked on the dry-run path
+        raise AssertionError("resolve_square_token() called on dry-run path — Keychain/.env touched")
+
+    monkeypatch.setattr(inst, "resolve_square_token", _boom)
+
+    item_dir = tmp_path / "RG-0009"
+    item_dir.mkdir(parents=True)
+    label = {
+        "sku": "RG-0009",
+        "price": "95.00",
+        "channels": {"square": {"status": "listed", "variation_id": "WJ7"}},
+    }
+    (item_dir / "label.json").write_text(json.dumps(label), encoding="utf-8")
+
+    result = apply_set_price(item_dir, 80.0)  # apply defaults to False — resolver must not fire
+
+    assert result["applied"] is False
+    assert json.loads((item_dir / "label.json").read_text(encoding="utf-8"))["price"] == "80.00"
+    assert [p for p in result["pushes"] if p["channel"] == "square"][0]["mode"] == "api"

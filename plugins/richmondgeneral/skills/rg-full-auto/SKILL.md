@@ -10,10 +10,15 @@ description: >
   "add to whatnot". NOT for simple edits to existing items -- use rg-item-update for price
   changes, description tweaks, or adding images.
 metadata:
-  version: "6.3"
+  version: "6.4"
   author: scottybe
   updated: "2026-06-19"
   changelog: |
+    v6.4 - Workflow docs aligned to current intake standards: definition of done
+    (full real photo set + final pricing), dedupe-first, pricing-report step
+    (ops/pricing/), and New Arrivals as the default tier across SKILL.md +
+    references/square-catalog.md (which still documented New Finds as default).
+
     v6.3 - Intake category fix: new items default to the New Arrivals tier
     (was New Finds). process_new_item.py tier default + docstring updated to the
     current type=reporting + New-Arrivals-default model; re-tier as items age.
@@ -116,6 +121,15 @@ PR #3 plan (this one): `docs/plans/2026-05-13-v6-pr3-flip-default.md`
 | GitHub Pages | https://richmondgeneral.github.io/items/ |
 | Working Directory | `/Users/scottybe/workspace/square/items/` |
 
+### Intake standards (definition of done)
+
+An item is **not** intake-complete (don't list it or call it done) until **both**:
+1. **Full real photo set** — a real hero + required angles (back/marks, condition, scale). Staging/AI placeholders don't count; download iCloud-offloaded originals first (`photos-library extract_photos.py` reports offloaded ones).
+2. **Final, research-based pricing** — set during Phase 1 appraisal and refined as facts firm up, never deferred to "after."
+
+- **Dedupe first.** Before minting a SKU, run the duplicate check (GitHub `items/` → live Square → other channels). See `RG-intake-dedupe-SOP.md`.
+- **Pricing report** for every **unsigned** or **judgment-/higher-value** item: `ops/pricing/RG-XXXX-pricing.md` (template `ops/pricing/_TEMPLATE.md`) — ID basis, comps + sources, condition adjustment, final price + date. Quick-flip (<$15) items are exempt. A confirmed maker's mark can move price 30–100%+.
+
 ### Category Assignment
 
 Pick one **type** (primary, sets `reporting_category`) + one **tier** (secondary). See `references/square-catalog.md` for full category ID table.
@@ -132,7 +146,7 @@ Pick one **type** (primary, sets `reporting_category`) + one **tier** (secondary
 | Gifts | Giftable items, home decor (also: Home for general-purpose home goods) |
 | Analog | Vinyl, pinball, analog tech |
 
-**Tiers:** The New Finds (default) or The Real Rarities (genuinely special).
+**Tiers (market tier):** **New Arrivals** is the default on intake — every new item lands there and is re-tiered later (The New Finds / The Real Rarities for genuinely special) as it ages.
 
 ### Channel Classification By Phase
 

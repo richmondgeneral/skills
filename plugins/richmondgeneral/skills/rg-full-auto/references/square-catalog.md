@@ -26,7 +26,7 @@ auto-attaches the room. An item whose TYPE *is* itself one of these rooms
 | **The Vintage Market** | `TX6SBQLJDMZOCVXBUD3KT3CL` | Parent of Furniture, Collectibles, Vintage Media, Analog, Trésor Vintage Market |
 | **The Apothecary Cabinet** | `QIPW32HGKMU5BDPU3A7YZCM4` | Top-level room (NOT a sub-type — items get this as their primary category) |
 | **The Gallery** | `UMWTT7Q6UU4PXPUKU3DVNLFJ` | Parent of Artisan Lighting |
-| **New Arrivals** | `TGWDFETSQPR6BF67YJCTOLW6` | Storefront-managed; usually auto-populated, not assigned by us |
+| **New Arrivals** | `TGWDFETSQPR6BF67YJCTOLW6` | **Default intake tier** — assigned to every new item on intake (re-tier later) |
 
 ### RG Type Categories (choose ONE primary)
 
@@ -58,8 +58,9 @@ auto-attaches the room. An item whose TYPE *is* itself one of these rooms
 
 | Category | ID | Use For |
 |----------|-----|---------|
+| **New Arrivals** | `TGWDFETSQPR6BF67YJCTOLW6` | **Default intake tier** — every new item lands here, re-tier later as it ages |
 | **The Real Rarities** | `FL4L42RRUE5UXMWFDLXOCNB5` | Truly rare, showcase-worthy pieces (secondary only) |
-| **The New Finds** | `P34KX3L7XRZJJ5RP6W35K4YO` | Default intake category — new items land here, get sorted later |
+| **The New Finds** | `P34KX3L7XRZJJ5RP6W35K4YO` | A re-tier destination (no longer the intake default) |
 
 ### TVM Categories (reserved)
 
@@ -73,13 +74,13 @@ auto-attaches the room. An item whose TYPE *is* itself one of these rooms
 ### Category Assignment Rules
 
 1. **Primary category** = type-based (Books & Paper, Furniture, etc.) — determines reporting
-2. **Secondary category** = The New Finds (default intake) — items get moved out over time
-3. **The Real Rarities** = reserved for genuinely rare/special items — replaces The New Finds as secondary
+2. **Secondary category (tier)** = New Arrivals (default intake) — items get re-tiered over time
+3. **The New Finds / The Real Rarities** = re-tier destinations for aged / genuinely special items
 4. **Reporting category** = ALWAYS set to the type-based primary category (for Square sales reports)
 
 **Decision flow:**
 - Pick the type category that best fits → set as primary + reporting_category
-- Add The New Finds as secondary (or The Real Rarities if genuinely special)
+- Add New Arrivals as the secondary tier on intake (re-tier to The New Finds / The Real Rarities later)
 
 ### Reporting Category
 

@@ -144,7 +144,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--expect-new-finds-count",
         default=10,
         type=int,
-        help="Expected The New Finds item count.",
+        help="Expected legacy New Finds tier count (note: New Arrivals is now the intake default tier).",
     )
     audit.add_argument("--json-out", default="", help="Optional path to save audit JSON.")
 

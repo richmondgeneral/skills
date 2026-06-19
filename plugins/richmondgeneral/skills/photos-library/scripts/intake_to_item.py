@@ -84,6 +84,10 @@ def stub_label(sku):
         "price": "",
         "condition": "",
         "condition_notes": "",
+        "eye_color": "",
+        "measurements_in": {},     # {"l":.., "w":.., "h":..} when known; drives oversize
+        "buyer_questions": [],     # [{"q":.., "a":.., "posted_to":[..]}]
+        "oversize": False,         # recompute from measurements_in via compute_oversize
         "state": "Intake",
         "target_channels": [],
         "channels": {

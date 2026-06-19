@@ -64,3 +64,25 @@ def test_roundtrip_fresh(tmp_path):
     assert back.reference_price == original.reference_price
     assert set(back.listed_on) == set(original.listed_on)
     assert back.intended_channel_prices == original.intended_channel_prices
+
+
+def test_write_clears_shrunk_intended_prices(tmp_path):
+    d = tmp_path / "RG-0030"; d.mkdir()
+    (d / "label.json").write_text(json.dumps({
+        "sku": "RG-0030", "price": "5.00", "intended_channel_prices": {"whatnot": 4.0},
+    }), encoding="utf-8")
+    rec = PageRecord(sku="RG-0030", reference_price=5.0, listed_on=[Channel.SQUARE])  # no overrides
+    write_page_record(d, rec)
+    assert "intended_channel_prices" not in _read(d)   # stale override cleared, not retained
+
+
+def test_write_migrates_legacy_listed_on(tmp_path):
+    d = tmp_path / "RG-0031"; d.mkdir()
+    (d / "label.json").write_text(json.dumps({
+        "sku": "RG-0031", "price": "5.00", "listed_on": ["square"],
+    }), encoding="utf-8")
+    rec = PageRecord(sku="RG-0031", reference_price=5.0, listed_on=[Channel.SQUARE])
+    write_page_record(d, rec)
+    label = _read(d)
+    assert "listed_on" not in label                            # deprecated array removed
+    assert label["channels"]["square"]["status"] == "listed"   # migrated into the registry

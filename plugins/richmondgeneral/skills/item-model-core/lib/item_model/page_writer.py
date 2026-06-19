@@ -13,10 +13,13 @@ def write_page_record(item_dir: Union[str, Path], record: PageRecord,
     """Write/merge a PageRecord into items/<SKU>/label.json, maintaining the channels registry.
 
     Merge semantics: preserve all existing keys (product_name, condition, channel platform
-    IDs, state, ...). Update sku / price / intended_channel_prices from the record. For each
-    channel in record.listed_on, set channels.<key>.status = "listed" (create the entry if
-    absent, preserving its other fields). Channels NOT in listed_on are left untouched — never
-    downgrade a sold/ended/pending status. Atomic write (tmp -> rename).
+    IDs, state, ...). Update sku / price from the record. `intended_channel_prices` is set to
+    the record's value, or REMOVED when the record's is empty (faithful to the view, not
+    additive). For each channel in record.listed_on, set channels.<key>.status = "listed"
+    (create the entry if absent, preserving its other fields). Channels NOT in listed_on are
+    left untouched — never downgrade a sold/ended/pending status. The deprecated top-level
+    `listed_on` array is migrated into the registry and removed (the registry is authoritative).
+    Atomic write (tmp -> rename).
     """
     item_dir = Path(item_dir)
     item_dir.mkdir(parents=True, exist_ok=True)
@@ -32,6 +35,8 @@ def write_page_record(item_dir: Union[str, Path], record: PageRecord,
         label["intended_channel_prices"] = {
             ch.value: price for ch, price in record.intended_channel_prices.items()
         }
+    else:
+        label.pop("intended_channel_prices", None)
 
     channels = label.get("channels")
     if not isinstance(channels, dict):
@@ -45,6 +50,8 @@ def write_page_record(item_dir: Union[str, Path], record: PageRecord,
         channels[key] = entry
     if channels:
         label["channels"] = channels
+    # The channels registry is authoritative; drop the deprecated top-level listed_on array.
+    label.pop("listed_on", None)
 
     tmp = label_path.with_suffix(label_path.suffix + ".tmp")
     tmp.write_text(json.dumps(label, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

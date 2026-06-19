@@ -33,6 +33,13 @@ Prepare this image as a Richmond General storefront catalog photo:
   eBay, supplier logos), human hands/fingers/thumbs, photographer
   reflections, hot specular glare on glass/varnish/lacquer that obscures
   detail.
+- NEVER add, invent, or fabricate text or graphics of any kind — no price
+  tags, SKUs, stickers, labels, captions, watermarks, logos, borders, or
+  overlays that are not physically present in the source photo. Reproduce
+  only text that genuinely exists on the item; if existing text is
+  illegible, leave it soft rather than inventing characters. (A fabricated
+  price tag with a wrong SKU and a false "AS-IS" once slipped through — this
+  guard must hold on every item.)
 - Preserve faithful colors. Keep authentic warm tones of brass, copper,
   gold, mahogany, amber glass, oxidized bronze, aged paper, sepia
   photographs, terracotta, shellac. Keep authentic cool tones of silver,

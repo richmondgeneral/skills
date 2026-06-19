@@ -2,10 +2,18 @@
 name: image-processor
 description: Unified image processing with background removal, generation, editing, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "photos library", "get from photos", or when rg-full-auto needs image processing.
 metadata:
-  version: "1.5"
+  version: "1.6"
   author: scottybe
-  updated: "2026-06-17"
+  updated: "2026-06-19"
   changelog: |
+    v1.6 - Bridge key resolution + anti-hallucination guard:
+    - lib/env.py resolves GEMINI_API_KEY / NANO_BANANA_API_KEY (env -> Keychain
+      -> workspace .env) into os.environ on lib import, so clean.py works over
+      the bare mac-bridge shell (was "All models failed" because ~/.zshrc never
+      ran to export the keys).
+    - cleanup_prompts.md base now forbids adding/inventing any text, tags, SKUs,
+      labels, or watermarks — a cleanup run had fabricated a fake price tag.
+
     v1.5 - Safe Photos database access:
     - lib/photos.py now opens Photos.sqlite with mode=ro&immutable=1 (was
       mode=ro only). immutable=1 additionally prevents shared locks and WAL

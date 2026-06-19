@@ -196,3 +196,10 @@ def test_cli_help_runs():
     r = subprocess.run([sys.executable, path, "--help"], capture_output=True, text=True)
     assert r.returncode == 0
     assert "bootstrap" in r.stdout and "peek" in r.stdout
+
+
+def test_process_new_item_has_no_cwd_glob():
+    import pathlib
+    import process_new_item
+    src = pathlib.Path(process_new_item.__file__).read_text()
+    assert "glob('RG-*')" not in src and 'glob("RG-*")' not in src

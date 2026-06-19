@@ -46,6 +46,7 @@ except ImportError:
 
 from item_state import ItemState
 from onboarding_queue import OnboardingQueue, QueueEntry
+from sku_authority import default_next_sku
 
 
 class RGItemProcessor:
@@ -68,21 +69,15 @@ class RGItemProcessor:
             raise ValueError("REMOVEBG_API_KEY environment variable required")
     
     def get_next_sku(self) -> str:
-        """Generate next available SKU number.
-        
-        NOTE: This is a fallback local directory scan.
-        Preferred method: Use square-cache skill (MCP) to query existing SKUs.
-        See SKILL.md Phase 0 for details.
+        """Allocate the next available RG-XXXX SKU via the Square allocation authority.
+
+        Delegates to sku_authority.default_next_sku(), which atomically reserves
+        the next number on Square (version-CAS), so concurrent/multi-machine
+        callers never collide. Replaces the former CWD-relative `Path('.').glob`
+        scan, which was both race-prone and dependent on the process's working
+        directory. See SKILL.md Phase 0.
         """
-        max_num = 0
-        for item in Path('.').glob('RG-*'):
-            if item.is_dir():
-                try:
-                    num = int(item.name.replace('RG-', ''))
-                    max_num = max(max_num, num)
-                except ValueError:
-                    continue
-        return f"RG-{max_num + 1:04d}"
+        return default_next_sku()
     
     def prompt(self, message: str, default: str = "") -> str:
         """Interactive prompt for user supervision."""

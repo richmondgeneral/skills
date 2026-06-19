@@ -38,6 +38,7 @@ from item_state import (
     PhaseStatus,
 )
 from onboarding_queue import DEFAULT_QUEUE_PATH, OnboardingQueue, QueueEntry
+from sku_authority import default_next_sku
 
 try:
     from remove_background import remove_background as _remove_background  # type: ignore
@@ -71,7 +72,9 @@ def _check_sku_in_square_cache(sku: str) -> Optional[str]:
 
 
 def _default_next_sku(items_dir: str) -> str:
-    """Allocate the next RG-XXXX SKU by scanning the items dir."""
+    """DEPRECATED: superseded by sku_authority.allocate_sku; retained for reference/bootstrap fs-scan.
+
+    Allocate the next RG-XXXX SKU by scanning the items dir."""
     max_n = 0
     for child in Path(items_dir).glob("RG-*"):
         if child.is_dir():
@@ -98,7 +101,7 @@ class BatchOrchestrator:
         self.queue_path = queue_path
         self.queue = OnboardingQueue(queue_path=queue_path)
         self.phase_runner: PhaseRunner = phase_runner or self._default_phase_runner
-        self.next_sku = next_sku or (lambda: _default_next_sku(str(self.items_dir)))
+        self.next_sku = next_sku or default_next_sku
         self.audit_log = audit_log or AuditLog()
 
     # ── Intake ──

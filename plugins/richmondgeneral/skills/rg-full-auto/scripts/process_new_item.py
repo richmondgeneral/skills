@@ -58,7 +58,8 @@ class RGItemProcessor:
         self.location_id = "B87BAEZ0NWV34"  # Richmond General
         self.categories = {
             'real_rarities': 'FL4L42RRUE5UXMWFDLXOCNB5',
-            'new_finds': 'P34KX3L7XRZJJ5RP6W35K4YO'
+            'new_finds': 'P34KX3L7XRZJJ5RP6W35K4YO',
+            'new_arrivals': 'TGWDFETSQPR6BF67YJCTOLW6',  # default intake tier (re-tier later)
         }
         
         if not self.square_token:
@@ -223,8 +224,9 @@ class RGItemProcessor:
         Per catalog-classifier v2.0+ (refactored Feb 2026), every item must carry:
           - a TYPE category (Books & Paper, Pottery & Ceramics, Collectibles, etc.),
             consumed by storefront nav surfaces and by reporting_category for analytics
-          - a TIER category (New Finds or Real Rarities), required so items appear in
-            tier-level nav surfaces and don't fall off the storefront's discovery index
+          - a TIER category (defaults to New Arrivals on intake; re-tiered later to
+            New Finds / Real Rarities), required so items appear in tier-level nav
+            surfaces and don't fall off the storefront's discovery index
           - a ROOM category (The General Store or The Vintage Market), the top-level
             parent under which the storefront hero tiles route. Auto-derived from
             type_category_id via ROOM_BY_TYPE.
@@ -238,8 +240,10 @@ class RGItemProcessor:
         only the tier so the item still gets onto the storefront, but the gap
         should be patched at the caller.
         """
+        # Default intake tier is New Arrivals — every new item lands there and is
+        # re-tiered later (New Finds / Real Rarities) as it ages. (CLAUDE.md rule.)
         tier_category_id = item_data.get(
-            'tier_category_id', self.categories['new_finds']
+            'tier_category_id', self.categories['new_arrivals']
         )
         type_category_id = item_data.get('type_category_id')
 

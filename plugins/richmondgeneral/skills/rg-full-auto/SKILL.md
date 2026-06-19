@@ -10,10 +10,14 @@ description: >
   "add to whatnot". NOT for simple edits to existing items -- use rg-item-update for price
   changes, description tweaks, or adding images.
 metadata:
-  version: "6.2"
+  version: "6.3"
   author: scottybe
   updated: "2026-06-19"
   changelog: |
+    v6.3 - Intake category fix: new items default to the New Arrivals tier
+    (was New Finds). process_new_item.py tier default + docstring updated to the
+    current type=reporting + New-Arrivals-default model; re-tier as items age.
+
     v6.2 - Generated item cards include the optional detail gallery: the
     .gallery CSS is baked into the card template (references/info-card-template.html)
     with a commented 2-up gallery block authors uncomment for multi-photo items.

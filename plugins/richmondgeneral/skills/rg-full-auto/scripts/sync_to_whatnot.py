@@ -237,7 +237,7 @@ def parse_args() -> argparse.Namespace:
         # Default matches SKILL.md Phase 8.1 (append target). Previously
         # hardcoded to /Users/scottybe/... which won't exist on another
         # machine and pointed at a stale qa-artifacts path.
-        default=str(Path.home() / "workspace" / "square" / "items"
+        default=str(Path.home() / "workspace" / "richmondgeneral" / "items"
                     / "rg-inventory" / "whatnot-import.csv"),
         help="Output Whatnot CSV path (default: ~/workspace/richmondgeneral/items/rg-inventory/whatnot-import.csv)",
     )

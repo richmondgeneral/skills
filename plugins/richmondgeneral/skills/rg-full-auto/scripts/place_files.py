@@ -42,7 +42,7 @@ def place_files(
     
     # Resolve repo path
     if not repo_path:
-        repo_path = Path.home() / "workspace" / "square" / "items"
+        repo_path = Path.home() / "workspace" / "richmondgeneral" / "items"
     else:
         repo_path = Path(repo_path)
     

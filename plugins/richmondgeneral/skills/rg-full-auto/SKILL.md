@@ -10,10 +10,15 @@ description: >
   "add to whatnot". NOT for simple edits to existing items -- use rg-item-update for price
   changes, description tweaks, or adding images.
 metadata:
-  version: "6.1"
+  version: "6.2"
   author: scottybe
-  updated: "2026-06-18"
+  updated: "2026-06-19"
   changelog: |
+    v6.2 - Generated item cards include the optional detail gallery: the
+    .gallery CSS is baked into the card template (references/info-card-template.html)
+    with a commented 2-up gallery block authors uncomment for multi-photo items.
+    Previously the gallery CSS had to be hand-added to every multi-photo item.
+
     v6.1 - Fix: generated item-card .sku-badge now has z-index:2 so the SKU
     chip stays above the hero image. Raw/un-removed-background heroes were
     painting over the badge (first seen on RG-0021). Mirrors the items-repo fix.

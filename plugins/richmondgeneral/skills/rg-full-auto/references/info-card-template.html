@@ -222,6 +222,25 @@
             margin-bottom: 1.25rem;
         }
         
+        /* Optional detail gallery — a 2-up grid of supplementary photos
+           (back, marks, tags, condition shots). Rule is always present;
+           render it by uncommenting the gallery block in the story-section. */
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.4rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .gallery img {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            border-radius: 6px;
+            background: var(--rg-cream);
+            border: 1px solid #e0d8c4;
+        }
+
         .detail-item {
             background: var(--rg-cream);
             padding: 0.6rem 0.8rem;
@@ -504,7 +523,18 @@
                 <div class="story-section">
                     <p class="section-label">History & Provenance</p>
                     <p class="story-text">{{STORY_TEXT}}</p>
-                    
+
+                    <!-- OPTIONAL detail gallery — supplementary photos (back, marks,
+                         tags, condition). Uncomment and add <img>s for multi-photo
+                         items; omit for single-photo items. .gallery CSS is already
+                         in the stylesheet, so no other change is needed.
+                    <p class="section-label">Detail</p>
+                    <div class="gallery">
+                        <img src="./detail-back.png" alt="Detail — back">
+                        <img src="./detail-mark.png" alt="Detail — maker's mark">
+                    </div>
+                    -->
+
                     <div class="details-grid">
                         <div class="detail-item">
                             <p class="detail-label">{{DETAIL_1_LABEL}}</p>

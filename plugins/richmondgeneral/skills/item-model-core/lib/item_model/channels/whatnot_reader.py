@@ -43,8 +43,13 @@ def build_whatnot_index(csv_path: Union[str, Path]) -> WhatnotIndex:
     return index
 
 
-def observe_whatnot(sku: str, index: WhatnotIndex) -> ChannelObservation:
+def observe_whatnot(sku: str, index: WhatnotIndex) -> Optional[ChannelObservation]:
+    """Positive-only: the Whatnot import CSV can AFFIRM a listing (+ price/sold) but cannot
+    DENY one — items listed directly via the Whatnot UI never appear in it. So a SKU absent
+    from the CSV yields None (no observation = "not checked"), NOT present=False, to avoid
+    false "not present" findings. (Square, a live catalog, stays authoritative and may report
+    present=False.)"""
     if sku not in index:
-        return ChannelObservation(channel=Channel.WHATNOT, present=False)
+        return None
     price, sold = index[sku]
     return ChannelObservation(channel=Channel.WHATNOT, present=True, price=price, sold=sold)

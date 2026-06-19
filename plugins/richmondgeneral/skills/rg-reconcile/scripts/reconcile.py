@@ -24,7 +24,10 @@ def gather_records_and_obs(items_dir, square_index, whatnot_index):
         if not (child / "label.json").exists():
             continue
         page = read_page_record(child)
-        obs = [observe_square(page.sku, square_index), observe_whatnot(page.sku, whatnot_index)]
+        # observe_whatnot is positive-only (returns None when the SKU isn't in the CSV) —
+        # filter those out so "not in the import CSV" isn't treated as "absent from Whatnot".
+        obs = [o for o in (observe_square(page.sku, square_index),
+                           observe_whatnot(page.sku, whatnot_index)) if o is not None]
         out.append((page, obs))
     return out
 

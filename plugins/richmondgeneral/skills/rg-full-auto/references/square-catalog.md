@@ -23,7 +23,7 @@ auto-attaches the room. An item whose TYPE *is* itself one of these rooms
 | Room | ID | Notes |
 |------|-----|-------|
 | **The General Store** | `QLM2GZ643LOCYHB653YIDJWT` | Parent of Books & Paper, Furniture-not, Wellness, Gifts, Home, Pottery, Food & Pantry, Art & Craft Kits |
-| **The Vintage Market** | `TX6SBQLJDMZOCVXBUD3KT3CL` | Parent of Furniture, Collectibles, Vintage Media, Analog, Trésor Vintage Market |
+| **The Vintage Market** | `TX6SBQLJDMZOCVXBUD3KT3CL` | Parent of Furniture, Collectibles, Analog & Vintage Media, Trésor Vintage Market |
 | **The Apothecary Cabinet** | `QIPW32HGKMU5BDPU3A7YZCM4` | Top-level room (NOT a sub-type — items get this as their primary category) |
 | **The Gallery** | `UMWTT7Q6UU4PXPUKU3DVNLFJ` | Parent of Artisan Lighting |
 | **New Arrivals** | `TGWDFETSQPR6BF67YJCTOLW6` | **Default intake tier** — assigned to every new item on intake (re-tier later) |
@@ -41,8 +41,7 @@ auto-attaches the room. An item whose TYPE *is* itself one of these rooms
 | **Gifts** | `AR3ZTA45KU4BH23AJ7LOLLRA` | General Store | Home decor, giftable items (live name: "Gifts" — previously labeled "Home & Gifts") |
 | **Home** | `43IPDJV36K4AX55M4QFPYHHO` | General Store | General home goods that don't fit Gifts or Pottery |
 | **Food & Pantry** | `CYTCL6ES7TSG2XCUVHIDG5B2` | General Store | Snacks, beverages — parent of Chips & Crisps / Cookies & Sweets / Drinks / Asian Imports |
-| **Vintage Media** | `QPDGKT3BGR63MSZ6AQ6VI4ZP` | Vintage Market | LPs, cassettes, DVDs, magazines as decor |
-| **Analog** | `N35REXL33FZWJNJV24IUQGPN` | Vintage Market | Vinyl, pinball, film, analog tech |
+| **Analog & Vintage Media** | `N35REXL33FZWJNJV24IUQGPN` | Vintage Market | Vinyl, LPs, cassettes, DVDs, film, magazines, analog tech (absorbed the deleted "Vintage Media" category) |
 | **Trésor Vintage Market** | `XQY33UQNPA7IPZ4CBIYJX3VM` | Vintage Market | TVM-curated vintage (parent of Classic Beauty / Timeless Treasures / Expressly TVM / Whimsical Gifts) |
 
 ### Snack Categories

@@ -42,6 +42,7 @@ The script's stdout (pass `--json` where the script supports it) comes back as t
 - **Confirm before destructive/outward actions.** The bridge runs real commands on the Mac (file writes, uploads, sends). For anything that changes state or hits a live service (Square, payment links, sending messages), show the user the exact command and get sign-off first.
 - **Prefer a dedicated MCP when one exists** (Square, etc.). The bridge is for Mac-local capabilities those don't cover — the Photos library, local image cleanup, local files.
 - **Read-only skills with Full Disk Access needs** (photos-library reads `Photos.sqlite`; imessage reads `chat.db`) work over the bridge because they run as the Mac user — but the Mac must have granted FDA to whatever runs osascript.
+- **Photo extraction uses `sips`** (macOS built-in — no ImageMagick). `extract_photos.py` converts HEIC→JPEG natively and reports any iCloud-offloaded originals it couldn't reach (download them in Photos, then re-run).
 
 ## Notes
 

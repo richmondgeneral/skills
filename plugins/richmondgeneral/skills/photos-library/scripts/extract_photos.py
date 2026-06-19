@@ -71,6 +71,7 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
         rows = cursor.fetchall()
 
     extracted = []
+    offloaded = []  # originals not on disk (iCloud-offloaded) — reported, never silently skipped
     for row in rows:
         uuid, file_type, orig_name, width, height, created = row
 
@@ -79,7 +80,11 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
         src_path = os.path.join(library_path, f"originals/{first_char}/{uuid}.{ext}")
 
         if not os.path.exists(src_path):
-            print(f"✗ Not found: {orig_name or uuid[:8]}")
+            # Original isn't on local disk — almost always iCloud-offloaded
+            # ("Optimize Mac Storage"). Track it so we report the full set at
+            # the end instead of silently skipping (which hid intake photos).
+            offloaded.append(orig_name or f"{uuid[:8]}.{ext}")
+            print(f"☁︎ Offloaded (not on disk): {orig_name or uuid[:8]}")
             continue
 
         # Determine output filename
@@ -91,13 +96,19 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
         out_name = f"{base_name}.{output_format}"
         dst_path = os.path.join(output_dir, out_name)
 
-        # Build convert command
-        cmd = ['convert', src_path]
-
+        # Convert with macOS-native `sips` — no Homebrew/ImageMagick needed.
+        # sips reads HEIC and writes jpeg/png directly.
+        cmd = ['sips', '-s', 'format', output_format]
+        if output_format == 'jpeg':
+            # formatOptions takes a 0–100 JPEG quality (lossless PNG ignores it)
+            cmd.extend(['-s', 'formatOptions', str(quality)])
         if resize:
-            cmd.extend(['-resize', resize])
-
-        cmd.extend(['-quality', str(quality), dst_path])
+            # `sips -Z` bounds the longest side and preserves aspect ratio.
+            # --resize is WxH (validated); use the larger dimension so the
+            # result fits within the WxH box.
+            w, h = (int(n) for n in resize.lower().split('x'))
+            cmd.extend(['-Z', str(max(w, h))])
+        cmd.extend([src_path, '--out', dst_path])
 
         try:
             subprocess.run(cmd, check=True, capture_output=True)
@@ -111,13 +122,23 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
                 'created': created
             })
         except subprocess.CalledProcessError as e:
-            print(f"✗ Failed: {orig_name or uuid[:8]} - {e.stderr.decode()[:50] if e.stderr else 'unknown error'}")
+            print(f"✗ Failed: {orig_name or uuid[:8]} - {e.stderr.decode()[:80] if e.stderr else 'sips error'}")
+            continue  # per-file failure (e.g. corrupt original): skip, keep going
         except FileNotFoundError:
-            print("✗ ImageMagick 'convert' not found. Install with: brew install imagemagick")
-            return extracted  # Exit early, don't process remaining photos
+            print("✗ 'sips' not found — this script requires macOS (sips is built in).")
+            return extracted  # nothing will convert without sips
         except (OSError, PermissionError) as e:
             print(f"✗ {orig_name or uuid[:8]}: {e}")
             continue  # Skip this photo, try next
+
+    # Report offloaded originals clearly — never silently skip (that hid intake
+    # photos in the first batch). Tell the user how to materialize them.
+    if offloaded:
+        print(f"\n☁︎ {len(offloaded)} original(s) offloaded to iCloud (not on disk):")
+        for name in offloaded:
+            print(f"    - {name}")
+        print('  Download via Photos (select → File ▸ "Download Originals"),')
+        print("  or `osxphotos export --download-missing`, then re-run.")
 
     return extracted
 

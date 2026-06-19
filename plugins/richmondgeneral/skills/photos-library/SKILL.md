@@ -2,10 +2,19 @@
 name: photos-library
 description: Query and extract photos from macOS Photos Library. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, or pull images from Photos app for processing. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll".
 metadata:
-  version: "1.3"
+  version: "1.4"
   author: scottybe
-  updated: "2026-06-17"
+  updated: "2026-06-18"
   changelog: |
+    v1.4 - macOS-native extraction + offloaded reporting:
+    - extract_photos.py converts with `sips` (built into macOS) instead of
+      ImageMagick `convert`, which isn't installed (extraction returned 0).
+      JPEG quality via -s formatOptions; --resize maps to `sips -Z` (bounds
+      the longest side, preserves aspect).
+    - iCloud-offloaded originals (not on disk) are collected and reported with
+      a count + filenames + how to download, instead of being silently skipped
+      (which hid intake photos in the first batch).
+
     v1.3 - Safe database access (critical fix):
     - All scripts now open Photos.sqlite with mode=ro&immutable=1
     - Previously query/extract/find_product_clusters used a plain
@@ -41,7 +50,7 @@ Query the macOS Photos Library SQLite database and extract photos for processing
 - macOS with Photos app
 - Mount user's home directory via `mcp__cowork__request_cowork_directory`
 - Python 3 with sqlite3 module
-- ImageMagick (`convert`) for HEIC→JPEG conversion
+- macOS `sips` (built in) for HEIC→JPEG conversion — no Homebrew/ImageMagick needed
 
 ## Database Location
 
@@ -75,12 +84,16 @@ List photos with metadata. Filters:
 
 ### `scripts/extract_photos.py`
 
-Extract and convert photos. Options:
+Extract and convert photos with macOS-native `sips` (no ImageMagick). Options:
 - `--days N` - Photos from last N days
 - `--output PATH` - Destination folder
 - `--format jpeg|png` - Output format (default: jpeg)
 - `--quality N` - JPEG quality 1-100 (default: 90)
-- `--resize WxH` - Resize to max dimensions
+- `--resize WxH` - Bound the longest side to fit a WxH box (aspect preserved)
+
+iCloud-offloaded originals (not on local disk) are reported at the end with a
+count + filenames, never silently skipped. Download them in Photos (select →
+File ▸ "Download Originals") or `osxphotos export --download-missing`, then re-run.
 
 ### `scripts/find_product_clusters.py`
 
@@ -201,6 +214,6 @@ WHERE ZDATECREATED > (strftime('%s', 'now') - 978307200 - 7*24*60*60)
 
 ### Creating size variants
 ```bash
-convert photo.jpeg -resize 800x800 photo_medium.jpeg
-convert photo.jpeg -resize 400x400 photo_small.jpeg
+sips -Z 800 photo.jpeg --out photo_medium.jpeg
+sips -Z 400 photo.jpeg --out photo_small.jpeg
 ```

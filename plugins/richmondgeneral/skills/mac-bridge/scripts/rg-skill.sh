@@ -33,8 +33,8 @@ rg-skill.sh — run a Richmond General skill script on the Mac (plugin uv env).
   rg-skill.sh --list
 
 Examples:
-  rg-skill.sh photos-library query_photos.py --recent 10 --json
-  rg-skill.sh image-processor clean.py in.png --output out.png --remove "price tag"
+  rg-skill.sh photos-library query_photos.py --days 7 --limit 10 --json
+  rg-skill.sh image-processor clean.py --input in.png --output out.png --remove "price tag"
 EOF
   exit 2
 }

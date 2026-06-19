@@ -231,7 +231,7 @@ def main():
     parser.add_argument('--both', action='store_true',
                         help='Produce both preserved-damage and damage-fixed versions')
     parser.add_argument('--pro', action='store_true',
-                        help='Use gemini-3-pro-image-preview (~$2.13/call vs ~$0.57)')
+                        help='Use gemini-3-pro-image-preview for higher quality (more expensive)')
     parser.add_argument('--agentic', action='store_true',
                         help='Use LLM judge to evaluate 3 candidates and loop until satisfied')
     parser.add_argument('--remove', '-r', dest='extra',

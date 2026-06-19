@@ -269,7 +269,10 @@ class SquareCounterStore:
         }
         try:
             r = client.catalog.batch_upsert(
-                idempotency_key=f"rg-sku-counter-create-{uuid.uuid4()}",
+                # FIXED key (not a fresh uuid): makes Square dedupe concurrent
+                # self-heal creates into ONE sentinel, robust to the search_items
+                # eventual-consistency lag observed during integration (M-1 contract).
+                idempotency_key="rg-sku-counter-create-v1",
                 batches=[{"objects": [obj]}],
             )
             if getattr(r, "errors", None):

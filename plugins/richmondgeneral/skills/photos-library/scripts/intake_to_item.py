@@ -101,6 +101,18 @@ def stub_label(sku):
     }
 
 
+def resolve_staging_dir(items_dir, sku, staging_dir=None):
+    """Compute where intake scratch is staged — OUTSIDE the item folder.
+
+    Default: ``<items_dir>/../rg-pending/<sku>`` (a sibling of ``items/``, never
+    inside ``items/<sku>/``, so scratch can't contaminate another item's folder).
+    With ``staging_dir`` set, returns ``<staging_dir>/<sku>``. Pure path logic.
+    """
+    # NOTE: --staging-dir / --promote CLI wiring is a deferred follow-up.
+    base = staging_dir if staging_dir is not None else os.path.join(items_dir, "..", "rg-pending")
+    return os.path.normpath(os.path.join(base, sku))
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Pull an album/tag of originals into an item folder (library-based intake)"

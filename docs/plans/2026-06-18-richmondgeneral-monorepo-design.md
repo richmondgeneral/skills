@@ -87,6 +87,8 @@ The skills hardcode instance config (`B87BAEZ0NWV34`, `7MM9AFJAD0XHW`, `/Users/s
 - the "make it genericizable later" seam (framework vs instance), and
 - the fix for the rot in `rg-full-auto-review.md` (broken SKU-verify, hardcoded category IDs, dual-category assignment, stale timestamps, path mismatches) and the duplicated legacy `process_new_item.py` copies that still carry the dead category rule.
 
+**Phase 2a (done):** the seam now exists as `item_model/instance.py` — `resolve_square_token()` (env→Keychain→.env) + `load_instance_config()` (location/merchant/pages/items_dir, env-overridable). The `item_model` system routes through it; the public/private split + remaining older-skill touchpoints are specified in **`2026-06-19-public-private-boundary.md`**. Physical reorg + older-skill migration remain deferred (they overlap active intake).
+
 ---
 
 ## 6. Target monorepo layout (north-star — refined during restructure, executed store-first)

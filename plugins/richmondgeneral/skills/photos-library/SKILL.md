@@ -2,10 +2,16 @@
 name: photos-library
 description: Query and extract photos from macOS Photos Library. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, or pull images from Photos app for processing. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll".
 metadata:
-  version: "1.5"
+  version: "1.6"
   author: scottybe
   updated: "2026-06-19"
   changelog: |
+    v1.6 - Library-based intake helper (intake_to_item.py):
+    - Given --sku + --album/--keyword, pulls matching originals via sips into
+      items/RG-XXXX/ (hero.jpeg + detail-N.jpeg) and stubs label.json. Takes the
+      first --limit ON-DISK photos so offloaded originals don't crowd out usable
+      ones (reports offloaded). Replaces the retired catalog_pipeline/images/.
+
     v1.5 - Album / keyword (tag) filtering for intake:
     - query_photos.py, extract_photos.py, find_product_clusters.py gained
       --album and --keyword/--tag, so intake can pull by the Intake album or a
@@ -125,6 +131,24 @@ Classification heuristics:
 - **screenshot**: Wide aspect ratio (2.16+ = phone screenshots)
 - **single**: Isolated photo, not part of cluster
 - **mixed**: Unclear classification
+
+### `scripts/intake_to_item.py`
+
+Library-based intake — pull an album/tag straight into an item folder:
+```bash
+python3 scripts/intake_to_item.py --sku RG-0028 --album "Intake RG-0028"
+```
+Finds the matching originals, converts them with `sips` into `items/RG-XXXX/`
+(`hero.jpeg` + `detail-1.jpeg` …), and stubs `label.json`. Options: `--keyword/--tag`,
+`--hero "<filename substring>"` (choose the hero), `--limit`, `--resize WxH`,
+`--items-dir`, `--force`. It takes the first `--limit` **on-disk** photos (skipping +
+reporting iCloud-offloaded ones) and refuses to clobber a populated folder without
+`--force`. Replaces the retired `catalog_pipeline/images/` staging folder.
+
+First intake step only, not the whole thing — the hero is the raw original (run
+image-processor for background removal), rename `detail-N` to semantic names
+(detail-back / detail-mark / detail-tag), then set final pricing and run the
+rg-full-auto Square / label / publish phases.
 
 ## Database Schema
 

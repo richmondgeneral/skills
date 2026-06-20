@@ -20,16 +20,20 @@ import hero_qa as hq
 FIX = os.path.join(os.path.dirname(__file__), "_fixtures")
 
 
-def _save_png(name, bgr, alpha=None):
-    os.makedirs(FIX, exist_ok=True)
-    path = os.path.join(FIX, name)
+def _save_png_to(path, bgr, alpha=None):
+    os.makedirs(os.path.dirname(str(path)), exist_ok=True)
     if alpha is not None:
         bgra = cv2.cvtColor(bgr, cv2.COLOR_BGR2BGRA)
         bgra[:, :, 3] = alpha
-        cv2.imwrite(path, bgra)
+        cv2.imwrite(str(path), bgra)
     else:
-        cv2.imwrite(path, bgr)
-    return path
+        cv2.imwrite(str(path), bgr)
+    return str(path)
+
+
+def _save_png(name, bgr, alpha=None):
+    os.makedirs(FIX, exist_ok=True)
+    return _save_png_to(os.path.join(FIX, name), bgr, alpha)
 
 
 def _rect_alpha(angle=0, size=400, rw=180, rh=300):
@@ -139,6 +143,19 @@ def test_upright_does_not_false_fail_textless_image():
     assert hq.check_upright(p)["ok"] is True
 
 
+def test_upright_flags_lowconf_rotation(monkeypatch):
+    # Atari cartridges read rotate!=0 at LOW conf (0.12-0.19). Lock that the
+    # threshold logic flags any nonzero rotate above the noise floor, and never
+    # flags rotate=0. (tesseract-independent: OSD is monkeypatched.)
+    p = _save_png("up_logic.png", _straight_book_bgr())
+    monkeypatch.setattr(hq, "_osd_rotation", lambda bgr: {"rotate": 270.0, "conf": 0.15})
+    assert hq.check_upright(p)["ok"] is False                 # low-conf sideways -> fail
+    monkeypatch.setattr(hq, "_osd_rotation", lambda bgr: {"rotate": 0.0, "conf": 0.10})
+    assert hq.check_upright(p)["ok"] is True                  # upright -> pass
+    monkeypatch.setattr(hq, "_osd_rotation", lambda bgr: {"rotate": 90.0, "conf": 0.02})
+    assert hq.check_upright(p)["ok"] is True                  # below noise floor -> pass
+
+
 # --------------------------------------------------------------------------
 # Task 4 — full-face (class-aware clip detection)
 # --------------------------------------------------------------------------
@@ -236,3 +253,32 @@ def test_resolve_item_class_from_label(tmp_path):
     item.mkdir()
     (item / "label.json").write_text(json.dumps({"product_name": "Vintage hardcover book"}))
     assert hq.resolve_item_class(str(item)) == "flat"      # book/hardcover -> flat-goods
+
+
+# --------------------------------------------------------------------------
+# Task 8 — CLI single item writes label.json -> hero_qa
+# --------------------------------------------------------------------------
+def test_cli_writes_hero_qa_block_on_pass(tmp_path):
+    item = tmp_path / "RG-9002"
+    item.mkdir()
+    _save_png_to(item / "hero.png", _straight_book_bgr())
+    (item / "label.json").write_text(json.dumps(
+        {"product_name": "hardcover book", "state": "Priced", "price": 12}))
+    rc = hq.run_item(str(item), write=True)
+    d = json.loads((item / "label.json").read_text())
+    assert d["hero_qa"]["status"] == "pass"
+    assert d["hero_qa"]["checker"] == hq.CHECKER
+    assert d["price"] == 12                                 # other fields preserved
+    assert rc == 0
+
+
+def test_cli_fail_sets_needs_manual(tmp_path):
+    item = tmp_path / "RG-9003"
+    item.mkdir()
+    _save_png_to(item / "hero.png", _straight_book_bgr())   # opaque -> fails cutout bg
+    (item / "label.json").write_text(json.dumps({"product_name": "ceramic mug", "state": "Priced"}))
+    rc = hq.run_item(str(item), write=True)
+    d = json.loads((item / "label.json").read_text())
+    assert d["hero_qa"]["status"] == "fail"
+    assert d["photo_overrides"]["status"] == "needs_manual"
+    assert rc == 1

@@ -33,11 +33,14 @@ from deskew import residual_tilt_deg
 CHECKER = "auto:hero_qa_gate v1"
 TILT_MAX_DEG = 1.5
 TILT_MIN_CONF = 0.5
-# OSD orientation_conf floor to FLAG a sideways hero. Measured: synthetic text
-# reads 0.78–1.05 across 90/180/270; real covers/labels read higher. 0.5 catches
-# all of them with margin. Bias is intentional — a false positive routes a hero
-# to manual review (cheap); a false negative ships sideways (the incident).
-OSD_FLAG_CONF = 0.5
+# OSD floor to FLAG a sideways hero. Empirically (survey of real heroes):
+# UPRIGHT heroes always read rotate=0; ROTATED heroes always read rotate≠0, but
+# text-sparse labels (Atari cartridges) read at low conf (0.12–0.19) while
+# book covers read high (1.6–4.7). So rotate≠0 is itself the reliable signal —
+# this floor only filters near-zero OSD noise. Bias is intentional: a false
+# positive routes to manual review (cheap); a false negative ships sideways
+# (RG-0036–0051). Locked by test_upright_flags_lowconf_rotation (monkeypatched).
+OSD_FLAG_CONF = 0.10
 
 
 def _imread(path: str):
@@ -229,3 +232,74 @@ def hero_qa_gate(hero_path: str, original_path: Optional[str] = None,
             "checked_at": datetime.now(timezone.utc).isoformat(),
             "checker": CHECKER, "item_class": item_class,
             "checks": checks, "reasons": reasons}
+
+
+# --------------------------------------------------------------------------
+# CLI / item-directory layer
+# --------------------------------------------------------------------------
+def find_hero(item_dir: str) -> Optional[str]:
+    for name in ("hero.png", "hero.jpg", "hero.jpeg", "hero.webp"):
+        p = Path(item_dir) / name
+        if p.exists():
+            return str(p)
+    cand = sorted(Path(item_dir).glob("hero.*"))
+    return str(cand[0]) if cand else None
+
+
+def _write_hero_qa(item_dir: str, verdict: Dict[str, Any]) -> None:
+    """Persist the verdict into label.json -> hero_qa (atomic tmp+rename),
+    preserving all other fields. A fail also flips photo_overrides.status."""
+    p = Path(item_dir) / "label.json"
+    d = json.loads(p.read_text()) if p.exists() else {}
+    d["hero_qa"] = {k: verdict[k] for k in
+                    ("status", "checked_at", "checker", "checks", "reasons")}
+    if verdict["status"] == "fail":
+        d.setdefault("photo_overrides", {})["status"] = "needs_manual"
+    tmp = p.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(d, indent=2))
+    tmp.replace(p)
+
+
+def run_item(item_dir: str, write: bool = True,
+             original_path: Optional[str] = None) -> int:
+    """Gate one item dir. Returns 0 pass / 1 fail / 2 no-hero."""
+    hero = find_hero(item_dir)
+    if not hero:
+        print(f"  ✗ {Path(item_dir).name}: no hero image found", file=sys.stderr)
+        return 2
+    verdict = hero_qa_gate(hero, original_path, resolve_item_class(item_dir))
+    if write:
+        _write_hero_qa(item_dir, verdict)
+    tag = "✓ pass" if verdict["status"] == "pass" else "✗ FAIL"
+    extra = f"  — {'; '.join(verdict['reasons'])}" if verdict["reasons"] else ""
+    print(f"  {tag}  {Path(item_dir).name}{extra}")
+    return 0 if verdict["status"] == "pass" else 1
+
+
+def run_batch(items_root: str, write: bool = True, as_json: bool = False) -> int:
+    raise NotImplementedError  # implemented in Task 9
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Pre-publish Hero QA gate")
+    ap.add_argument("path", help="items/RG-XXXX dir (or items/ root with --batch)")
+    ap.add_argument("--batch", action="store_true",
+                    help="run over every RG-* under path (back-fill / audit)")
+    ap.add_argument("--no-write", action="store_true",
+                    help="do not modify label.json")
+    ap.add_argument("--original", help="original photo for the defect comparison")
+    ap.add_argument("--json", action="store_true", help="emit machine JSON")
+    a = ap.parse_args()
+    if a.batch:
+        return run_batch(a.path, write=not a.no_write, as_json=a.json)
+    if a.json:
+        hero = find_hero(a.path)
+        verdict = (hero_qa_gate(hero, a.original, resolve_item_class(a.path))
+                   if hero else {"status": "fail", "reasons": ["no hero image"]})
+        print(json.dumps(verdict, indent=2))
+        return 0 if verdict.get("status") == "pass" else 1
+    return run_item(a.path, write=not a.no_write, original_path=a.original)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

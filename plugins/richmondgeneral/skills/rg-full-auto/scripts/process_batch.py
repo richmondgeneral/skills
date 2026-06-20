@@ -32,10 +32,12 @@ from typing import Any, Callable, Dict, List, Optional
 from audit_log import AuditLog
 from item_state import (
     PHASE_NAMES,
+    PUBLISH_PHASES,
     ItemState,
     ItemStatus,
     PendingQuestion,
     PhaseStatus,
+    can_list,
 )
 from onboarding_queue import DEFAULT_QUEUE_PATH, OnboardingQueue, QueueEntry
 from sku_authority import default_next_sku
@@ -209,6 +211,27 @@ class BatchOrchestrator:
 
     # ── Per-item advancement ──
 
+    def _run_hero_qa(self, item_dir: str) -> None:
+        """Run the image-processor hero_qa CLI to populate label.json -> hero_qa.
+        Subprocessed (matches the default phase_runner's sibling-skill pattern)
+        so cv2/pytesseract never load into this process."""
+        import subprocess
+        here = Path(__file__).resolve()
+        script = here.parents[2] / "image-processor" / "scripts" / "hero_qa.py"
+        proj = next((p for p in here.parents if (p / "pyproject.toml").exists()),
+                    here.parents[3])
+        if not script.exists():
+            print(f"  ⚠ hero_qa script missing at {script}; cannot gate {item_dir}",
+                  file=sys.stderr)
+            return
+        try:
+            subprocess.run(
+                ["uv", "run", "--project", str(proj), "python", str(script), item_dir],
+                check=False, timeout=180,
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"  ⚠ hero_qa runner failed for {item_dir}: {exc}", file=sys.stderr)
+
     def _advance_item(self, state: ItemState) -> Dict[str, Any]:
         """Drive an item through its phases until blocked or done.
 
@@ -222,6 +245,28 @@ class BatchOrchestrator:
             phase = state.next_runnable_phase()
             if phase is None:
                 break
+            # BLOCKING HERO QA GATE — no Square-primary (phase_4) / GitHub publish
+            # (phase_7) without hero_qa.status == "pass". Run the gate to populate
+            # label.json if it hasn't been, then re-check; on fail, BLOCK the phase
+            # (do not run it) and park a question for the human.
+            if phase in PUBLISH_PHASES:
+                ok, reason = can_list(item_dir)
+                if not ok:
+                    self._run_hero_qa(item_dir)
+                    ok, reason = can_list(item_dir)
+                if not ok:
+                    q = PendingQuestion(
+                        question_id=f"q-heroqa-{phase}",
+                        phase=phase,
+                        question=(f"Hero QA gate failed: {reason}. Fix the hero "
+                                  f"(straight, upright, full face), then re-run."),
+                    )
+                    state.block_phase(phase, q)
+                    state.save()
+                    self._sync_queue(state)
+                    phases_run.append({"phase": phase, "result": "blocked",
+                                       "reason": f"hero_qa: {reason}"})
+                    continue
             state.start_phase(phase)
             state.save()
             self._sync_queue(state)  # I-1: queue reflects in-progress phase

@@ -117,6 +117,28 @@ PHASE_NAMES: Dict[str, str] = {
 }
 
 
+# Phases that publish a hero externally; the Hero QA gate must pass before them.
+# phase_4 = Square primary image upload, phase_7 = GitHub Pages publishing.
+PUBLISH_PHASES = ("phase_4", "phase_7")
+
+
+def can_list(item_dir: str) -> "tuple[bool, str]":
+    """Read-side chokepoint: True only if label.json -> hero_qa.status == 'pass'.
+    Pure label.json read (no cv2) so the orchestrator can call it cheaply before
+    every publish phase. No item may go Listed / publish a hero without a pass."""
+    p = Path(item_dir) / "label.json"
+    if not p.exists():
+        return False, "no label.json — hero_qa gate not run"
+    try:
+        hero_qa = (json.loads(p.read_text(encoding="utf-8")).get("hero_qa") or {})
+    except Exception as exc:
+        return False, f"label.json unreadable: {exc}"
+    status = hero_qa.get("status")
+    if status == "pass":
+        return True, "hero_qa pass"
+    return False, f"hero_qa status={status or 'not_checked'} (must be 'pass' before publish)"
+
+
 @dataclass
 class ItemState:
     """Per-item state container; persists to <items_dir>/<sku>/.state.json."""

@@ -93,6 +93,53 @@ def test_allocate_self_heals_when_sentinel_missing():
     assert store.create_calls == 1
 
 
+class LaggyCreateFakeStore(FakeStore):
+    """Models Square eventual-consistency: after create(), the freshly-made sentinel
+    stays invisible to read() (returns n=None) for `lag` reads, then appears.
+    Reproduces the cold-start / recreate-after-deletion propagation window."""
+    def __init__(self, rg_max=0, lag=0):
+        super().__init__(n=None, rg_max=rg_max)
+        self._lag = lag
+        self._pending_n = None
+
+    def create(self, n: int) -> None:
+        self.create_calls += 1
+        self._pending_n = n            # created on Square, not yet visible to search
+
+    def read(self) -> CounterState:
+        if self.unavailable:
+            raise SquareUnavailable("fake down")
+        if self.n is None and self._pending_n is not None:
+            if self._lag > 0:
+                self._lag -= 1         # still propagating
+            else:
+                self.n = self._pending_n   # now consistent / visible
+                self.version = 1
+        return CounterState(n=self.n, version=self.version, rg_max=self.rg_max)
+
+
+def test_allocate_self_heal_survives_consistency_lag_without_burning_cas_budget():
+    # The just-created sentinel is invisible for several reads (Square eventual
+    # consistency). The self-heal must absorb that lag on its OWN budget and never
+    # consume the CAS-conflict retry budget -- otherwise a cold-start / recreate
+    # raises SkuAllocationError having never attempted a single CAS.
+    store = LaggyCreateFakeStore(rg_max=30, lag=5)
+    # Zero contention here, so a CAS budget of 1 must suffice; the 5-read propagation
+    # lag is the self-heal's problem, not max_retries'.
+    assert allocate_sku(store, max_retries=1) == "RG-0031"
+    assert store.create_calls >= 1
+    assert store.cas_calls == 1        # exactly one CAS, taken once the sentinel appeared
+
+
+def test_allocate_hard_fails_bounded_when_sentinel_never_becomes_visible():
+    # If a created sentinel never propagates (permanent inconsistency / silent create
+    # failure), the self-heal must hard-fail with a BOUNDED error -- never loop forever.
+    store = LaggyCreateFakeStore(rg_max=30, lag=10_000)   # effectively never visible
+    with pytest.raises(SkuAllocationError):
+        allocate_sku(store, max_retries=2, heal_retries=4)
+    assert store.cas_calls == 0        # never reached a CAS; bounded by heal_retries
+
+
 def test_bootstrap_initializes_to_max_of_square_and_fs():
     store = FakeStore(n=None, rg_max=30)
     assert bootstrap(store, fs_max=29) == 30

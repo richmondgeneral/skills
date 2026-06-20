@@ -69,26 +69,51 @@ class CounterStore(Protocol):
     # create() must tolerate a concurrent create (idempotent, or self-healing on the next read).
 
 
-def allocate_sku(store: CounterStore, max_retries: int = DEFAULT_MAX_RETRIES) -> str:
+def allocate_sku(
+    store: CounterStore,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    heal_retries: int = DEFAULT_MAX_RETRIES,
+) -> str:
     """Return a fresh RG-XXXX, reserved on Square. Raises on hard failure.
 
     candidate = max(stored N, live Square RG max) + 1, so the result is always
     >= 1 (never negative) given non-negative inputs. CAS on the sentinel version
     guarantees exactly one winner per increment; conflicts retry.
 
-    A missing-sentinel self-heal consumes one retry iteration, so callers passing
-    a very small max_retries should account for it.
+    `max_retries` bounds CAS *conflict* retries ONLY. A missing sentinel is
+    self-healed on a SEPARATE `heal_retries` budget (see `_read_healed`), so Square's
+    post-create eventual-consistency lag can never exhaust the conflict budget and
+    raise having attempted no CAS. Both budgets are bounded: a permanently invisible
+    sentinel hard-fails, it never loops forever.
     """
     for _ in range(max_retries):
-        st = store.read()                          # may raise SquareUnavailable -> propagate
-        if st.n is None:                           # sentinel missing -> self-heal
-            store.create(st.rg_max)
-            continue
+        st = _read_healed(store, heal_retries)     # n is not None on return, or raises
         candidate = max(st.n, st.rg_max) + 1       # forward-only reconcile
         if store.cas_set(st.version, candidate):   # CAS on sentinel version
             return format_sku(candidate)
-        # version conflict -> retry
-    raise SkuAllocationError(f"could not allocate after {max_retries} attempts")
+        # version conflict -> retry (self-heal lag did NOT cost us a CAS attempt)
+    raise SkuAllocationError(f"could not allocate after {max_retries} CAS attempts")
+
+
+def _read_healed(store: CounterStore, heal_retries: int) -> CounterState:
+    """Read the sentinel, self-healing a missing one on an INDEPENDENT budget.
+
+    Returns a CounterState whose `n` is not None. If the sentinel is absent, create it
+    once, then re-read until Square makes it visible (absorbs the post-create
+    eventual-consistency window). Propagates SquareUnavailable; raises SkuAllocationError
+    if the sentinel never appears within `heal_retries` reads -- bounded, never an
+    infinite loop."""
+    st = store.read()                              # may raise SquareUnavailable -> propagate
+    if st.n is not None:
+        return st
+    store.create(st.rg_max)                        # sentinel missing -> create once
+    for _ in range(heal_retries):
+        st = store.read()
+        if st.n is not None:                       # visible now (or already created elsewhere)
+            return st
+    raise SkuAllocationError(
+        f"sentinel not visible after create + {heal_retries} re-reads"
+    )
 
 
 def bootstrap(store: CounterStore, fs_max: int = 0) -> int:

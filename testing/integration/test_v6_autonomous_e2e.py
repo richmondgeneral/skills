@@ -43,6 +43,7 @@ def test_autonomous_e2e_one_item(tmp_path):
         phase_runner=fake_runner,
         next_sku=lambda: "RG-9999",
         audit_log=AuditLog(log_dir=str(audit_dir)),
+        hero_gate=lambda item_dir: (True, "test-bypass"),  # publish gate tested separately
     )
 
     states = orch.ingest_photos([str(FIXTURE)])

@@ -98,6 +98,7 @@ class BatchOrchestrator:
         phase_runner: Optional[PhaseRunner] = None,
         next_sku: Optional[Callable[[], str]] = None,
         audit_log: Optional[AuditLog] = None,
+        hero_gate: Optional[Callable[[str], "tuple[bool, str]"]] = None,
     ):
         self.items_dir = Path(items_dir)
         self.queue_path = queue_path
@@ -105,6 +106,8 @@ class BatchOrchestrator:
         self.phase_runner: PhaseRunner = phase_runner or self._default_phase_runner
         self.next_sku = next_sku or default_next_sku
         self.audit_log = audit_log or AuditLog()
+        # Injectable so orchestration-only tests can bypass the real gate.
+        self.hero_gate = hero_gate or self._default_hero_gate
 
     # ── Intake ──
 
@@ -211,6 +214,15 @@ class BatchOrchestrator:
 
     # ── Per-item advancement ──
 
+    def _default_hero_gate(self, item_dir: str) -> "tuple[bool, str]":
+        """Real publish gate: pass iff label.json hero_qa.status=='pass'. Runs
+        the gate to populate the verdict if it hasn't been, then re-checks."""
+        ok, reason = can_list(item_dir)
+        if not ok:
+            self._run_hero_qa(item_dir)
+            ok, reason = can_list(item_dir)
+        return ok, reason
+
     def _run_hero_qa(self, item_dir: str) -> None:
         """Run the image-processor hero_qa CLI to populate label.json -> hero_qa.
         Subprocessed (matches the default phase_runner's sibling-skill pattern)
@@ -250,10 +262,7 @@ class BatchOrchestrator:
             # label.json if it hasn't been, then re-check; on fail, BLOCK the phase
             # (do not run it) and park a question for the human.
             if phase in PUBLISH_PHASES:
-                ok, reason = can_list(item_dir)
-                if not ok:
-                    self._run_hero_qa(item_dir)
-                    ok, reason = can_list(item_dir)
+                ok, reason = self.hero_gate(item_dir)
                 if not ok:
                     q = PendingQuestion(
                         question_id=f"q-heroqa-{phase}",

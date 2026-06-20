@@ -90,6 +90,7 @@ def test_orchestrator_process_all_returns_summary(tmp_path):
         items_dir=str(items_dir),
         queue_path=str(queue_path),
         phase_runner=trivial,
+        hero_gate=lambda item_dir: (True, "test-bypass"),  # publish gate is tested separately
     )
     summary = orch.process_all()
     assert summary["processed"] == 2

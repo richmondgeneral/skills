@@ -2,8 +2,23 @@ import os
 import pydantic
 from typing import List, Optional, Tuple
 
-from google import genai
-from google.genai import types
+
+def _require_genai():
+    """Import the optional google-genai SDK lazily, with a clear message if missing.
+
+    google-genai is needed ONLY when the agentic judge actually runs (clean.py
+    --agentic). Keeping the import out of module scope lets judge.py — and therefore
+    clean.py and the pure-Pillow downscale helpers/tests that import it — load
+    without the SDK installed."""
+    try:
+        from google import genai
+        return genai
+    except ImportError as e:
+        raise ImportError(
+            "The agentic image judge requires the optional 'google-genai' SDK. "
+            "Install it in the image-processor environment (`uv add google-genai`) "
+            "to use clean.py --agentic."
+        ) from e
 
 class Evaluation(pydantic.BaseModel):
     candidate_index: int
@@ -22,6 +37,7 @@ class AgentJudge:
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is required for the AgentJudge.")
         
+        genai = _require_genai()
         self.client = genai.Client(api_key=self.api_key)
         self.model = "gemini-2.5-pro"
         
@@ -40,7 +56,8 @@ The best candidate index should be 0-indexed relative to the candidate images pr
 
     def evaluate_candidates(self, original_path: str, candidate_paths: List[str]) -> Tuple[Optional[int], str]:
         from PIL import Image
-        
+        from google.genai import types
+
         payload = ["ORIGINAL:"]
         payload.append(Image.open(original_path))
         

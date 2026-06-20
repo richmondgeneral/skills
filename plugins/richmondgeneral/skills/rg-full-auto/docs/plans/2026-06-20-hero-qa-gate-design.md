@@ -14,23 +14,29 @@ Three hero/photo defects shipped live to GitHub Pages + Square in three days bec
 
 Common root gap: no blocking pre-publish hero QA gate. Build it once; it would have caught all three.
 
-## Scope of this pass (decided)
+## Scope of this pass (decided + revised after verifying the tree)
 
-**Full gate, defer auto-deskew remediation.** Deliver all four handoff acceptance criteria:
+**Full gate.** Deliver all four handoff acceptance criteria:
 1. No item reaches `Listed`/publish without `hero_qa.status=="pass"`.
 2. The three historical failure modes (90° rotation, ≥1.5° tilt, clipped face) are each caught by a unit test.
 3. Orientation baked once at ingest; no post-`exif_transpose` blind rotation.
 4. Both skill copies updated; CLI + `--batch` back-fill works.
 
-**Deferred** (separate task per handoff): the auto-deskew *remediation* — implementing `--deskew`/`--perspective-correct`/`--crop-to-face` so `standardize.py` actually transforms a tilted hero — and wiring `residual_tilt_deg` into `analyze_mask_quality`. The gate's level-check covers tilt at the publish chokepoint in the meantime. (The validated geometry is ported in `flat_hero.py` regardless, so the remediation is a small follow-on.)
+**⚠️ Revision (verified 2026-06-20):** the auto-deskew remediation I planned to *defer* is **already landed** in skills `3b72236` (a parallel agent), so it is **out of scope by virtue of being done**, not deferred:
+- `image-processor/scripts/deskew.py` — the prototype ported verbatim: `residual_tilt_deg(bgr, alpha=None)`, `deskew_to_face(bgr, ...)`, `detect_face_quad`, `_CV2_OK`.
+- `standardize.py` — real `--deskew`/`--perspective-correct`/`--crop-to-face` + `_deskew_flat_goods()` (lazy cv2; routes to manual on low-confidence/non-rectangular/no-cv2).
+- `process.py` + `process_group.py` — `analyze_mask_quality` emits `residual_tilt_deg` (the dormant `photo-profiles.json` tilt rule now fires).
+- `opencv-python-headless` + `numpy` at `plugins/richmondgeneral/pyproject.toml` + `uv.lock`; cv2 verified 4.13.0, `_CV2_OK True`.
+
+**Consequence for this pass:** do **not** port `flat_hero.py` and do **not** touch `analyze_mask_quality` — **reuse** `deskew.residual_tilt_deg` for the level check. The remaining, genuinely-unbuilt work is the **pre-publish gate** (esp. the **upright/OSD** check — a 90°-rotated hero reads tilt ≈ 0°, so the existing tilt gate does NOT catch the Atari mode), its **blocking integration**, and the **orientation bake-once** fix (verified still absent from `standardize.py`).
 
 ## Key facts grounding the design
 
-- **cv2 is not installed** in any local env, but `uv run --with opencv-python-headless` resolves it on demand (4.13.0 confirmed). **tesseract binary is present** (`/opt/homebrew/bin/tesseract`); `pytesseract` is not (addable via uv). → cv2/pytesseract come from **PEP 723 inline deps** on the gate scripts; the Pillow-only env that `process.py` runs in is untouched.
+- **cv2/numpy now resolve** via the plugin-root env: `uv run --project skills/plugins/richmondgeneral` (cv2 4.13.0, `deskew._CV2_OK True`). They are declared in `plugins/richmondgeneral/pyproject.toml` + `uv.lock` (added by `3b72236`). → The gate runs via `uv run --project ${CLAUDE_PLUGIN_ROOT}` (the existing image-processor pattern, SKILL.md), **not** PEP 723 inline deps. **tesseract binary is present** (`/opt/homebrew/bin/tesseract`); add **`pytesseract`** to the plugin-root pyproject. OSD is lazy/guarded (mirrors `deskew._CV2_OK`) so a missing binary/wrapper degrades to the deterministic fallback, never a crash.
 - **No code sets `label.json → state="Listed"`** — it is hand-edited. → Enforcement is the standalone CLI gate + a pipeline hook + an `item_state.can_list()` guard, not a single state-setter.
-- The `residual_tilt_deg` gate rule is **already** present in `ops/docs/photo-profiles.json` (`op:"gte"`, value 1.5), dormant until a checker emits the value.
+- The `residual_tilt_deg` gate rule in `ops/docs/photo-profiles.json` (`op:"gte"`, 1.5) is now **live** — `analyze_mask_quality` emits the value (`3b72236`). The pre-publish gate's level check is a second, independent enforcement at publish time.
 - The prototype's `imgs/` fixtures are **not on disk** → tests self-generate fixtures from real `items/` heroes + deterministic transforms.
-- `standardize.py` **never calls `exif_transpose`** at ingest → the "bake orientation once" fix is a clean add.
+- `standardize.py` **never calls `exif_transpose`** at ingest (re-verified post-`3b72236`) → the "bake orientation once" fix is a clean add.
 
 ## Architecture & module layout
 
@@ -38,9 +44,10 @@ Engine lives in **image-processor** (image-analysis home, already dual-copied; `
 
 | File | Change | Role |
 |---|---|---|
-| `image-processor/lib/flat_hero.py` | **new** (verbatim port of prototype) | Tilt measurement + deskew geometry (cv2/numpy). 23/23 validated. Gate reuses `residual_tilt_deg`. |
-| `image-processor/lib/hero_qa.py` | **new** | `hero_qa_gate(hero_path, original_path=None, item_class=None) -> {status, checks, reasons}` — orchestrates the 5 checks. |
-| `image-processor/scripts/hero_qa.py` | **new** | Standalone CLI (PEP 723 deps): single `hero_qa.py items/RG-XXXX` + `--batch items/` back-fill audit; writes `label.json → hero_qa`. |
+| `image-processor/scripts/deskew.py` | **reuse (no change)** | Already-landed engine. Gate imports `residual_tilt_deg` (and `detect_face_quad` if needed) from here. |
+| `image-processor/lib/hero_qa.py` | **new** | `hero_qa_gate(hero_path, original_path=None, item_class=None) -> {status, checks, reasons}` — orchestrates the 5 checks; imports the level check from `deskew.py`. |
+| `image-processor/scripts/hero_qa.py` | **new** | Standalone CLI (`uv run --project`): single `hero_qa.py items/RG-XXXX` + `--batch items/` back-fill audit; writes `label.json → hero_qa`. |
+| `plugins/richmondgeneral/pyproject.toml` | edit | Add `pytesseract` (cv2/numpy already present). |
 | `image-processor/scripts/standardize.py` | edit | Add `bake_orientation()` (exif_transpose once + strip tag) at ingest; assert no second blind rotation. |
 | `rg-full-auto/scripts/process_new_item.py`, `process_batch.py` | edit | Call the gate before commit / Square-primary / `state=Listed`; on fail → manual queue, no publish. |
 | `rg-full-auto/scripts/item_state.py` | edit | `can_list()` guard — phase_7 (Publishing) refuses without `hero_qa.status=="pass"`. |
@@ -96,7 +103,7 @@ Cases:
 - Unit (gate): straight → pass; 90° → fail(upright); 16° tilt → fail(level); corner-clip cutout → fail(full_face).
 - Orientation regression: synthetic EXIF-orientation-6 source → standardize output upright + tag stripped.
 - Integration: `process_batch` on a bad-hero fixture → never reaches `Listed`, lands in manual queue, reasons printed.
-- Regression guard: port the prototype's 23 tilt/deskew checks (keeps `flat_hero.py` validated).
+- Reuse guard: a thin test asserting `deskew.residual_tilt_deg` still returns the expected shape on a known-tilt fixture (the engine is `3b72236`'s code; we depend on its API, so pin it).
 
 ## Dual-copy & rollout
 

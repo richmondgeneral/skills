@@ -229,12 +229,20 @@ class SquareCounterStore:
             raise SquareUnavailable(f"sentinel fetch failed: {e}") from e
 
     def cas_set(self, expected_version: int, n: int) -> bool:
+        # Square optimistic concurrency is FIELD-LEVEL: a stale-version upsert is
+        # rejected only if the specific field it changes was ALSO changed since that
+        # version. Our safety rests on the counter living in item_data.name and that
+        # being the SOLE field this CAS (and every allocator) mutates -- so a stale
+        # writer always touches the contended field and therefore always conflicts.
+        # ⚠️ Do NOT add a second mutable field to this sentinel: it would let a stale
+        # writer win a name-CAS while only touching the other field, reopening the
+        # cross-machine collision this whole module exists to prevent.
         if self._cached_obj is None:
             return False                                    # force a re-read
         client = self._client_or_make()
         d = self._cached_obj.model_dump(mode="json", exclude_none=True)
         d["version"] = expected_version
-        d["item_data"]["name"] = format_counter_name(n)
+        d["item_data"]["name"] = format_counter_name(n)     # the one contended field
         try:
             r = client.catalog.batch_upsert(
                 idempotency_key=str(uuid.uuid4()),          # fresh key: network-retry safe

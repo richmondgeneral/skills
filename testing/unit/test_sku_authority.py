@@ -178,8 +178,16 @@ def test_concurrent_allocations_are_unique_under_contention():
         t.join()
     assert not errors
     assert len(results) == N
-    assert len(set(results)) == N          # zero collisions
-    assert store.conflict_count > 0        # PROVES real contention occurred (retry path exercised)
+    # Uniqueness is NECESSARY BUT NOT SUFFICIENT as a CAS-correctness check: the fake's
+    # lock serializes the n read/write, so even a version-IGNORING (broken) cas_set
+    # still yields N unique SKUs (confirmed by mutation test -- 40/40 broken runs passed
+    # these two asserts). The load-bearing assertion is conflict_count: all N threads
+    # start from ONE barrier-snapshotted version, so a correct version-CAS lets exactly
+    # one win that version and forces the other N-1 to conflict on their first CAS
+    # (empirically exactly N-1, 200/200 runs); a broken CAS yields 0. Do NOT weaken the
+    # conflict_count bound back to "> 0" -- that is one deletion away from a vacuous test.
+    assert len(set(results)) == N                  # necessary, not sufficient (see comment)
+    assert store.conflict_count >= N - 1           # LOAD-BEARING: stale-version writes are rejected
 
 
 def test_square_store_is_constructible_without_network():

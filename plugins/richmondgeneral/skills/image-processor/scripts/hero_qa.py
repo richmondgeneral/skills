@@ -260,6 +260,14 @@ def _write_hero_qa(item_dir: str, verdict: Dict[str, Any]) -> None:
                     ("status", "checked_at", "checker", "checks", "reasons")}
     if verdict["status"] == "fail":
         d.setdefault("photo_overrides", {})["status"] = "needs_manual"
+    else:
+        # Idempotent: clear a stale gate-set needs_manual now that it passes,
+        # without disturbing other photo_overrides keys.
+        po = d.get("photo_overrides")
+        if isinstance(po, dict) and po.get("status") == "needs_manual":
+            po.pop("status", None)
+            if not po:
+                d.pop("photo_overrides", None)
     tmp = p.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(d, indent=2))
     tmp.replace(p)

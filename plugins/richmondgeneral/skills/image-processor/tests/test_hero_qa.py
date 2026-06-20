@@ -314,6 +314,35 @@ def test_cli_writes_hero_qa_block_on_pass(tmp_path):
     assert rc == 0
 
 
+def test_write_hero_qa_clears_stale_needs_manual_on_pass(tmp_path):
+    # Re-running the gate after a hero is fixed (or after a buggy prior run)
+    # must clear the gate-set needs_manual, not leave it stale.
+    item = tmp_path / "RG-9100"
+    item.mkdir()
+    (item / "label.json").write_text(json.dumps({"product_name": "book"}))
+    fail_v = {"status": "fail", "checked_at": "t", "checker": hq.CHECKER, "checks": {}, "reasons": ["x"]}
+    hq._write_hero_qa(str(item), fail_v)
+    assert json.loads((item / "label.json").read_text())["photo_overrides"]["status"] == "needs_manual"
+    pass_v = {"status": "pass", "checked_at": "t", "checker": hq.CHECKER, "checks": {}, "reasons": []}
+    hq._write_hero_qa(str(item), pass_v)
+    d = json.loads((item / "label.json").read_text())
+    assert d["hero_qa"]["status"] == "pass"
+    assert d.get("photo_overrides", {}).get("status") != "needs_manual"
+
+
+def test_write_hero_qa_preserves_unrelated_photo_overrides(tmp_path):
+    # Clearing needs_manual must not wipe other photo_overrides keys.
+    item = tmp_path / "RG-9101"
+    item.mkdir()
+    (item / "label.json").write_text(json.dumps(
+        {"photo_overrides": {"status": "needs_manual", "profile": "flat-goods"}}))
+    hq._write_hero_qa(str(item), {"status": "pass", "checked_at": "t",
+                                  "checker": hq.CHECKER, "checks": {}, "reasons": []})
+    po = json.loads((item / "label.json").read_text()).get("photo_overrides", {})
+    assert po.get("profile") == "flat-goods"
+    assert "status" not in po or po["status"] != "needs_manual"
+
+
 def test_cli_fail_sets_needs_manual(tmp_path):
     item = tmp_path / "RG-9003"
     item.mkdir()

@@ -2,10 +2,25 @@
 name: rg-item-mark-sold
 description: Mark a Richmond General item as sold across all surfaces — migrate the GitHub Pages item card (and the matching gallery grid card on the landing page) to the sold-archive pattern (brown SOLD badge, "Sold · $X" front price, sold-status-panel back footer replacing the QR + buy button), write status.json with sold metadata, delete the Square payment link via API so the printed QR / bookmarked checkout URL can no longer charge a phantom sale, validate, and commit/push. Use this skill whenever the user says any of "mark RG-XXXX as sold", "mark as sold", "this sold", "[item] sold for $X", "RG-XXXX sold on Square", "buyer paid", "this item sold", "update RG-XXXX to sold", "set RG-XXXX status to sold", "deactivate the buy link", "kill the payment link for X", "retire this listing", or otherwise indicates that a unique inventory item has been purchased and needs the listing taken down without being deleted. Do NOT use for inventory loss/giveaways/damage (use square-inventory-loss instead), description or price edits on still-available items (use rg-item-update), or new item onboarding (use rg-full-auto).
 metadata:
-  version: "1.1"
+  version: "1.2"
   author: scottybe
-  updated: "2026-06-18"
+  updated: "2026-06-20"
   changelog: |
+    v1.2 - Payment-link discovery gap (RG-0014 phantom-charge fix):
+    - delete_payment_link.py: --id now deletes directly from the full
+      account-wide link list instead of filtering *within* the SKU matches,
+      so it reaches a link whose description AND payment_note are both null
+      (the case that left RG-0014's link 2PE4WMYVYB6TXE2V live after sale).
+    - Added --url (short-slug or full URL) and --order-id selectors, both of
+      which also bypass the SKU metadata match.
+    - Empty SKU match no longer reports "all clear" when live links exist:
+      it lists every live link and exits 5 so a caller can't treat an
+      unseen null-metadata link as handled.
+    - Added --audit: read-only sweep flagging every live link whose item is
+      already marked sold (CRITICAL) or maps to no item (WARN).
+    - Step 7 doc rewritten: --id no longer "disambiguates within the SKU";
+      records the deleted link id/order_id/slug into status.json for audit.
+    - Regression test: tests/test_delete_payment_link.py.
     v1.1 - Gallery-card surface:
     - Added Step 5 "Migrate the gallery card in items/index.html" — the
       landing-page grid card is a separate GitHub Pages surface that does
@@ -221,12 +236,28 @@ python3 skills/rg-item-mark-sold/scripts/delete_payment_link.py RG-XXXX
 
 The script:
 1. Sources `SQUARE_ACCESS_TOKEN` from the workspace `.env` (override with `--env-file`)
-2. Lists all payment links and matches on `description` containing the SKU (e.g. `"RG-0002 - 1892 Kings of the Forest"`) or `payment_note` containing the SKU
+2. Lists all payment links and matches the SKU against each link's `description` or `payment_note` (e.g. `"RG-0002 - 1892 Kings of the Forest"`)
 3. Prints what it found (id, url, description, created_at) for visual confirmation
-4. Refuses to proceed if multiple links match (pass `--id <PAYMENT_LINK_ID>` to disambiguate)
-5. Refuses to proceed if zero links match (the user may already have cancelled it via dashboard — in which case skip this step)
+4. Refuses to proceed if multiple links match — pass `--id <PAYMENT_LINK_ID>` to pick exactly one. `--id` deletes that link **directly, from the full account-wide list** (not "within the SKU matches"), so it also reaches a link the SKU search can't see.
+5. **Does NOT report "all clear" when the SKU matches nothing but live links still exist** (exit 5). The SKU search has a blind spot: a link whose `description` *and* `payment_note` are both null is invisible to it — this is exactly the RG-0014 phantom-charge gap (2026-06-20), where the helper printed "no payment link found" and would have left a live link able to charge. When this happens the script prints every live link and tells you to re-run with a precise selector. Only a genuinely empty account (zero links anywhere) is a clean "nothing to delete" (exit 0).
 6. Deletes via `DELETE /v2/online-checkout/payment-links/{id}` once you pass `--yes`
-7. Returns the cancelled `order_id` from Square — capture this for the commit message
+7. Returns the cancelled `order_id` from Square — capture it for the commit message **and record the deleted link's id + cancelled `order_id` + short slug in `status.json` `notes`** (Step 6). That recorded identifier is what lets a later `--audit` (below) confirm the dead link belonged to this sold item even when its Square metadata was null.
+
+**Reaching a link the SKU can't match.** If `description`/`payment_note` are null (or wrong), select the link explicitly — any one of these works, with or without a SKU argument:
+
+```bash
+python3 skills/rg-item-mark-sold/scripts/delete_payment_link.py --id 2PE4WMYVYB6TXE2V --yes        # by payment_link_id
+python3 skills/rg-item-mark-sold/scripts/delete_payment_link.py --url WYk1Yl12 --yes               # by short-URL slug (or full URL)
+python3 skills/rg-item-mark-sold/scripts/delete_payment_link.py --order-id Td1qji0tORadRLBNfgZGWR0WIjFZY --yes   # by order_id
+```
+
+**Audit sweep (read-only)** — catch this whole class proactively across the catalog:
+
+```bash
+python3 skills/rg-item-mark-sold/scripts/delete_payment_link.py --audit
+```
+
+It lists every live payment link, maps each to an item (by SKU in metadata, or by finding the link's id/slug/order_id in the item's `status.json` / `label.json` / `index.html`), and flags any link whose item is already marked **sold** (`CRITICAL`) or that maps to **no item at all** (`WARN` — possibly a sold item's null-metadata link). It never deletes; exit code is 6 if any `CRITICAL` is found, else 0. Run it after a batch of sales or whenever reconciling.
 
 After the delete, verify both URL forms 404:
 
@@ -237,7 +268,7 @@ curl -sI https://checkout.square.site/merchant/7MM9AFJAD0XHW/order/<order_id> -o
 
 Expected: short URL `303` (Square's "link gone" redirect page), long URL `404`.
 
-**If the user reports they already deleted the link via Square Dashboard**, the script will return "no matches found" — that's fine, skip the API call and note it in the commit message.
+**If the user reports they already deleted the link via Square Dashboard**, re-running by SKU will report no SKU match. If the account has no other live links that's a clean exit 0 — note it in the commit message. But if it exits 5 (other live links still exist), do **not** assume *this* item's link is the one that's gone: confirm with `--url <slug>` / `--order-id <id>` (or run `--audit`) before treating the link as deleted. A null-metadata link survives a SKU miss — that is the exact failure this guard exists to stop.
 
 ### Step 8 — Validate
 
@@ -293,7 +324,7 @@ State, in this shape:
 - **Items where Square inventory `track_inventory: true`** — payment-link deletion is independent from inventory state. Square Online auto-decrements inventory at checkout; payment links don't. If the item is also in the Square Catalog and inventory matters, that's `rg-item-update`'s job (set quantity to 0 separately) — this skill doesn't touch the Catalog object.
 - **Items sold off-channel (cash, Facebook Marketplace, etc.) where no Square payment link ever existed** — skip Step 7 (no link to delete), but still write the `status.json` and migrate **both** HTML surfaces (item page + gallery card). The skill is the source of truth for "this listing is retired", not just for Square-sourced sales.
 - **Multiple payment links for the same SKU** — happens occasionally when someone regenerated a link mid-listing. The script will refuse to auto-delete and print all matches with their `created_at`. Confirm with the user which to delete (usually all of them).
-- **Already-sold items with stale live links** — discovered during the 2026-05-20 audit: RG-0002, RG-0003, RG-0005 were all marked SOLD on the site but had live `square.link/u/...` URLs. All three were cleaned up in commit `5d93566` and the API DELETE in the same session. If you find another, treat it exactly like a fresh sale — run this skill end-to-end. The item page may already be on the clean pattern, but the **gallery card is often the surface still left stale** (Step 1 detects the clean item page and routes you to Step 5 for exactly this). RG-0002 is the canonical example: item page migrated in `5d93566`, gallery card missed until `f05c330`.
+- **Already-sold items with stale live links** — discovered during the 2026-05-20 audit: RG-0002, RG-0003, RG-0005 were all marked SOLD on the site but had live `square.link/u/...` URLs. All three were cleaned up in commit `5d93566` and the API DELETE in the same session. If you find another, treat it exactly like a fresh sale — run this skill end-to-end. The item page may already be on the clean pattern, but the **gallery card is often the surface still left stale** (Step 1 detects the clean item page and routes you to Step 5 for exactly this). RG-0002 is the canonical example: item page migrated in `5d93566`, gallery card missed until `f05c330`. **Find these proactively with `delete_payment_link.py --audit`** (read-only) — it flags every live link whose item is already sold. RG-0014 (2026-06-20) extended this class: its link had **null `description` and `payment_note`**, so a SKU search couldn't see it at all and the helper said "no payment link found" — `--audit`, or a precise `--url` / `--order-id` / `--id`, is the only way to catch a null-metadata straggler.
 - **User wants to "un-sell" an item** — out of scope for this skill. The Square payment link is gone permanently; regenerating one requires the `rg-item-update` flow (or a fresh listing) plus a manual `git revert` on the sold-state commit.
 
 ## Related skills

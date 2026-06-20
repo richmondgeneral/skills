@@ -9,22 +9,39 @@ short URL (square.link/u/...) and the long checkout URL
 Stdlib only — no `requests`, no `python-dotenv`. Reads SQUARE_ACCESS_TOKEN
 from the process env first, then from the workspace `.env` file.
 
+Discovery matches a SKU only when it appears in the link's `description` or
+`payment_note`. A link with BOTH fields null (Square allows this) is invisible
+to a SKU search — so an explicit selector is the only way to reach it:
+
+    --id <payment_link_id>   delete that link directly (bypasses SKU metadata)
+    --url <slug-or-url>      match the short square.link slug or full checkout URL
+    --order-id <order_id>    match the link's order_id
+
 Usage:
-    # Discovery only (no delete) — see what would match:
+    # Discovery only (no delete) — see what a SKU would match:
     python3 delete_payment_link.py RG-XXXX
 
     # Confirm + delete:
     python3 delete_payment_link.py RG-XXXX --yes
 
-    # Disambiguate when multiple links match the same SKU:
-    python3 delete_payment_link.py RG-XXXX --id 6O42ERXZU4TBERKC --yes
+    # Reach a link the SKU can't see (null description/payment_note) — by id,
+    # short-URL slug, or order_id; any one works even with no SKU:
+    python3 delete_payment_link.py --id 2PE4WMYVYB6TXE2V --yes
+    python3 delete_payment_link.py --url WYk1Yl12 --yes
+    python3 delete_payment_link.py --order-id Td1qji0tORadRLBNfgZGWR0WIjFZY --yes
+
+    # Read-only sweep: flag every live link whose item is already marked sold:
+    python3 delete_payment_link.py --audit
 
 Exit codes:
-    0 — success (link deleted, OR no match found and that's fine)
+    0 — success (link deleted, OR the link is confirmably already gone)
     1 — generic error (network, validation, etc.)
     2 — auth not found (no token in env or .env)
     3 — Square API rejected the request (HTTP 4xx/5xx)
-    4 — multiple links matched and --id was not supplied (refuse to guess)
+    4 — multiple links matched a non-id selector (pass --id to pick one)
+    5 — SKU matched nothing but live links exist; could be a null-metadata link
+        (re-run with --id/--url/--order-id, or --audit) — refuses "all clear"
+    6 — audit found a sold item with a live payment link (phantom-charge risk)
 """
 
 from __future__ import annotations
@@ -222,6 +239,218 @@ def match_links(links: list[dict], sku: str) -> list[dict]:
     return hits
 
 
+def _slug(u: Optional[str]) -> str:
+    """Last path segment of a URL (or a bare slug), lowercased.
+
+    ``https://square.link/u/WYk1Yl12`` -> ``wyk1yl12``; a bare ``WYk1Yl12`` ->
+    the same. Lets ``--url`` accept the short link, the long checkout URL, or
+    just the slug a human copied off a printed QR label.
+    """
+    if not u:
+        return ""
+    return u.rstrip("/").rsplit("/", 1)[-1].strip().lower()
+
+
+def select_links(
+    links: list[dict],
+    sku: Optional[str] = None,
+    *,
+    link_id: Optional[str] = None,
+    url: Optional[str] = None,
+    order_id: Optional[str] = None,
+) -> list[dict]:
+    """Resolve the payment link(s) the operator means, from the FULL link list.
+
+    Explicit selectors win over SKU and search *every* link regardless of its
+    ``description`` / ``payment_note``. This is the fix for the RG-0014 gap:
+    that link had both metadata fields null, so it was invisible to a SKU search
+    and the old ``--id`` (which filtered *within* SKU matches) could not rescue
+    it. Here ``--id`` / ``--url`` / ``--order-id`` go straight at the full list.
+
+    Precedence when several are passed: link_id > order_id > url > sku.
+    """
+    if link_id:
+        return [L for L in links if L.get("id") == link_id]
+    if order_id:
+        return [L for L in links if L.get("order_id") == order_id]
+    if url:
+        want = _slug(url)
+        if not want:
+            return []
+        return [
+            L
+            for L in links
+            if _slug(L.get("url")) == want or _slug(L.get("long_url")) == want
+        ]
+    if sku:
+        return match_links(links, sku)
+    return []
+
+
+# -----------------------------------------------------------------------------
+# Audit — read-only cross-check of every live link against the item ledger
+# -----------------------------------------------------------------------------
+
+
+def load_item_records(items_dir: str) -> list[dict]:
+    """Read every ``items/RG-*/`` folder into ``{sku, status, blob}`` records.
+
+    ``status`` comes from ``status.json`` (``None`` if absent/unreadable → the
+    item is treated as available). ``blob`` is the lowercased concatenation of
+    ``status.json``, ``label.json`` and ``index.html`` so the audit can attribute
+    a null-metadata link to its item by finding the link's id / order_id /
+    url-slug anywhere in that item's own files.
+    """
+    base = Path(items_dir)
+    out: list[dict] = []
+    if not base.is_dir():
+        log(f"items dir not found: {items_dir}")
+        return out
+    for d in sorted(base.glob("RG-*")):
+        if not d.is_dir():
+            continue
+        status: Optional[str] = None
+        parts: list[str] = []
+        for fn in ("status.json", "label.json", "index.html"):
+            f = d / fn
+            if not f.exists():
+                continue
+            try:
+                text = f.read_text(encoding="utf-8")
+            except OSError as e:
+                log(f"read error {f}: {e}")
+                continue
+            parts.append(text)
+            if fn == "status.json":
+                try:
+                    status = json.loads(text).get("status")
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+        out.append(
+            {"sku": d.name, "status": status, "blob": "\n".join(parts).lower()}
+        )
+    return out
+
+
+def _link_identifiers(link: dict) -> list[str]:
+    """The strings that uniquely tie a link to an item, lowercased."""
+    raw = [
+        link.get("id"),
+        link.get("order_id"),
+        _slug(link.get("url")),
+        _slug(link.get("long_url")),
+    ]
+    return [s.lower() for s in raw if s]
+
+
+def attribute_link(
+    link: dict, items: list[dict]
+) -> tuple[Optional[dict], Optional[str]]:
+    """Map a live link to the item it belongs to, returning ``(item, how)``.
+
+    ``how`` is ``"record"`` (a link identifier appears in the item's files),
+    ``"metadata"`` (the item's SKU appears in the link's description/payment_note),
+    or ``(None, None)`` when the link can't be tied to any item — which is itself
+    a signal worth flagging (it may be a sold item's orphaned, null-metadata link).
+    """
+    idents = _link_identifiers(link)
+    for it in items:
+        blob = it.get("blob") or ""
+        if any(ident and ident in blob for ident in idents):
+            return it, "record"
+    haystack = f"{link.get('description') or ''}\n{link.get('payment_note') or ''}"
+    for it in items:
+        sku = it.get("sku") or ""
+        if not sku:
+            continue
+        pat = re.compile(
+            r"(?<![A-Z0-9-])" + re.escape(sku.upper()) + r"(?![A-Z0-9-])",
+            re.IGNORECASE,
+        )
+        if pat.search(haystack):
+            return it, "metadata"
+    return None, None
+
+
+def audit_links(links: list[dict], items: list[dict]) -> list[dict]:
+    """Classify every live payment link against the item ledger (read-only).
+
+    - **CRITICAL**: link maps to an item whose ``status.json`` says ``sold`` — a
+      live checkout URL on a sold item (phantom-charge risk; should be deleted).
+    - **WARN**: link can't be attributed to any item — e.g. a null-metadata link
+      like RG-0014's. Could be a sold item's orphaned link; needs a human look.
+    - **OK**: link maps to a still-available item (an expected active listing).
+    """
+    findings: list[dict] = []
+    for L in links:
+        it, how = attribute_link(L, items)
+        if it is None:
+            severity, sku, status = "WARN", None, None
+        elif (it.get("status") or "").lower() == "sold":
+            severity, sku, status = "CRITICAL", it.get("sku"), "sold"
+        else:
+            severity, sku, status = "OK", it.get("sku"), it.get("status")
+        findings.append(
+            {
+                "severity": severity,
+                "sku": sku,
+                "status": status,
+                "attributed_by": how,
+                "link_id": L.get("id"),
+                "url": L.get("url"),
+                "order_id": L.get("order_id"),
+                "description": L.get("description"),
+                "payment_note": L.get("payment_note"),
+            }
+        )
+    return findings
+
+
+def audit_has_critical(findings: list[dict]) -> bool:
+    return any(f.get("severity") == "CRITICAL" for f in findings)
+
+
+def format_audit_report(findings: list[dict], item_count: int) -> str:
+    crit = [f for f in findings if f["severity"] == "CRITICAL"]
+    warn = [f for f in findings if f["severity"] == "WARN"]
+    ok = [f for f in findings if f["severity"] == "OK"]
+    lines = [
+        f"Payment-link audit — {len(findings)} live link(s) vs "
+        f"{item_count} item record(s)",
+        f"  CRITICAL: {len(crit)}   WARN: {len(warn)}   OK: {len(ok)}",
+        "",
+    ]
+    if crit:
+        lines.append("CRITICAL — sold item still has a LIVE payment link:")
+        for f in crit:
+            lines.append(
+                f"  • {f['sku']}  id={f['link_id']}  {f['url']}  "
+                f"order={f['order_id']}"
+            )
+            lines.append(
+                f"      delete: delete_payment_link.py {f['sku']} "
+                f"--id {f['link_id']} --yes"
+            )
+        lines.append("")
+    if warn:
+        lines.append(
+            "WARN — live link not attributable to any item (manual review; "
+            "may be a sold item's null-metadata link):"
+        )
+        for f in warn:
+            lines.append(
+                f"  • id={f['link_id']}  {f['url']}  order={f['order_id']}  "
+                f"desc={f['description']!r} note={f['payment_note']!r}"
+            )
+        lines.append("")
+    if not crit and not warn:
+        lines.append(
+            "All live payment links map to still-available items. "
+            "No phantom-charge risk found."
+        )
+    return "\n".join(lines).rstrip()
+
+
 def print_link(L: dict, prefix: str = "") -> None:
     print(f"{prefix}id:          {L.get('id')}")
     print(f"{prefix}url:         {L.get('url')}")
@@ -230,6 +459,20 @@ def print_link(L: dict, prefix: str = "") -> None:
     print(f"{prefix}payment_note:{L.get('payment_note')}")
     print(f"{prefix}order_id:    {L.get('order_id')}")
     print(f"{prefix}created_at:  {L.get('created_at')}")
+
+
+def run_audit(token: str, args) -> int:
+    """Read-only phantom-charge sweep. Never deletes (ignores --yes)."""
+    links = list_all_payment_links(token, args.version)
+    log(f"auditing {len(links)} live links against {args.items_dir}")
+    items = load_item_records(args.items_dir)
+    findings = audit_links(links, items)
+    print(format_audit_report(findings, len(items)))
+    if audit_has_critical(findings):
+        # Non-zero so an automated caller / CI treats a sold item with a live
+        # link as the failure it is.
+        return 6
+    return 0
 
 
 # -----------------------------------------------------------------------------
@@ -241,19 +484,50 @@ def main() -> int:
     global VERBOSE
 
     ap = argparse.ArgumentParser(
-        description="Find and delete a Square payment link by SKU.",
+        description="Find and delete a Square payment link by SKU, id, url, or "
+        "order_id; or --audit every live link against the item ledger.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
     ap.add_argument(
         "sku",
-        help="Item SKU to match (e.g. RG-0002). Matched as a case-insensitive "
-        "substring against payment-link description and payment_note.",
+        nargs="?",
+        help="Item SKU to match (e.g. RG-0002), as a word-boundary match against "
+        "payment-link description and payment_note. Optional — omit it and pass "
+        "--id/--url/--order-id to reach a link with empty metadata.",
     )
     ap.add_argument(
         "--id",
-        help="Specific payment_link_id to delete. Required when multiple "
-        "links match the same SKU.",
+        help="Delete this payment_link_id directly, from the FULL link list — "
+        "bypasses the SKU metadata match, so it reaches a link whose "
+        "description/payment_note are null (the RG-0014 case).",
+    )
+    ap.add_argument(
+        "--url",
+        help="Select by short-URL slug or full URL (e.g. WYk1Yl12 or "
+        "https://square.link/u/WYk1Yl12). Matches the link's url or long_url; "
+        "also bypasses the SKU metadata match.",
+    )
+    ap.add_argument(
+        "--order-id",
+        dest="order_id",
+        help="Select by the link's order_id. Also bypasses the SKU match.",
+    )
+    ap.add_argument(
+        "--audit",
+        action="store_true",
+        help="Read-only: list every live payment link and flag any whose item is "
+        "already marked sold (status.json status=sold) — phantom-charge sweep. "
+        "Never deletes; ignores --yes.",
+    )
+    ap.add_argument(
+        "--items-dir",
+        dest="items_dir",
+        default=os.environ.get(
+            "RG_ITEMS_DIR", "/Users/scottybe/workspace/richmondgeneral/items"
+        ),
+        help="Item ledger root for --audit (default: the GitHub Pages items "
+        "repo, override with --items-dir or RG_ITEMS_DIR).",
     )
     ap.add_argument(
         "--yes",
@@ -276,51 +550,78 @@ def main() -> int:
     args = ap.parse_args()
     VERBOSE = args.verbose
 
+    if not (args.sku or args.id or args.url or args.order_id or args.audit):
+        ap.error("supply a SKU, or one of --id/--url/--order-id, or --audit")
+
     token = resolve_token(args.env_file)
 
-    log(f"listing payment links to match SKU {args.sku!r}…")
+    if args.audit:
+        return run_audit(token, args)
+
+    log("listing all payment links…")
     links = list_all_payment_links(token, args.version)
     log(f"found {len(links)} total payment links on the merchant")
 
-    matches = match_links(links, args.sku)
+    explicit = bool(args.id or args.url or args.order_id)
+    targets = select_links(
+        links,
+        sku=args.sku,
+        link_id=args.id,
+        url=args.url,
+        order_id=args.order_id,
+    )
 
-    # Filter by explicit --id if the user supplied one
-    if args.id:
-        matches = [L for L in matches if L.get("id") == args.id]
-        if not matches:
-            # Consistent with the bare-SKU "no match" path below — already-gone
-            # is a success outcome for this skill, not an error. The operator
-            # most likely passed a stale --id (the link was already deleted via
-            # dashboard or an earlier run).
+    if not targets:
+        if explicit:
+            # An explicit selector that matches nothing means the link is already
+            # gone — the desired end state. Success, not an error.
+            sel = args.id or args.order_id or args.url
             print(
-                f"No payment link with id={args.id} matched SKU {args.sku}. "
+                f"No live payment link matched the selector ({sel}). "
                 f"It may already have been deleted."
             )
             return 0
-
-    if not matches:
+        if links:
+            # FIX (RG-0014): a SKU search finding nothing is NOT proof the link is
+            # gone. A link with null description/payment_note cannot match by SKU
+            # — exactly the phantom-charge gap. Refuse the old "all clear":
+            # surface every live link so the operator re-runs with an explicit
+            # selector (or --audit), and exit non-zero so an automated caller
+            # can't mistake this for "handled".
+            print(
+                f"No live payment link's description/payment_note contained "
+                f"{args.sku}. This is NOT proof the link is gone — a link with "
+                f"empty metadata cannot match by SKU (the RG-0014 phantom-charge "
+                f"gap). {len(links)} live link(s) exist on the account; identify "
+                f"the item's link below and re-run with --id / --url / "
+                f"--order-id, or run --audit to cross-check every link against "
+                f"the item ledger.",
+                file=sys.stderr,
+            )
+            for L in links:
+                print(file=sys.stderr)
+                print_link(L, prefix="  ")
+            return 5
         print(
-            f"No payment link found matching SKU {args.sku}. "
-            f"It may have already been deleted, or it never existed "
-            f"(off-channel sale, e.g. cash / FB Marketplace).",
+            f"No payment links exist on the merchant account at all — nothing to "
+            f"delete for {args.sku} (off-channel sale, or already cleaned up)."
         )
         return 0
 
-    if len(matches) > 1 and not args.id:
+    if len(targets) > 1:
         print(
-            f"Multiple payment links matched SKU {args.sku} "
-            f"({len(matches)} hits). Refusing to auto-delete — pass --id "
-            f"to disambiguate.",
+            f"Multiple payment links matched ({len(targets)} hits). Refusing to "
+            f"auto-delete — pass --id <PAYMENT_LINK_ID> to pick exactly one.",
             file=sys.stderr,
         )
-        for L in matches:
-            print()
+        for L in targets:
+            print(file=sys.stderr)
             print_link(L, prefix="  ")
         return 4
 
-    target = matches[0]
+    target = targets[0]
 
-    print(f"Matched payment link for {args.sku}:")
+    print(f"Matched payment link for {args.sku or target.get('id')}:")
     print_link(target, prefix="  ")
     print()
 

@@ -161,3 +161,28 @@ def test_full_face_pass_on_floating_cutout():
 def test_full_face_lenient_for_flat_goods_fullbleed():
     p = _save_png("ff_flat.png", _straight_book_bgr())   # opaque, reaches edges
     assert hq.check_full_face(p, item_class="flat")["ok"] is True
+
+
+# --------------------------------------------------------------------------
+# Task 5 — background by class
+# --------------------------------------------------------------------------
+def test_bg_cutout_requires_transparency():
+    p = _save_png("bg_opaque.png", _straight_book_bgr())          # no alpha
+    assert hq.check_bg(p, item_class="cutout")["ok"] is False
+
+
+def test_bg_cutout_pass_with_transparency():
+    bgr, alpha = _rect_alpha(angle=0)
+    p = _save_png("bg_transp.png", bgr, alpha)
+    assert hq.check_bg(p, item_class="cutout")["ok"] is True
+
+
+def test_bg_flat_requires_opaque():
+    bgr, alpha = _rect_alpha(angle=0)
+    p = _save_png("bg_flat_transp.png", bgr, alpha)              # transparent
+    assert hq.check_bg(p, item_class="flat")["ok"] is False
+
+
+def test_bg_keepbg_is_lenient():
+    p = _save_png("bg_keepbg.png", _straight_book_bgr())
+    assert hq.check_bg(p, item_class="keepbg")["ok"] is True

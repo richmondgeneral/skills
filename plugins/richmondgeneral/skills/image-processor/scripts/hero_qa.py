@@ -126,6 +126,23 @@ def check_full_face(hero_path: str, item_class: str = "cutout") -> Dict[str, Any
     return {"ok": True, "method": "alpha_bbox"}
 
 
+def check_bg(hero_path: str, item_class: str = "cutout") -> Dict[str, Any]:
+    """Cutout heroes must have a real transparent background; flat-goods must be
+    opaque full-bleed; keep-bg (glass/silver on its setting) is lenient."""
+    _, alpha = _imread(hero_path)
+    has_transp = alpha is not None and bool((alpha < 250).any())
+    if item_class == "keepbg":
+        return {"ok": True, "method": "keepbg_lenient"}
+    if item_class == "flat":
+        if has_transp:
+            return {"ok": False,
+                    "reason": "flat-goods hero must be opaque full-bleed, not a cutout"}
+        return {"ok": True}
+    if not has_transp:                                 # cutout class
+        return {"ok": False, "reason": "cutout hero has no transparent background"}
+    return {"ok": True}
+
+
 def check_level(hero_path: str) -> Dict[str, Any]:
     """Fail if the dominant object is tilted > TILT_MAX_DEG with a trustworthy
     reading (confidence >= TILT_MIN_CONF). Mirrors the validated prototype gate."""

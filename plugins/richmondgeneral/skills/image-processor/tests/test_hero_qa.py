@@ -186,3 +186,27 @@ def test_bg_flat_requires_opaque():
 def test_bg_keepbg_is_lenient():
     p = _save_png("bg_keepbg.png", _straight_book_bgr())
     assert hq.check_bg(p, item_class="keepbg")["ok"] is True
+
+
+# --------------------------------------------------------------------------
+# Task 6 — defect-retention (soft)
+# --------------------------------------------------------------------------
+def test_defects_not_compared_without_original():
+    p = _save_png("def_solo.png", _straight_book_bgr())
+    r = hq.check_defects(p, original_path=None)
+    assert r["ok"] is True and r["reason"] == "not_compared"
+
+
+def test_defects_fail_on_extreme_detail_wipe():
+    orig = _straight_book_bgr()                     # has edges/detail
+    blank = np.full_like(orig, 235)                 # detail wiped
+    po = _save_png("def_orig.png", orig)
+    pb = _save_png("def_wiped.png", blank)
+    assert hq.check_defects(pb, original_path=po)["ok"] is False
+
+
+def test_defects_pass_on_honest_retention():
+    orig = _straight_book_bgr()
+    po = _save_png("def_orig2.png", orig)
+    ph = _save_png("def_hero2.png", orig.copy())    # same detail retained
+    assert hq.check_defects(ph, original_path=po)["ok"] is True

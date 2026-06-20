@@ -143,6 +143,33 @@ def check_bg(hero_path: str, item_class: str = "cutout") -> Dict[str, Any]:
     return {"ok": True}
 
 
+DEFECT_MIN_RETENTION = 0.40
+
+
+def _edge_density(bgr) -> float:
+    g = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    return float((cv2.Canny(cv2.GaussianBlur(g, (5, 5), 0), 40, 120) > 0).mean())
+
+
+def check_defects(hero_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
+    """Soft guard against over-cleaning (RG-0030 hallucinated-clean). Only active
+    with an original; fails ONLY on extreme detail loss so honest cleanups pass."""
+    if not original_path or not os.path.exists(original_path):
+        return {"ok": True, "reason": "not_compared"}
+    hb, _ = _imread(hero_path)
+    ob, _ = _imread(original_path)
+    if hb is None or ob is None:
+        return {"ok": True, "reason": "not_compared"}
+    od = _edge_density(ob)
+    if od < 1e-4:
+        return {"ok": True, "reason": "original_featureless"}
+    retention = _edge_density(hb) / od
+    if retention < DEFECT_MIN_RETENTION:
+        return {"ok": False,
+                "reason": f"detail retention {retention:.0%} < {DEFECT_MIN_RETENTION:.0%} (over-cleaned?)"}
+    return {"ok": True, "retention": round(retention, 2)}
+
+
 def check_level(hero_path: str) -> Dict[str, Any]:
     """Fail if the dominant object is tilted > TILT_MAX_DEG with a trustworthy
     reading (confidence >= TILT_MIN_CONF). Mirrors the validated prototype gate."""

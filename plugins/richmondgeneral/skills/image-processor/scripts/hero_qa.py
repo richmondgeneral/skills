@@ -33,6 +33,11 @@ from deskew import residual_tilt_deg
 CHECKER = "auto:hero_qa_gate v1"
 TILT_MAX_DEG = 1.5
 TILT_MIN_CONF = 0.5
+# OSD orientation_conf floor to FLAG a sideways hero. Measured: synthetic text
+# reads 0.78–1.05 across 90/180/270; real covers/labels read higher. 0.5 catches
+# all of them with margin. Bias is intentional — a false positive routes a hero
+# to manual review (cheap); a false negative ships sideways (the incident).
+OSD_FLAG_CONF = 0.5
 
 
 def _imread(path: str):
@@ -43,6 +48,56 @@ def _imread(path: str):
              if raw is not None and raw.ndim == 3 and raw.shape[2] == 4
              else None)
     return bgr, alpha
+
+
+def _osd_rotation(bgr) -> Optional[Dict[str, float]]:
+    """Tesseract OSD: {'rotate': 0/90/180/270, 'conf': float} or None if OSD
+    is unavailable (no binary / too little text / error)."""
+    try:
+        import pytesseract
+        from PIL import Image
+        pytesseract.get_tesseract_version()          # raises if binary missing
+        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        osd = pytesseract.image_to_osd(Image.fromarray(rgb),
+                                       output_type=pytesseract.Output.DICT)
+        return {"rotate": float(osd.get("rotate", 0)),
+                "conf": float(osd.get("orientation_conf", 0))}
+    except Exception:
+        return None
+
+
+def _exif_orientation(path: str) -> Optional[int]:
+    try:
+        from PIL import Image
+        return Image.open(path).getexif().get(0x0112)   # Orientation tag
+    except Exception:
+        return None
+
+
+def check_upright(hero_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
+    """Fail only on a POSITIVE sideways signal — OSD says the text is rotated
+    90/180/270 (catches the Atari batch), or (fallback) the source EXIF says it
+    needed rotation that was never baked into the hero. 'unknown' never fails."""
+    bgr, _ = _imread(hero_path)
+    if bgr is None:
+        return {"ok": False, "reason": "unreadable_hero", "method": "none"}
+    osd = _osd_rotation(bgr)
+    if osd is not None and int(osd["rotate"]) in (90, 180, 270) and osd["conf"] >= OSD_FLAG_CONF:
+        return {"ok": False, "method": "osd",
+                "reason": f"text rotated {int(osd['rotate'])}° (OSD conf {osd['conf']:.2f})"}
+    # Fallback: positive 'orientation not baked' signal from the source only.
+    if original_path:
+        ori = _exif_orientation(original_path)
+        if ori in (5, 6, 7, 8):                       # source needed a 90/270 rotation
+            src, _ = _imread(original_path)
+            if src is not None:
+                h, w = bgr.shape[:2]
+                sh, sw = src.shape[:2]
+                if (w > h) == (sw > sh):              # hero kept the un-baked aspect
+                    return {"ok": False, "method": "exif_fallback",
+                            "reason": f"source EXIF orientation {ori} not baked into hero"}
+    method = "osd" if osd is not None else "no_osd"
+    return {"ok": True, "method": method}
 
 
 def check_level(hero_path: str) -> Dict[str, Any]:

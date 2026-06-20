@@ -94,3 +94,46 @@ def test_level_fail_on_16deg_tilt():
     r = hq.check_level(p)
     assert r["ok"] is False
     assert r["level_deg"] > 1.5
+
+
+# --------------------------------------------------------------------------
+# Task 3 — upright check (tesseract OSD + fallback)
+# --------------------------------------------------------------------------
+def _osd_available():
+    try:
+        import pytesseract
+        pytesseract.get_tesseract_version()
+        return True
+    except Exception:
+        return False
+
+
+OSD = _osd_available()
+needs_osd = pytest.mark.skipif(not OSD, reason="tesseract OSD unavailable")
+
+
+@needs_osd
+def test_upright_fail_on_90deg_rotation():
+    p = _save_png("up_rot90.png", np.rot90(_text_hero_bgr(), 1))
+    r = hq.check_upright(p)
+    assert r["ok"] is False
+    assert "90" in r["reason"]
+
+
+@needs_osd
+def test_upright_fail_on_270deg_rotation():
+    p = _save_png("up_rot270.png", np.rot90(_text_hero_bgr(), 3))
+    assert hq.check_upright(p)["ok"] is False
+
+
+@needs_osd
+def test_upright_pass_on_straight_text():
+    p = _save_png("up_straight.png", _text_hero_bgr())
+    assert hq.check_upright(p)["ok"] is True
+
+
+def test_upright_does_not_false_fail_textless_image():
+    # a textless gradient: OSD errors -> fallback with no original -> must pass
+    grad = np.tile(np.linspace(0, 255, 300, dtype=np.uint8), (300, 1))
+    p = _save_png("up_textless.png", cv2.cvtColor(grad, cv2.COLOR_GRAY2BGR))
+    assert hq.check_upright(p)["ok"] is True

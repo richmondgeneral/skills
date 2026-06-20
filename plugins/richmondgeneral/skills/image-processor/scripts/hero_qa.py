@@ -33,14 +33,16 @@ from deskew import residual_tilt_deg
 CHECKER = "auto:hero_qa_gate v1"
 TILT_MAX_DEG = 1.5
 TILT_MIN_CONF = 0.5
-# OSD floor to FLAG a sideways hero. Empirically (survey of real heroes):
-# UPRIGHT heroes always read rotate=0; ROTATED heroes always read rotate≠0, but
-# text-sparse labels (Atari cartridges) read at low conf (0.12–0.19) while
-# book covers read high (1.6–4.7). So rotate≠0 is itself the reliable signal —
-# this floor only filters near-zero OSD noise. Bias is intentional: a false
-# positive routes to manual review (cheap); a false negative ships sideways
-# (RG-0036–0051). Locked by test_upright_flags_lowconf_rotation (monkeypatched).
-OSD_FLAG_CONF = 0.10
+# OSD floors to FLAG a mis-oriented hero. Empirically (survey of real heroes):
+# UPRIGHT heroes always read rotate=0; truly SIDEWAYS heroes read 90/270 (their
+# text runs vertically) — reliable even at low conf (text-sparse Atari labels
+# read 0.12–0.19; book covers 1.6–4.7). So for 90/270 a low floor is safe and
+# catches the Atari incident. 180° (upside-down) is the UNRELIABLE reading —
+# OSD weakly guesses 180 (conf 0.1–0.5) on upright items with symmetric-ish
+# label text (false positives on RG-0049/0050/0016/0019) — so 180 needs high
+# confidence. No real incident was ever 180°. Locked by monkeypatched tests.
+OSD_FLAG_CONF = 0.10      # 90/270 (vertical text) — the RG-0036–0051 mode
+OSD_FLIP_CONF = 1.0       # 180 (upside-down) — only when OSD is confident
 
 
 def _imread(path: str):
@@ -85,9 +87,13 @@ def check_upright(hero_path: str, original_path: Optional[str] = None) -> Dict[s
     if bgr is None:
         return {"ok": False, "reason": "unreadable_hero", "method": "none"}
     osd = _osd_rotation(bgr)
-    if osd is not None and int(osd["rotate"]) in (90, 180, 270) and osd["conf"] >= OSD_FLAG_CONF:
-        return {"ok": False, "method": "osd",
-                "reason": f"text rotated {int(osd['rotate'])}° (OSD conf {osd['conf']:.2f})"}
+    if osd is not None:
+        rot, conf = int(osd["rotate"]), osd["conf"]
+        flag = ((rot in (90, 270) and conf >= OSD_FLAG_CONF) or
+                (rot == 180 and conf >= OSD_FLIP_CONF))
+        if flag:
+            return {"ok": False, "method": "osd",
+                    "reason": f"text rotated {rot}° (OSD conf {conf:.2f})"}
     # Fallback: positive 'orientation not baked' signal from the source only.
     if original_path:
         ori = _exif_orientation(original_path)
@@ -130,19 +136,18 @@ def check_full_face(hero_path: str, item_class: str = "cutout") -> Dict[str, Any
 
 
 def check_bg(hero_path: str, item_class: str = "cutout") -> Dict[str, Any]:
-    """Cutout heroes must have a real transparent background; flat-goods must be
-    opaque full-bleed; keep-bg (glass/silver on its setting) is lenient."""
+    """Only fails the one unambiguous wrong-treatment case: a FLAT-goods hero
+    shipped as a transparent cutout (flat goods must be an opaque full-bleed
+    face crop). An opaque hero is ALWAYS acceptable — we deliberately do NOT
+    require transparency for cutout/unknown items. That absolute "hero must be
+    transparent" rule is exactly what drove RG-0031 (postmortem A1 reversed it)
+    and would false-fail the many legitimately-opaque photo heroes in the
+    catalog. The gate's job is geometry/orientation defects, not cutout aesthetics."""
     _, alpha = _imread(hero_path)
     has_transp = alpha is not None and bool((alpha < 250).any())
-    if item_class == "keepbg":
-        return {"ok": True, "method": "keepbg_lenient"}
-    if item_class == "flat":
-        if has_transp:
-            return {"ok": False,
-                    "reason": "flat-goods hero must be opaque full-bleed, not a cutout"}
-        return {"ok": True}
-    if not has_transp:                                 # cutout class
-        return {"ok": False, "reason": "cutout hero has no transparent background"}
+    if item_class == "flat" and has_transp:
+        return {"ok": False,
+                "reason": "flat-goods hero must be opaque full-bleed, not a cutout"}
     return {"ok": True}
 
 
@@ -277,7 +282,44 @@ def run_item(item_dir: str, write: bool = True,
 
 
 def run_batch(items_root: str, write: bool = True, as_json: bool = False) -> int:
-    raise NotImplementedError  # implemented in Task 9
+    """Gate every RG-* under items_root, writing each hero_qa. Returns 1 if any
+    currently-Listed item FAILS (the blocking audit signal), else 0."""
+    root = Path(items_root)
+    item_dirs = sorted(d for d in root.glob("RG-*")
+                       if (d / "label.json").exists() or list(d.glob("hero.*")))
+    listed_fail = 0
+    rows = []
+    for d in item_dirs:
+        hero = find_hero(str(d))
+        label: Dict[str, Any] = {}
+        lp = d / "label.json"
+        if lp.exists():
+            try:
+                label = json.loads(lp.read_text())
+            except Exception:
+                pass
+        state = label.get("state", "?")
+        if not hero:
+            rows.append((d.name, "no-hero", state, ""))
+            continue
+        verdict = hero_qa_gate(hero, None, resolve_item_class(str(d)))
+        if write:
+            _write_hero_qa(str(d), verdict)
+        if verdict["status"] == "fail" and state == "Listed":
+            listed_fail += 1
+        rows.append((d.name, verdict["status"], state, "; ".join(verdict["reasons"])))
+    if as_json:
+        print(json.dumps([{"sku": s, "status": st, "state": stt, "reasons": r}
+                          for s, st, stt, r in rows], indent=2))
+    else:
+        print(f"\nHero QA audit — {len(rows)} items:")
+        for sku, status, state, note in rows:
+            mark = "✓" if status == "pass" else ("∅" if status == "no-hero" else "✗")
+            tail = f"  [{state}] {note}" if note else f"  [{state}]"
+            print(f"  {mark} {sku:<10} {status:<7}{tail}")
+        print(f"\n⚠ {listed_fail} currently-Listed item(s) FAIL the gate."
+              if listed_fail else "\n✓ All Listed items pass the gate.")
+    return 1 if listed_fail else 0
 
 
 def main() -> int:

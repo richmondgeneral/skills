@@ -143,17 +143,21 @@ def test_upright_does_not_false_fail_textless_image():
     assert hq.check_upright(p)["ok"] is True
 
 
-def test_upright_flags_lowconf_rotation(monkeypatch):
-    # Atari cartridges read rotate!=0 at LOW conf (0.12-0.19). Lock that the
-    # threshold logic flags any nonzero rotate above the noise floor, and never
-    # flags rotate=0. (tesseract-independent: OSD is monkeypatched.)
+def test_upright_threshold_logic(monkeypatch):
+    # tesseract-independent: OSD is monkeypatched. Locks the asymmetric rule —
+    # 90/270 (vertical text, the real incident) flag at a low floor; 180
+    # (upside-down, OSD-unreliable) only flags when confident.
     p = _save_png("up_logic.png", _straight_book_bgr())
-    monkeypatch.setattr(hq, "_osd_rotation", lambda bgr: {"rotate": 270.0, "conf": 0.15})
-    assert hq.check_upright(p)["ok"] is False                 # low-conf sideways -> fail
-    monkeypatch.setattr(hq, "_osd_rotation", lambda bgr: {"rotate": 0.0, "conf": 0.10})
-    assert hq.check_upright(p)["ok"] is True                  # upright -> pass
-    monkeypatch.setattr(hq, "_osd_rotation", lambda bgr: {"rotate": 90.0, "conf": 0.02})
-    assert hq.check_upright(p)["ok"] is True                  # below noise floor -> pass
+
+    def osd(rotate, conf):
+        monkeypatch.setattr(hq, "_osd_rotation", lambda bgr: {"rotate": rotate, "conf": conf})
+
+    osd(270.0, 0.15); assert hq.check_upright(p)["ok"] is False   # low-conf vertical -> fail
+    osd(90.0, 0.15);  assert hq.check_upright(p)["ok"] is False   # low-conf vertical -> fail
+    osd(0.0, 0.10);   assert hq.check_upright(p)["ok"] is True    # upright -> pass
+    osd(90.0, 0.02);  assert hq.check_upright(p)["ok"] is True    # below noise floor -> pass
+    osd(180.0, 0.48); assert hq.check_upright(p)["ok"] is True    # weak 180 (RG-0049/0050) -> pass
+    osd(180.0, 1.20); assert hq.check_upright(p)["ok"] is False   # confident 180 -> fail
 
 
 # --------------------------------------------------------------------------
@@ -183,9 +187,11 @@ def test_full_face_lenient_for_flat_goods_fullbleed():
 # --------------------------------------------------------------------------
 # Task 5 — background by class
 # --------------------------------------------------------------------------
-def test_bg_cutout_requires_transparency():
+def test_bg_cutout_opaque_is_lenient():
+    # An opaque hero is ALWAYS acceptable — we do NOT require transparency
+    # (that absolute rule caused RG-0031). Only flat-as-cutout is a defect.
     p = _save_png("bg_opaque.png", _straight_book_bgr())          # no alpha
-    assert hq.check_bg(p, item_class="cutout")["ok"] is False
+    assert hq.check_bg(p, item_class="cutout")["ok"] is True
 
 
 def test_bg_cutout_pass_with_transparency():
@@ -275,10 +281,45 @@ def test_cli_writes_hero_qa_block_on_pass(tmp_path):
 def test_cli_fail_sets_needs_manual(tmp_path):
     item = tmp_path / "RG-9003"
     item.mkdir()
-    _save_png_to(item / "hero.png", _straight_book_bgr())   # opaque -> fails cutout bg
+    bgr, alpha = _rect_alpha(angle=16)                       # 16° tilt -> level fail
+    _save_png_to(item / "hero.png", bgr, alpha)
     (item / "label.json").write_text(json.dumps({"product_name": "ceramic mug", "state": "Priced"}))
     rc = hq.run_item(str(item), write=True)
     d = json.loads((item / "label.json").read_text())
     assert d["hero_qa"]["status"] == "fail"
     assert d["photo_overrides"]["status"] == "needs_manual"
     assert rc == 1
+
+
+# --------------------------------------------------------------------------
+# Task 9 — --batch back-fill / audit
+# --------------------------------------------------------------------------
+def test_batch_audits_and_flags_listed_failures(tmp_path):
+    items = tmp_path / "items"
+    items.mkdir()
+    good = items / "RG-1000"
+    good.mkdir()
+    _save_png_to(good / "hero.png", _straight_book_bgr())
+    (good / "label.json").write_text(json.dumps({"product_name": "hardcover book", "state": "Listed"}))
+    bad = items / "RG-1001"
+    bad.mkdir()
+    bbgr, balpha = _rect_alpha(angle=16)                     # 16° tilt -> level fail
+    _save_png_to(bad / "hero.png", bbgr, balpha)
+    (bad / "label.json").write_text(json.dumps({"product_name": "ceramic mug", "state": "Listed"}))
+    rc = hq.run_batch(str(items), write=True)
+    assert rc == 1                                            # a Listed item failed
+    assert json.loads((bad / "label.json").read_text())["hero_qa"]["status"] == "fail"
+    assert json.loads((good / "label.json").read_text())["hero_qa"]["status"] == "pass"
+
+
+def test_batch_zero_exit_when_failures_not_listed(tmp_path):
+    items = tmp_path / "items"
+    items.mkdir()
+    draft = items / "RG-1002"
+    draft.mkdir()
+    dbgr, dalpha = _rect_alpha(angle=16)                     # 16° tilt -> fail, but...
+    _save_png_to(draft / "hero.png", dbgr, dalpha)
+    (draft / "label.json").write_text(json.dumps({"product_name": "ceramic mug", "state": "Priced"}))
+    rc = hq.run_batch(str(items), write=True)
+    assert rc == 0                                            # not Listed -> non-blocking
+    assert json.loads((draft / "label.json").read_text())["hero_qa"]["status"] == "fail"

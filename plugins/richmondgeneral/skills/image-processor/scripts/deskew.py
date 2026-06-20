@@ -68,7 +68,6 @@ def _rect_angle_deg(rrect) -> float:
 # the whole *frame* (always ~0 deg) and for a noisy photo collapses to a 45 deg
 # artifact. We instead segment the actual dominant object and discard the frame.
 # --------------------------------------------------------------------------
-_MASK_CACHE: dict = {}  # id(bgr) -> (shape, mask) ; avoids recomputing GrabCut
 
 
 def _grabcut_small(bgr: np.ndarray, margin: float, iters: int, cap: int):
@@ -107,12 +106,12 @@ def _object_mask(bgr: np.ndarray, margin: float = 0.04, iters: int = 4,
     GrabCut foreground (computed on a <=cap downscale), cleaned with OPEN (drop
     speckle) + CLOSE (fill interior detail) AT THE WORKING RESOLUTION for speed,
     reduced to the single largest filled blob, then upsampled to full res.
-    Cached per array id so deskew_to_face's detect + tilt share one GrabCut.
+
+    Computed fresh every call. (A previous id(bgr)->mask cache was removed:
+    id() is reused after an array is GC'd, so in a batch loop a new same-shape
+    image silently received a prior image's mask — that made the straight
+    RG-0025 read the tilted RG-0023's 41.6° and made --batch non-deterministic.)
     """
-    key = id(bgr)
-    cached = _MASK_CACHE.get(key)
-    if cached is not None and cached[0] == bgr.shape:
-        return cached[1]
     fg, (h, w) = _grabcut_small(bgr, margin, iters, cap)
     sh, sw = fg.shape[:2]
     if fg.max() != 0:
@@ -124,9 +123,6 @@ def _object_mask(bgr: np.ndarray, margin: float = 0.04, iters: int = 4,
                               cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kc, kc)))
         fg = _largest_filled_blob(fg, sh, sw)
     full = cv2.resize(fg, (w, h), interpolation=cv2.INTER_NEAREST)
-    if len(_MASK_CACHE) > 8:
-        _MASK_CACHE.clear()
-    _MASK_CACHE[key] = (bgr.shape, full)
     return full
 
 

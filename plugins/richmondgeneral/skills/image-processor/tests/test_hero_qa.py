@@ -262,6 +262,42 @@ def test_resolve_item_class_from_label(tmp_path):
 
 
 # --------------------------------------------------------------------------
+# Regression: deskew._object_mask must NOT leak a stale mask across images.
+# (id(bgr) cache returned RG-0023's 41.6° for the truly-straight RG-0025 in
+# the live --batch back-fill.)
+# --------------------------------------------------------------------------
+def _bgr_obj(angle, size=400):
+    """A dark rectangle object on a light bg with clear border margin, so the
+    BGR object-segmentation path of residual_tilt_deg engages (not full-bleed)."""
+    img = np.full((size, size, 3), 240, np.uint8)
+    obj = np.zeros((size, size), np.uint8)
+    cv2.rectangle(obj, (size // 2 - 90, size // 2 - 150),
+                  (size // 2 + 90, size // 2 + 150), 255, -1)
+    if angle:
+        M = cv2.getRotationMatrix2D((size / 2, size / 2), angle, 1.0)
+        obj = cv2.warpAffine(obj, M, (size, size))
+    img[obj > 0] = (50, 50, 50)
+    return img
+
+
+def test_residual_tilt_no_stale_mask_across_images():
+    import gc
+    from deskew import residual_tilt_deg
+    # Alternate tilted/straight SAME-SHAPE images in a batch-like loop. Each must
+    # report its OWN tilt; the straight ones must NOT inherit a tilted mask.
+    results = []
+    for ang in (16, 0, 16, 0, 16, 0):
+        b = _bgr_obj(ang)
+        results.append(round(residual_tilt_deg(b)["tilt_deg"], 1))
+        del b
+        gc.collect()
+    tilted = results[0::2]
+    straight = results[1::2]
+    assert all(t > 10 for t in tilted), f"tilted misread: {results}"
+    assert all(s < 3 for s in straight), f"straight inherited a stale mask: {results}"
+
+
+# --------------------------------------------------------------------------
 # Task 8 — CLI single item writes label.json -> hero_qa
 # --------------------------------------------------------------------------
 def test_cli_writes_hero_qa_block_on_pass(tmp_path):

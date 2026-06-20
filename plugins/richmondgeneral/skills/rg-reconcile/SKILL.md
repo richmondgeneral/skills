@@ -2,9 +2,9 @@
 name: rg-reconcile
 description: READ-ONLY drift reconcile for Richmond General inventory. Walks each items/RG-XXXX page (label.json + status.json) and compares it against every channel the item lives on — Square (live catalog) and Whatnot (import CSV) — using the item-model field-authority rules, then writes a JSON drift report to ops/reports/. Surfaces sold-state conflicts (CRITICAL — can double-sell a unique item) and unintended price divergence (WARNING). Use to audit channel consistency, run the reconciliation sweep, check for drift, or answer "are prices/sold-state consistent across channels". Triggers on "reconcile", "drift report", "check channels", "channel consistency", "reconciliation sweep". Makes NO writes to any channel — for fixing drift, use rg-item-update (price/description) or rg-item-mark-sold (sold state).
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: scottybe
-  updated: "2026-06-19"
+  updated: "2026-06-20"
 ---
 
 # Richmond General Reconcile
@@ -20,6 +20,12 @@ mutated — the output is a report.
 |-------|----------|------|
 | sold_state | CRITICAL | page sold ≠ channel sold (risk of double-selling a unique item) |
 | price | WARNING | channel price ≠ intended/reference price (skipped on sold items) |
+
+> **Channel authority.** Square is *authoritative* — a live catalog that can both confirm a
+> listing and report it absent (`present=false`). The Whatnot **import CSV is affirm-only**: it
+> confirms a SKU's listing/price/sold, but a SKU *missing* from the CSV means "not in this export"
+> (e.g. listed directly via the Whatnot UI), **not** "delisted." So this reconcile cannot surface a
+> genuine Whatnot delisting — Whatnot absence is treated as "not checked," never as drift.
 
 ## Run
 

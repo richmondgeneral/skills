@@ -60,3 +60,19 @@ def test_whatnot_listed_but_absent_from_csv_is_not_flagged(tmp_path):
     report = run_reconcile(items_dir=str(items_dir), square_index={}, whatnot_index={})
     assert all(f["field"] != "presence" for f in report["findings"])
     assert report["summary"] == {"critical": 0, "warning": 0, "info": 0}
+
+
+def test_whatnot_affirmed_observation_is_diffed_not_dropped(tmp_path):
+    # Counterpart to the positive-only filter: it must drop ONLY absent (None) observations.
+    # When the import CSV AFFIRMS a SKU, its price/sold must still be diffed — a conflict has
+    # to surface, not get swallowed alongside the genuine absences.
+    items_dir = tmp_path / "items"; items_dir.mkdir()
+    _item(items_dir, "RG-0040", "60.00",
+          label_extra={"channels": {"whatnot": {"status": "listed"}}})
+    # CSV affirms RG-0040 at $48 (price drift) and Status=sold (sold-state conflict).
+    whatnot_index = {"RG-0040": (48.0, True)}
+    report = run_reconcile(items_dir=str(items_dir), square_index={}, whatnot_index=whatnot_index)
+    flagged = {(f["sku"], f["field"]): (f["channel"], f["severity"]) for f in report["findings"]}
+    assert flagged[("RG-0040", "sold_state")] == ("whatnot", "critical")
+    assert flagged[("RG-0040", "price")] == ("whatnot", "warning")
+    assert report["summary"] == {"critical": 1, "warning": 1, "info": 0}

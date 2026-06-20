@@ -22,3 +22,18 @@ def test_build_snapshot_sorts_and_derives():
 
 def test_build_snapshot_empty():
     assert build_catalog_state([]) == {"item_count": 0, "items": []}
+
+
+def test_snapshot_omits_unobserved_channel_key():
+    # Positive-only Whatnot: the gatherer drops a None Whatnot observation (SKU absent from the
+    # import CSV), so build_catalog_state gets no Whatnot obs for that item. It must NOT fabricate
+    # a "whatnot" key — an unobserved channel is ABSENT from the snapshot, never present=false.
+    # (listed_on still reflects the page's declared intent, even with no observation.)
+    recs = [
+        (PageRecord(sku="RG-0022", reference_price=32.0, listed_on=[Channel.WHATNOT]),
+         [ChannelObservation(Channel.SQUARE, present=True, price=32.0, sold=False)]),
+    ]
+    item = build_catalog_state(recs)["items"][0]
+    assert "whatnot" not in item["channels"]        # unobserved -> absent (not present:false)
+    assert item["channels"]["square"]["present"] is True
+    assert item["listed_on"] == ["whatnot"]          # page intent preserved despite no observation

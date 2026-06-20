@@ -403,12 +403,35 @@ def _deskew_flat_goods(src_path, input_path, size):
                  "deskew_confidence": res.get("confidence")}
 
 
+def bake_orientation(img: Image.Image) -> Image.Image:
+    """Bake EXIF orientation into pixels ONCE and drop the tag, so every later
+    tool/viewer agrees and no second blind rotation is ever needed. This is the
+    root fix for the Atari batch (RG-0036–0051), which shipped 90° sideways
+    because a hardcoded rotation was applied ON TOP of exif_transpose. After
+    this, downstream steps must NOT rotate again."""
+    out = ImageOps.exif_transpose(img)
+    if out is None:
+        out = img
+    exif = out.getexif()
+    if 0x0112 in exif:                # belt-and-suspenders; exif_transpose usually clears it
+        del exif[0x0112]
+        out.info["exif"] = exif.tobytes()
+    return out
+
+
 def standardize(input_path, output_path, do_color=True, do_bg=True, fill=0.85, size=2000,
                 shadow=False, copyright_text=None, sku=None, watermark=False,
                 watermark_logo=DEFAULT_LOGO, wb="background", model=None, allow_rect_mask=False,
                 do_deskew=False, perspective_correct=False, crop_to_face=False):
     mask_quality = None
     with tempfile.TemporaryDirectory() as td:
+        # Bake EXIF orientation into pixels ONCE, up front, so EVERY downstream
+        # step sees correctly-oriented pixels — including the cv2 deskew path,
+        # which re-reads input_path and would otherwise ignore EXIF orientation.
+        # No step after this may apply a second rotation.
+        baked = os.path.join(td, "baked.png")
+        bake_orientation(Image.open(input_path)).save(baked)
+        input_path = baked
         cur = input_path
         if do_color:
             cc = os.path.join(td, "cc.png")

@@ -247,3 +247,33 @@ def test_evaluate_mask_gate_unless_profile():
     assert st.evaluate_mask_gate({"unique_alpha_values": 1}, "keep-bg", profiles_json) is None
     assert st.evaluate_mask_gate({"unique_alpha_values": 1}, "standard", profiles_json) == "unique_alpha_values"
 
+
+# --------------------------------------------------------------------------
+# Orientation bake-once (Atari double-rotation root fix, 2026-06-20)
+# --------------------------------------------------------------------------
+def test_bake_orientation_rights_exif_6_and_strips_tag(tmp_path):
+    pixels = Image.new("RGB", (100, 60), (10, 20, 30))   # landscape pixels
+    exif = pixels.getexif()
+    exif[0x0112] = 6                                      # "rotate 90° CW to view"
+    src = tmp_path / "o6.jpg"
+    pixels.save(src, exif=exif)
+    baked = st.bake_orientation(Image.open(src))
+    assert baked.size == (60, 100)                        # transposed to true portrait
+    assert baked.getexif().get(0x0112) in (None, 1)       # tag stripped/normalized
+
+
+def test_standardize_routes_ingest_through_bake_orientation(tmp_path, monkeypatch):
+    seen = {}
+    real = st.bake_orientation
+
+    def spy(img):
+        seen["called"] = True
+        return real(img)
+
+    monkeypatch.setattr(st, "bake_orientation", spy)
+    src = tmp_path / "x.png"
+    Image.new("RGB", (40, 40), (1, 2, 3)).save(src)
+    out = tmp_path / "o.png"
+    st.standardize(str(src), str(out), do_color=False, do_bg=False, size=0)
+    assert seen.get("called") is True                     # ingest baked exactly once
+

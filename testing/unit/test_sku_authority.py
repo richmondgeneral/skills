@@ -243,6 +243,81 @@ def test_square_store_is_constructible_without_network():
     assert hasattr(store, "read") and hasattr(store, "cas_set") and hasattr(store, "create")
 
 
+# --- M-1: version-conflict detection must match the exact code, not a "version" substring ---
+
+class _Err:
+    """Minimal stand-in for square.types.error.Error (has .code / .detail / .category)."""
+    def __init__(self, code, detail="", category="INVALID_REQUEST_ERROR"):
+        self.code = code
+        self.detail = detail
+        self.category = category
+
+
+class _FakeApiError(Exception):
+    """Mimics square.core.api_error.ApiError: the SDK RAISES it on any non-2xx, carrying a
+    parsed .errors list. Its str() embeds the error detail text (as the real one does), so a
+    naive `"version" in str(e)` match trips on ANY error that merely mentions 'version'."""
+    def __init__(self, errors):
+        self.errors = errors
+        super().__init__("API Error 400: " + "; ".join(e.detail for e in errors))
+
+
+class _FakeCachedObj:
+    def model_dump(self, mode=None, exclude_none=None):
+        return {"type": "ITEM", "id": "#x", "version": 1,
+                "item_data": {"name": "RG-SKU-COUNTER:0050"}}
+
+
+class _RaisingCatalog:
+    def __init__(self, exc):
+        self._exc = exc
+
+    def batch_upsert(self, **kwargs):
+        raise self._exc
+
+
+class _FakeClient:
+    def __init__(self, catalog):
+        self.catalog = catalog
+
+
+def _store_whose_upsert_raises(exc):
+    from sku_authority import SquareCounterStore
+    store = SquareCounterStore(client=_FakeClient(_RaisingCatalog(exc)))
+    store._cached_obj = _FakeCachedObj()
+    return store
+
+
+def test_is_version_conflict_matches_real_version_mismatch_code():
+    from sku_authority import _is_version_conflict
+    assert _is_version_conflict(
+        [_Err("VERSION_MISMATCH", "Object version does not match the latest version.")]) is True
+
+
+def test_is_version_conflict_ignores_unrelated_error_that_mentions_version():
+    # Free text contains "version" but the code is unrelated -> NOT a conflict, or it gets
+    # retried to exhaustion (SkuAllocationError) instead of surfacing the real cause.
+    from sku_authority import _is_version_conflict
+    unrelated = [{"category": "INVALID_REQUEST_ERROR", "code": "BAD_REQUEST",
+                  "detail": "The provided API version is not supported."}]
+    assert _is_version_conflict(unrelated) is False
+
+
+def test_cas_set_retries_on_real_version_mismatch_apierror():
+    # Square raises ApiError(VERSION_MISMATCH) on a stale-version upsert -> retry signal (False).
+    store = _store_whose_upsert_raises(_FakeApiError([_Err("VERSION_MISMATCH", "stale version")]))
+    assert store.cas_set(1, 50) is False
+
+
+def test_cas_set_hard_fails_on_unrelated_apierror_mentioning_version():
+    # An unrelated ApiError whose text contains "version" must PROPAGATE, not be retried.
+    from sku_authority import SquareUnavailable
+    store = _store_whose_upsert_raises(
+        _FakeApiError([_Err("BAD_REQUEST", "The provided API version is not supported.")]))
+    with pytest.raises(SquareUnavailable):
+        store.cas_set(1, 50)
+
+
 def test_cli_help_runs():
     import subprocess
     import sys

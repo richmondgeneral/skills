@@ -132,10 +132,16 @@ def peek(store: CounterStore) -> Optional[int]:
 
 
 def _is_version_conflict(errors) -> bool:
+    """Retryable ONLY on Square's exact optimistic-concurrency code VERSION_MISMATCH --
+    never a free-text "version" substring, so an unrelated error (e.g. an unsupported-
+    API-version error) hard-fails with its real cause instead of being silently retried
+    until the CAS budget is exhausted. VERSION_MISMATCH is a documented Square code
+    (category INVALID_REQUEST_ERROR); it is absent from this SDK's ErrorCode Literal but
+    the SDK's UncheckedBaseModel accepts it as a runtime string, so we compare the value.
+    Accepts square.types.error.Error objects (.code) or plain dicts ({"code": ...})."""
     for e in errors or []:
         code = getattr(e, "code", None) or (e.get("code") if isinstance(e, dict) else None) or ""
-        detail = getattr(e, "detail", None) or (e.get("detail") if isinstance(e, dict) else None) or ""
-        if str(code).upper() == "VERSION_MISMATCH" or "version" in str(detail).lower():
+        if str(code).upper() == "VERSION_MISMATCH":
             return True
     return False
 
@@ -280,7 +286,11 @@ class SquareCounterStore:
         except SquareUnavailable:
             raise
         except Exception as e:                              # noqa: BLE001
-            if "version" in str(e).lower():
+            # A version conflict surfaces as a RAISED ApiError (the SDK raises on any
+            # non-2xx); its parsed .errors carry the real code. Retry ONLY on a genuine
+            # VERSION_MISMATCH -- otherwise hard-fail with the real cause rather than
+            # silently retrying an unrelated error (e.g. an API-version error) to exhaustion.
+            if _is_version_conflict(getattr(e, "errors", None)):
                 return False
             raise SquareUnavailable(f"cas upsert failed: {e}") from e
 

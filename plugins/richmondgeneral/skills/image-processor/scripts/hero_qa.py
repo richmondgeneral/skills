@@ -183,3 +183,49 @@ def check_level(hero_path: str) -> Dict[str, Any]:
     if failed:
         out["reason"] = f"tilt {tilt:.1f}° > {TILT_MAX_DEG}°"
     return out
+
+
+# Profile (from standardize/photo-profiles) -> gate item-class.
+_PROFILE_CLASS = {"flat-goods": "flat", "keep-bg": "keepbg",
+                  "standard": "cutout", "true-color": "cutout", "manual": "cutout"}
+
+
+def resolve_item_class(item_dir: str) -> str:
+    """Map the item's photo profile (inferred from label.json the same way
+    standardize.py does) to a gate class: flat | keepbg | cutout."""
+    label: Dict[str, Any] = {}
+    p = Path(item_dir) / "label.json"
+    if p.exists():
+        try:
+            label = json.loads(p.read_text())
+        except Exception:
+            label = {}
+    try:
+        import standardize as st
+        profiles = st.load_photo_profiles()
+        profile = st.resolve_profile(label, profiles) if profiles else "standard"
+    except Exception:
+        profile = "standard"
+    return _PROFILE_CLASS.get(profile, "cutout")
+
+
+def hero_qa_gate(hero_path: str, original_path: Optional[str] = None,
+                 item_class: Optional[str] = None) -> Dict[str, Any]:
+    """Run all five checks and return {status, checked_at, checker, item_class,
+    checks, reasons}. status == 'fail' if any hard check fails (defects is soft
+    but does fail on the extreme over-clean threshold)."""
+    item_class = item_class or "cutout"
+    up = check_upright(hero_path, original_path)
+    lv = check_level(hero_path)
+    ff = check_full_face(hero_path, item_class)
+    bg = check_bg(hero_path, item_class)
+    df = check_defects(hero_path, original_path)
+    checks = {"upright": up["ok"], "level_deg": lv.get("level_deg"),
+              "full_face": ff["ok"], "bg_ok": bg["ok"], "defects_ok": df["ok"]}
+    reasons = [c["reason"] for c in (up, lv, ff, bg, df)
+               if not c["ok"] and c.get("reason")]
+    hard_ok = up["ok"] and lv["ok"] and ff["ok"] and bg["ok"] and df["ok"]
+    return {"status": "pass" if hard_ok else "fail",
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "checker": CHECKER, "item_class": item_class,
+            "checks": checks, "reasons": reasons}

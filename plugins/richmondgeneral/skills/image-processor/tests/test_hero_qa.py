@@ -210,3 +210,29 @@ def test_defects_pass_on_honest_retention():
     po = _save_png("def_orig2.png", orig)
     ph = _save_png("def_hero2.png", orig.copy())    # same detail retained
     assert hq.check_defects(ph, original_path=po)["ok"] is True
+
+
+# --------------------------------------------------------------------------
+# Task 7 — orchestration + class resolution
+# --------------------------------------------------------------------------
+def test_gate_fails_and_collects_reasons():
+    # opaque (no transparency) 90°-rotated 'cutout' -> fails bg (+ upright if OSD)
+    p = _save_png("gate_bad.png", np.rot90(_text_hero_bgr(), 1))
+    r = hq.hero_qa_gate(p, item_class="cutout")
+    assert r["status"] == "fail"
+    assert len(r["reasons"]) >= 1
+    assert set(r["checks"]) == {"upright", "level_deg", "full_face", "bg_ok", "defects_ok"}
+
+
+def test_gate_passes_clean_flat_hero():
+    p = _save_png("gate_good.png", _straight_book_bgr())
+    r = hq.hero_qa_gate(p, item_class="flat")
+    assert r["status"] == "pass"
+    assert r["reasons"] == []
+
+
+def test_resolve_item_class_from_label(tmp_path):
+    item = tmp_path / "RG-9001"
+    item.mkdir()
+    (item / "label.json").write_text(json.dumps({"product_name": "Vintage hardcover book"}))
+    assert hq.resolve_item_class(str(item)) == "flat"      # book/hardcover -> flat-goods

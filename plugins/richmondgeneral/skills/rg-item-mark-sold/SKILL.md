@@ -21,6 +21,9 @@ metadata:
     - Step 7 doc rewritten: --id no longer "disambiguates within the SKU";
       records the deleted link id/order_id/slug into status.json for audit.
     - Regression test: tests/test_delete_payment_link.py.
+    - Step 7 verify note corrected: `curl -sI` on a square.link short URL
+      returns 404 for LIVE links too (HEAD probes are blocked), so confirm a
+      deletion via --audit or a GET-by-id against the API, not the HEAD code.
     v1.1 - Gallery-card surface:
     - Added Step 5 "Migrate the gallery card in items/index.html" — the
       landing-page grid card is a separate GitHub Pages surface that does
@@ -259,14 +262,20 @@ python3 skills/rg-item-mark-sold/scripts/delete_payment_link.py --audit
 
 It lists every live payment link, maps each to an item (by SKU in metadata, or by finding the link's id/slug/order_id in the item's `status.json` / `label.json` / `index.html`), and flags any link whose item is already marked **sold** (`CRITICAL`) or that maps to **no item at all** (`WARN` — possibly a sold item's null-metadata link). It never deletes; exit code is 6 if any `CRITICAL` is found, else 0. Run it after a batch of sales or whenever reconciling.
 
-After the delete, verify both URL forms 404:
+After the delete, confirm it's gone **via the Square API — not with `curl -sI` on the short URL.** `square.link/u/<slug>` returns **`404` to a HEAD request whether the link is live or deleted** (the shortener blocks bot/HEAD probes), so a 404 there proves nothing. Verified 2026-06-20: three *live* links 404'd on `curl -sI` exactly like the deleted ones. Authoritative checks:
 
 ```bash
-curl -sI https://square.link/u/<short-slug> -o /dev/null -w "short: %{http_code}\n"
-curl -sI https://checkout.square.site/merchant/7MM9AFJAD0XHW/order/<order_id> -o /dev/null -w "long: %{http_code}\n"
+# 1) Re-run the audit — the deleted link drops out of the live list (and any
+#    sold-item CRITICAL clears):
+python3 skills/rg-item-mark-sold/scripts/delete_payment_link.py --audit
+
+# 2) Or GET the link by id — a deleted link returns HTTP 404 from the API:
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer $SQUARE_ACCESS_TOKEN" -H "Square-Version: 2026-04-21" \
+  https://connect.squareup.com/v2/online-checkout/payment-links/<PAYMENT_LINK_ID>
 ```
 
-Expected: short URL `303` (Square's "link gone" redirect page), long URL `404`.
+A real browser GET of the short URL does show Square's "link no longer active" page, but don't script that as a `curl -sI` health check — the HEAD `404` is not a liveness signal either way.
 
 **If the user reports they already deleted the link via Square Dashboard**, re-running by SKU will report no SKU match. If the account has no other live links that's a clean exit 0 — note it in the commit message. But if it exits 5 (other live links still exist), do **not** assume *this* item's link is the one that's gone: confirm with `--url <slug>` / `--order-id <id>` (or run `--audit`) before treating the link as deleted. A null-metadata link survives a SKU miss — that is the exact failure this guard exists to stop.
 

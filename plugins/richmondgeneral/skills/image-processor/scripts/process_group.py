@@ -91,12 +91,26 @@ def analyze_mask_quality(output_path: Path) -> Optional[Dict[str, Any]]:
             unique_alpha <= 3
         )
 
+        # residual tilt of the cutout (RG-0031 RCA, 2026-06-20) — see process.py.
+        residual_tilt = None
+        try:
+            sys.path.insert(0, os.path.dirname(__file__))
+            from deskew import residual_tilt_deg
+            import numpy as _np
+            arr = _np.array(Image.open(output_path).convert('RGBA'))
+            bgr = arr[:, :, 2::-1]
+            alpha_ch = arr[:, :, 3]
+            residual_tilt = residual_tilt_deg(bgr, alpha=alpha_ch).get('tilt_deg')
+        except Exception:
+            residual_tilt = None
+
         return {
             'transparent_ratio': round(transparency_ratio, 4),
             'occupancy_ratio': round(occupancy, 4),
             'semi_alpha_ratio': round(semi_ratio, 4),
             'unique_alpha_values': unique_alpha,
             'suspicious_rect_mask': suspicious_rect_mask,
+            'residual_tilt_deg': residual_tilt,
         }
     except Exception:
         return None

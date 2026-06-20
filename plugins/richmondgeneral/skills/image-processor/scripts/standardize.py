@@ -40,6 +40,9 @@ PHOTO_PROFILES_FILE = os.path.expanduser("~/workspace/richmondgeneral/ops/docs/p
 OVERRIDE_FIELDS: Dict[str, tuple] = {
     "no_color":       ("no_color",       bool),
     "no_bg":          ("no_bg",          bool),
+    "deskew":         ("deskew",         bool),
+    "perspective_correct": ("perspective_correct", bool),
+    "crop_to_face":   ("crop_to_face",   bool),
     "allow_rect_mask": ("allow_rect_mask", bool),
     "shadow":         ("shadow",         bool),
     "fill":           ("fill",           float),
@@ -360,9 +363,50 @@ def remove_background(src, dst, model=None, allow_rect_mask=False) -> Optional[D
     return mask_quality
 
 
+def _deskew_flat_goods(src_path, input_path, size):
+    """flat-goods path: perspective-correct the flat item's face to straight-on.
+
+    Returns (final_img_or_None, mask_quality). On low confidence / non-rectangular
+    / missing cv2 returns (None, {"deskew_needs_manual": True, ...}) so the batch
+    routes the item to the manual queue instead of emitting a bad crop.
+    """
+    try:
+        sys.path.insert(0, SCRIPT_DIR)
+        from deskew import deskew_to_face, residual_tilt_deg, _CV2_OK
+        import cv2  # provided by opencv-python-headless (plugin dep, 2026-06-20)
+    except Exception:
+        return None, {"deskew_needs_manual": True, "reason": "cv2_unavailable"}
+    if not _CV2_OK:
+        return None, {"deskew_needs_manual": True, "reason": "cv2_unavailable"}
+    bgr = cv2.imread(src_path)
+    if bgr is None:
+        bgr = cv2.imread(input_path)
+    if bgr is None:
+        return None, {"deskew_needs_manual": True, "reason": "unreadable_input"}
+    res = deskew_to_face(bgr)
+    if not res.get("ok"):
+        return None, {"deskew_needs_manual": True,
+                      "reason": res.get("reason", "deskew_failed"),
+                      "residual_tilt_deg": res.get("angle_in")}
+    out_bgr = res["image"]
+    after = residual_tilt_deg(out_bgr).get("tilt_deg")
+    pil = Image.fromarray(out_bgr[:, :, ::-1])  # BGR -> RGB, opaque full-bleed face
+    if size and size > 0:
+        w0, h0 = pil.size
+        if max(w0, h0) > size:
+            if w0 >= h0:
+                pil = pil.resize((size, max(1, round(h0 * size / w0))), Image.LANCZOS)
+            else:
+                pil = pil.resize((max(1, round(w0 * size / h0)), size), Image.LANCZOS)
+    return pil, {"residual_tilt_deg": after, "flat_goods": True,
+                 "method": res.get("method"), "aspect": res.get("aspect"),
+                 "deskew_confidence": res.get("confidence")}
+
+
 def standardize(input_path, output_path, do_color=True, do_bg=True, fill=0.85, size=2000,
                 shadow=False, copyright_text=None, sku=None, watermark=False,
-                watermark_logo=DEFAULT_LOGO, wb="background", model=None, allow_rect_mask=False):
+                watermark_logo=DEFAULT_LOGO, wb="background", model=None, allow_rect_mask=False,
+                do_deskew=False, perspective_correct=False, crop_to_face=False):
     mask_quality = None
     with tempfile.TemporaryDirectory() as td:
         cur = input_path
@@ -370,12 +414,21 @@ def standardize(input_path, output_path, do_color=True, do_bg=True, fill=0.85, s
             cc = os.path.join(td, "cc.png")
             color_correct(Image.open(input_path), wb=wb).save(cc)
             cur = cc
-        if do_bg:
-            transp = os.path.join(td, "transp.png")
-            mask_quality = remove_background(cur, transp, model=model, allow_rect_mask=allow_rect_mask)
-            cur = transp
-            
-        final_img = square_pad_centered(Image.open(cur), fill=fill, size=size, shadow=shadow)
+
+        if do_deskew or perspective_correct or crop_to_face:
+            # flat-goods: deskew + perspective-correct + full-bleed face crop.
+            # No cutout (transparent bg N/A) and no square pad — the item's own
+            # edges are the frame. Low-confidence/non-rectangular -> manual.
+            final_img, mask_quality = _deskew_flat_goods(cur, input_path, size)
+            if final_img is None:
+                return None, mask_quality
+        else:
+            if do_bg:
+                transp = os.path.join(td, "transp.png")
+                mask_quality = remove_background(cur, transp, model=model, allow_rect_mask=allow_rect_mask)
+                cur = transp
+            final_img = square_pad_centered(Image.open(cur), fill=fill, size=size, shadow=shadow)
+
         if watermark:
             final_img = apply_watermark(final_img, logo_path=watermark_logo)
 
@@ -485,8 +538,24 @@ def _run_batch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Non
                 model=item_args.model,
                 allow_rect_mask=item_args.allow_rect_mask,
                 wb=item_args.wb,
+                do_deskew=getattr(item_args, "deskew", False),
+                perspective_correct=getattr(item_args, "perspective_correct", False),
+                crop_to_face=getattr(item_args, "crop_to_face", False),
             )
-            
+
+            # flat-goods deskew routed to manual (low confidence / non-rectangular / no cv2)
+            if out_path is None and mask_quality and mask_quality.get("deskew_needs_manual"):
+                reason = mask_quality.get("reason", "deskew_needs_manual")
+                print(f"  ⚠ {item_dir.name}  -> deskew needs manual ({reason}); sent to manual queue", file=sys.stderr)
+                update_label_json_status(item_dir, "needs_manual")
+                queue_path = os.path.expanduser("~/workspace/richmondgeneral/" + profiles_json.get("manual_queue", {}).get("report_path", "ops/reports/photo-manual-queue.jsonl"))
+                os.makedirs(os.path.dirname(queue_path), exist_ok=True)
+                with open(queue_path, "a", encoding="utf-8") as f:
+                    ts = datetime.datetime.utcnow().isoformat() + "Z"
+                    f.write(json.dumps({"sku": effective_sku, "reason": f"deskew_{reason}", "src": str(hero), "ts": ts}) + "\n")
+                results.append({"item": item_dir.name, "status": "needs_manual", "reason": f"deskew_{reason}"})
+                continue
+
             # Mask Gate Check
             tripped_gate = None
             if mask_quality:
@@ -600,9 +669,19 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", dest="json_out", action="store_true",
                    help="emit JSON result summary")
 
+    # ---- flat-goods deskew (books/paper/cards/boxed/framed) ----
+    p.add_argument("--deskew", action="store_true",
+                   help="detect the flat item's rectangular face and perspective-"
+                        "correct it to straight-on (the flat-goods path; no cutout)")
+    p.add_argument("--perspective-correct", dest="perspective_correct",
+                   action="store_true",
+                   help="alias/companion to --deskew (kept for flag symmetry)")
+    p.add_argument("--crop-to-face", dest="crop_to_face", action="store_true",
+                   help="with --deskew, output the tight full-bleed face crop")
+
     # ---- misc ----
     p.add_argument("--straighten", action="store_true",
-                   help="(no-op — auto-deskew needs opencv; shoot straight for now)")
+                   help="deprecated alias for --deskew (now implemented via opencv)")
     p.add_argument("-v", "--verbose", action="store_true")
     return p
 
@@ -612,7 +691,8 @@ def main() -> None:
     args = p.parse_args()
 
     if args.straighten:
-        print("warning: --straighten is not implemented; skipping.", file=sys.stderr)
+        # --straighten is now a deprecated alias for --deskew (opencv implemented).
+        args.deskew = True
 
     # ---- batch mode ----
     if args.batch_items_dir:
@@ -644,7 +724,7 @@ def main() -> None:
                 file=sys.stderr,
             )
 
-    out, _ = standardize(
+    out, mq = standardize(
         args.input, args.output,
         do_color=not args.no_color,
         do_bg=not args.no_bg,
@@ -658,7 +738,14 @@ def main() -> None:
         model=args.model,
         allow_rect_mask=args.allow_rect_mask,
         wb=args.wb,
+        do_deskew=args.deskew,
+        perspective_correct=args.perspective_correct,
+        crop_to_face=args.crop_to_face,
     )
+    if out is None:
+        reason = (mq or {}).get("reason", "needs_manual")
+        print(f"needs_manual: {reason}", file=sys.stderr)
+        sys.exit(2)
     print(out)
 
 

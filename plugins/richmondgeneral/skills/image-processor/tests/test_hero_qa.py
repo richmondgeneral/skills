@@ -137,3 +137,27 @@ def test_upright_does_not_false_fail_textless_image():
     grad = np.tile(np.linspace(0, 255, 300, dtype=np.uint8), (300, 1))
     p = _save_png("up_textless.png", cv2.cvtColor(grad, cv2.COLOR_GRAY2BGR))
     assert hq.check_upright(p)["ok"] is True
+
+
+# --------------------------------------------------------------------------
+# Task 4 — full-face (class-aware clip detection)
+# --------------------------------------------------------------------------
+def test_full_face_fail_on_clipped_cutout():
+    bgr = np.full((400, 400, 3), 200, np.uint8)
+    alpha = np.zeros((400, 400), np.uint8)
+    alpha[0:260, 0:240] = 255                      # flush to the top-left corner
+    p = _save_png("ff_clip.png", bgr, alpha)
+    assert hq.check_full_face(p, item_class="cutout")["ok"] is False
+
+
+def test_full_face_pass_on_floating_cutout():
+    bgr = np.full((400, 400, 3), 200, np.uint8)
+    alpha = np.zeros((400, 400), np.uint8)
+    alpha[80:320, 120:280] = 255                   # clear margin from every border
+    p = _save_png("ff_float.png", bgr, alpha)
+    assert hq.check_full_face(p, item_class="cutout")["ok"] is True
+
+
+def test_full_face_lenient_for_flat_goods_fullbleed():
+    p = _save_png("ff_flat.png", _straight_book_bgr())   # opaque, reaches edges
+    assert hq.check_full_face(p, item_class="flat")["ok"] is True

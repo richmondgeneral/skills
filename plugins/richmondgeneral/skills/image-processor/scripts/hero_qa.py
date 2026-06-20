@@ -100,6 +100,32 @@ def check_upright(hero_path: str, original_path: Optional[str] = None) -> Dict[s
     return {"ok": True, "method": method}
 
 
+BORDER_RING_FRAC = 0.01   # how close to the edge counts as 'touching'
+
+
+def check_full_face(hero_path: str, item_class: str = "cutout") -> Dict[str, Any]:
+    """Cutout heroes must float clear of every border (catches the RG-0031
+    corner clip). Flat-goods / keep-bg are full-frame by design — lenient."""
+    bgr, alpha = _imread(hero_path)
+    if bgr is None:
+        return {"ok": False, "reason": "unreadable_hero"}
+    if item_class in ("flat", "keepbg"):
+        return {"ok": True, "method": "fullbleed_lenient"}
+    if alpha is None:
+        return {"ok": True, "method": "no_alpha"}     # not a cutout; nothing to clip
+    h, w = alpha.shape[:2]
+    ys, xs = np.where(alpha > 8)
+    if len(xs) == 0:
+        return {"ok": False, "reason": "empty_alpha"}
+    ring = max(1, int(min(h, w) * BORDER_RING_FRAC))
+    touches = (xs.min() <= ring or ys.min() <= ring or
+               xs.max() >= w - 1 - ring or ys.max() >= h - 1 - ring)
+    if touches:
+        return {"ok": False, "method": "alpha_bbox",
+                "reason": "subject clipped at frame edge"}
+    return {"ok": True, "method": "alpha_bbox"}
+
+
 def check_level(hero_path: str) -> Dict[str, Any]:
     """Fail if the dominant object is tilted > TILT_MAX_DEG with a trustworthy
     reading (confidence >= TILT_MIN_CONF). Mirrors the validated prototype gate."""

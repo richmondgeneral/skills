@@ -332,6 +332,81 @@ def load_item_records(items_dir: str) -> list[dict]:
     return out
 
 
+def _normalize_text(s: str) -> str:
+    """Lowercase and collapse every run of non-alphanumeric chars to one space.
+
+    Makes line-item-name matching robust to punctuation/dash differences between
+    a Square order name ("Atari 1050 Disk Drive — Happy Upgrade") and the same
+    name as it appears in an item's index.html / label.json.
+    """
+    return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
+
+
+def batch_retrieve_orders(
+    token: str, version: str, order_ids: list[str]
+) -> dict:
+    """Fetch orders by id (read-only) → ``{order_id: order}``.
+
+    Lets the audit attribute a null-metadata payment link to its item via the
+    order's line items (``catalog_object_id`` → recorded variation id, or the
+    line-item name → the item's product name). Square's batch endpoint caps at
+    100 ids/call, so we chunk. A failed chunk is logged and skipped — a link
+    whose order can't be read simply stays unattributed (WARN), never crashes.
+    """
+    out: dict = {}
+    ids = [o for o in dict.fromkeys(order_ids) if o]  # de-dupe, drop falsy
+    for i in range(0, len(ids), 100):
+        chunk = ids[i : i + 100]
+        status, body = square_request(
+            "POST",
+            "/v2/orders/batch-retrieve",
+            token,
+            version,
+            {"order_ids": chunk},
+        )
+        if status >= 400:
+            log(f"order batch-retrieve returned {status}: {body}")
+            continue
+        for o in body.get("orders", []):
+            oid = o.get("id")
+            if oid:
+                out[oid] = o
+    return out
+
+
+# Generic line-item names that identify no specific item — never attribute on these.
+_GENERIC_LINE_NAMES = {
+    "custom amount",
+    "custom",
+    "item",
+    "payment",
+    "deposit",
+    "balance",
+    "order",
+}
+
+
+def order_signals(order: Optional[dict]) -> list[str]:
+    """Attribution strings derived from an order's line items, strongest first.
+
+    - ``catalog_object_id`` (exact, lowercased) — matches a modern item's
+      recorded variation/object id in its ``label.json``.
+    - ``"name:" + normalized line-item name`` (>= 6 chars, not generic) —
+      matches the item's product name in ``index.html`` / ``label.json``. This
+      is what catches a pre-ledger sold item like RG-0003 whose order line
+      carried no ``catalog_object_id`` and whose link had null metadata.
+    """
+    sigs: list[str] = []
+    for li in (order or {}).get("line_items", []):
+        cid = li.get("catalog_object_id")
+        if cid:
+            sigs.append(cid.lower())
+        name = _normalize_text(li.get("name") or "")
+        if len(name) >= 6 and name not in _GENERIC_LINE_NAMES:
+            sigs.append("name:" + name)
+    return sigs
+
+
 def _link_identifiers(link: dict) -> list[str]:
     """The strings that uniquely tie a link to an item, lowercased."""
     raw = [
@@ -350,8 +425,10 @@ def attribute_link(
 
     ``how`` is ``"record"`` (a link identifier appears in the item's files),
     ``"metadata"`` (the item's SKU appears in the link's description/payment_note),
-    or ``(None, None)`` when the link can't be tied to any item — which is itself
-    a signal worth flagging (it may be a sold item's orphaned, null-metadata link).
+    ``"order-catalog"`` / ``"order-name"`` (the link's order line items — set on
+    the link as ``_order_signals`` by the audit — match the item's recorded
+    catalog id or product name), or ``(None, None)`` when the link can't be tied
+    to any item (a true orphan worth flagging).
     """
     idents = _link_identifiers(link)
     for it in items:
@@ -369,6 +446,24 @@ def attribute_link(
         )
         if pat.search(haystack):
             return it, "metadata"
+    # Third pass — order line items (populated by the audit's order lookup).
+    # catalog_object_id matches a modern item's recorded variation/object id; a
+    # normalized line-item name matches the item's product name. This closes the
+    # gap that let RG-0003 (sold, pre-ledger, null-metadata link) slip to WARN.
+    for sig in link.get("_order_signals", []):
+        if sig.startswith("name:"):
+            needle = sig[len("name:"):]
+            for it in items:
+                nb = it.get("norm_blob")
+                if nb is None:
+                    nb = _normalize_text(it.get("blob") or "")
+                    it["norm_blob"] = nb
+                if needle and needle in nb:
+                    return it, "order-name"
+        else:
+            for it in items:
+                if sig and sig in (it.get("blob") or ""):
+                    return it, "order-catalog"
     return None, None
 
 
@@ -425,10 +520,10 @@ def format_audit_report(findings: list[dict], item_count: int) -> str:
         for f in crit:
             lines.append(
                 f"  • {f['sku']}  id={f['link_id']}  {f['url']}  "
-                f"order={f['order_id']}"
+                f"order={f['order_id']}  (matched by {f['attributed_by']})"
             )
             lines.append(
-                f"      delete: delete_payment_link.py {f['sku']} "
+                f"      delete: delete_payment_link.py "
                 f"--id {f['link_id']} --yes"
             )
         lines.append("")
@@ -466,6 +561,24 @@ def run_audit(token: str, args) -> int:
     links = list_all_payment_links(token, args.version)
     log(f"auditing {len(links)} live links against {args.items_dir}")
     items = load_item_records(args.items_dir)
+    # Cheap attribution first (record/metadata). Only links that STILL don't
+    # resolve get an order lookup — keeps API calls and fuzzy name-matching to
+    # the minimum needed to catch a null-metadata link on a sold item.
+    unresolved_order_ids = [
+        L.get("order_id")
+        for L in links
+        if attribute_link(L, items)[0] is None and L.get("order_id")
+    ]
+    if unresolved_order_ids:
+        orders = batch_retrieve_orders(token, args.version, unresolved_order_ids)
+        log(
+            f"fetched {len(orders)} order(s) for "
+            f"{len(set(unresolved_order_ids))} unresolved link(s)"
+        )
+        for L in links:
+            oid = L.get("order_id")
+            if oid in orders:
+                L["_order_signals"] = order_signals(orders[oid])
     findings = audit_links(links, items)
     print(format_audit_report(findings, len(items)))
     if audit_has_critical(findings):

@@ -150,6 +150,73 @@ def test_audit_warns_on_unattributable_live_link():
 
 
 # ---------------------------------------------------------------------------
+# order-based attribution (2026-06-20, RG-0003): a null-metadata link on a
+# pre-ledger sold item that records no buy_link must NOT slip to WARN. The
+# audit resolves it via the link's order line items — catalog_object_id, or
+# the line-item name matched against the item's product name.
+# ---------------------------------------------------------------------------
+
+def test_order_signals_extracts_catalog_id_and_name():
+    sigs = dpl.order_signals(
+        {"line_items": [
+            {"name": "Pressed-Back Oak Swivel Bar Stool"},
+            {"name": "X", "catalog_object_id": "VARID123"},   # name too short -> skipped
+            {"name": "Custom amount"},                         # generic -> skipped
+        ]}
+    )
+    assert "name:pressed back oak swivel bar stool" in sigs
+    assert "varid123" in sigs                       # catalog id, lowercased
+    assert not any(s.startswith("name:custom") for s in sigs)
+    assert not any(s == "name:x" for s in sigs)
+
+
+def test_audit_attributes_sold_link_by_order_name():
+    # RG-0003 case: sold, pre-ledger (no recorded buy_link), link metadata null.
+    # The order's line-item name matches the product name in the item blob.
+    link = {
+        "id": "3UKOFPUPC6IKMYFK", "url": "https://square.link/u/u3fWQWnE",
+        "order_id": "OLD3", "description": None, "payment_note": None,
+        "_order_signals": ["name:pressed back oak swivel bar stool"],
+    }
+    items = [
+        {"sku": "RG-0003", "status": "sold",
+         "blob": "<title>pressed-back oak swivel bar stool - antique 1900s</title>"},
+    ]
+    findings = dpl.audit_links([link], items)
+    assert findings[0]["severity"] == "CRITICAL"
+    assert findings[0]["sku"] == "RG-0003"
+    assert findings[0]["attributed_by"] == "order-name"
+    assert dpl.audit_has_critical(findings) is True
+
+
+def test_audit_attributes_link_by_order_catalog_id():
+    link = {
+        "id": "L_CAT", "url": "https://square.link/u/zzz", "order_id": "OC1",
+        "description": None, "payment_note": None,
+        "_order_signals": ["wcs75ndb36i2b5ugxtdkivde"],
+    }
+    items = [
+        {"sku": "RG-0026", "status": "sold",
+         "blob": '"variation_id": "wcs75ndb36i2b5ugxtdkivde" touch tablet'},
+    ]
+    findings = dpl.audit_links([link], items)
+    assert findings[0]["severity"] == "CRITICAL"
+    assert findings[0]["attributed_by"] == "order-catalog"
+
+
+def test_audit_still_warns_when_order_signals_match_nothing():
+    link = {
+        "id": "L_NONE", "url": "https://square.link/u/qqq", "order_id": "ON1",
+        "description": None, "payment_note": None,
+        "_order_signals": ["name:something not in any ledger blob"],
+    }
+    items = [{"sku": "RG-0050", "status": "available", "blob": "unrelated"}]
+    findings = dpl.audit_links([link], items)
+    assert findings[0]["severity"] == "WARN"
+    assert findings[0]["sku"] is None
+
+
+# ---------------------------------------------------------------------------
 # load_item_records — the filesystem glue audit_links sits on top of
 # ---------------------------------------------------------------------------
 

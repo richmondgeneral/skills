@@ -166,8 +166,11 @@ def extract_photos(library_path, output_dir, days=7, min_width=0, favorites_only
         print(f"\n☁︎ {len(offloaded)} original(s) offloaded to iCloud (not on disk):")
         for name in offloaded:
             print(f"    - {name}")
-        print('  Download via Photos (select → File ▸ "Download Originals"),')
-        print("  or `osxphotos export --download-missing`, then re-run.")
+        print('  Best (image-only): in Photos select → File ▸ "Download Originals"')
+        print("  (keeps them in-library, no video sidecars), then re-run — this stays image-only.")
+        print("  Do NOT 'Export Unmodified Originals' to a folder: Live Photos add a ~5MB .mov")
+        print("  each (≈1GB/session). If you did, strip them: intake_cleanup.py prune-sidecars <dir> --apply")
+        print("  (or osxphotos export --download-missing --skip-live --skip-raw).")
 
     # Requested UUIDs that matched no asset at all — surface, never silently drop.
     if not_found:

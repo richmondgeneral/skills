@@ -133,8 +133,11 @@ Extract and convert photos with macOS-native `sips` (no ImageMagick). Options:
 - `--resize WxH` - Bound the longest side to fit a WxH box (aspect preserved)
 
 iCloud-offloaded originals (not on local disk) are reported at the end with a
-count + filenames, never silently skipped. Download them in Photos (select →
-File ▸ "Download Originals") or `osxphotos export --download-missing`, then re-run.
+count + filenames, never silently skipped. Materialize them the **image-only** way:
+in Photos select → File ▸ "Download Originals" (keeps them in-library, no video
+sidecars), then re-run. **Do not "Export Unmodified Originals" to a folder** — Live
+Photos emit a ~5 MB `.mov` each (≈1 GB/session of bloat); if you already did, strip
+them with `intake_cleanup.py prune-sidecars <dir> --apply`.
 
 ### `scripts/find_product_clusters.py`
 
@@ -169,6 +172,27 @@ First intake step only, not the whole thing — the hero is the raw original (ru
 image-processor for background removal), rename `detail-N` to semantic names
 (detail-back / detail-mark / detail-tag), then set final pricing and run the
 rg-full-auto Square / label / publish phases.
+
+### `scripts/intake_cleanup.py` — intake scratch hygiene
+
+Two safeguards against intake bloat (the 2026-06-19 audit found ~1 GB/session of
+Live Photo `.mov` sidecars piling up in scratch, never cleaned up):
+
+```bash
+# A) Drop Live Photo .mov sidecars — only ones with a still twin (real videos kept).
+#    Safe anytime, on any export/staging folder. Dry-run unless --apply.
+python3 scripts/intake_cleanup.py prune-sidecars rg-pending/RG-0028 --apply
+
+# B) Sweep a DONE item's scratch (rg-pending/<sku> + legacy ops/_intake_*).
+#    Fires ONLY when label.json state is Sold/Archived; a Listed item with open
+#    photo follow-ups is skipped. Dry-run unless --apply.
+python3 scripts/intake_cleanup.py sweep --sku RG-0028 --items-dir ../items \
+    --extra ../ops/_intake_dishes3 --apply
+```
+
+**Definition of done:** run `prune-sidecars` on any export folder before processing,
+and `sweep` once the item is terminal, so scratch never accumulates. Both are
+importable (`prune_live_photo_sidecars`, `sweep_intake_scratch`) for rg-full-auto wiring.
 
 ## Database Schema
 

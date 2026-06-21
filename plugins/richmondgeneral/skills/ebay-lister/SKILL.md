@@ -1,7 +1,10 @@
 ---
 name: ebay-lister
 description: >
-  Create and publish Richmond General eBay listings programmatically via eBay's official
+  ⛔ NOT YET ACTIVE — the eBay developer account is PENDING APPROVAL, so no API keys exist
+  yet. Do NOT invoke this skill to list/publish until keys arrive (2026-06-19); use the manual
+  eBay listing pack in the meantime. `--dry-run` is the only safe call until then.
+  When active: Create and publish Richmond General eBay listings programmatically via eBay's official
   Sell **Inventory API** — no browser, no document_idle hang, batchable. Reads
   items/RG-XXXX/label.json (price, condition, attributes, photos from the live GitHub
   Pages URLs) and runs createOrReplaceInventoryItem -> createOffer -> publishOffer, then
@@ -14,10 +17,17 @@ metadata:
   version: "0.1"
   author: scottybe
   updated: "2026-06-19"
-  status: scaffold — live calls require the one-time OAuth + business-policy/location config in SETUP.md
+  status: "BLOCKED (2026-06-19) — eBay developer account application submitted, awaiting approval. No API keys issued yet. Do not use for live listing until keys arrive; --dry-run only."
 ---
 
 # ebay-lister — list on eBay via the Sell API
+
+> ⛔ **BLOCKED — DO NOT USE FOR LIVE LISTING YET.** The eBay developer account was applied
+> for on 2026-06-19 and is **pending approval**; no App ID / Cert ID / OAuth keys exist.
+> Until the keys arrive: list eBay items via the **manual listing pack** (`ops/RG-XXXX-ebay-listing-pack.md`),
+> not this skill. Only `ebay_lister.py list --sku … --dry-run` is safe to run (it builds
+> payloads locally, makes no API call). When the dev account is approved, follow SETUP.md,
+> then remove this banner and flip `metadata.status` to active.
 
 Replaces the flaky Chrome listing flow (which freezes at `document_idle`) with eBay's
 REST Sell Inventory API. Source of truth for each listing is `items/RG-XXXX/label.json`.

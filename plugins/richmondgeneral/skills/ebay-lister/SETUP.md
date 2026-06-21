@@ -1,5 +1,10 @@
 # ebay-lister — one-time setup (owner)
 
+> **STATUS (2026-06-19): BLOCKED — awaiting eBay dev-account approval.** The developer
+> account application is submitted but **not yet approved**, so steps 1–4 below cannot be
+> completed and the skill must not be used for live listing yet. When the approval email
+> arrives, work through this file top to bottom, then clear the BLOCKED banner in SKILL.md.
+
 This is the only part Claude can't do — it needs the eBay developer keys and a browser
 sign-in to the `richmondgeneral` seller account. Claude never sees a password; it only
 uses the post-consent `code` and the resulting tokens.

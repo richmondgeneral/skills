@@ -470,7 +470,8 @@ def standardize(input_path, output_path, do_color=True, do_bg=True, fill=0.85, s
             # Lazy import so a missing module degrades to "no card" instead of crashing.
             # Opaque full-bleed outputs (flat-goods / keep-bg) are skipped inside the composer.
             try:
-                sys.path.insert(0, SCRIPT_DIR)
+                if SCRIPT_DIR not in sys.path:
+                    sys.path.insert(0, SCRIPT_DIR)
                 from golden_card import compose_golden_card
                 compose_golden_card(output_path, Path(output_path).parent / "card.png")
             except Exception as exc:
@@ -617,8 +618,9 @@ def _run_batch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Non
             if changed:
                 entry["overrides"] = changed
             results.append(entry)
-            if getattr(item_args, "do_card", True) and (item_dir / "card.png").exists():
-                sys.path.insert(0, SCRIPT_DIR)
+            if getattr(item_args, "do_card", True):
+                if SCRIPT_DIR not in sys.path:
+                    sys.path.insert(0, SCRIPT_DIR)
                 from golden_card import record_photos_card
                 record_photos_card(item_dir)
             if not args.json_out:

@@ -96,3 +96,26 @@ def test_tiny_speck_is_skipped(tmp_path):
     out = gc.compose_golden_card(src, tmp_path / "card.png")
     assert out is None
     assert not (tmp_path / "card.png").exists()
+
+
+def test_skip_deletes_stale_card(tmp_path):
+    card = tmp_path / "card.png"
+    card.write_bytes(b"stale")                       # pre-existing stale card
+    src = tmp_path / "hero.png"
+    Image.new("RGB", (800, 600), (10, 20, 30)).save(src)   # opaque -> skip
+    out = gc.compose_golden_card(src, card)
+    assert out is None
+    assert not card.exists()                         # stale card removed on skip
+
+
+def test_record_photos_card_reconciles(tmp_path):
+    import json
+    label = tmp_path / "label.json"
+    label.write_text(json.dumps({"photos": {"hero": "hero.png", "card": "card.png"}}))
+    # no card.png present -> stale photos.card removed
+    gc.record_photos_card(tmp_path)
+    assert "card" not in json.loads(label.read_text())["photos"]
+    # card.png present -> photos.card set
+    (tmp_path / "card.png").write_bytes(b"x")
+    gc.record_photos_card(tmp_path)
+    assert json.loads(label.read_text())["photos"]["card"] == "card.png"

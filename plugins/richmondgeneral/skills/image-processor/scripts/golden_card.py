@@ -55,17 +55,24 @@ def compose_golden_card(hero_path, out_path=None, width: int = DEFAULT_WIDTH,
     nothing was written.
     """
     hero_path = Path(hero_path)
+    out_path = Path(out_path) if out_path else hero_path.parent / CARD_FILENAME
     src = Image.open(hero_path)
     rgba = src.convert("RGBA")
-    if not _has_cutout(rgba):
-        return None  # opaque full-bleed (flat-goods / keep-bg) -> no card
 
+    def _skip():
+        # No valid cutout to float — ensure no stale card lingers for this hero.
+        if out_path.exists():
+            out_path.unlink()
+        return None
+
+    if not _has_cutout(rgba):
+        return _skip()                 # opaque full-bleed (flat-goods / keep-bg)
     bbox = rgba.getchannel("A").getbbox()
     if bbox is None:
-        return None  # fully transparent — nothing to float
+        return _skip()                 # fully transparent — nothing to float
     bx0, by0, bx1, by1 = bbox
     if max(bx1 - bx0, by1 - by0) < MIN_CUTOUT_PX:
-        return None  # degenerate speck (alpha noise), not a real cutout
+        return _skip()                 # degenerate speck (alpha noise), not a real cutout
     obj = rgba.crop(bbox)
     ow, oh = obj.size
 
@@ -77,7 +84,6 @@ def compose_golden_card(hero_path, out_path=None, width: int = DEFAULT_WIDTH,
     canvas = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
     canvas.paste(obj, ((cw - new_w) // 2, (ch - new_h) // 2), obj)
 
-    out_path = Path(out_path) if out_path else hero_path.parent / CARD_FILENAME
     meta = PngInfo()                                   # carry provenance text chunks (Copyright/Title)
     for k, v in getattr(src, "text", {}).items():
         meta.add_text(k, v)
@@ -86,13 +92,19 @@ def compose_golden_card(hero_path, out_path=None, width: int = DEFAULT_WIDTH,
 
 
 def record_photos_card(item_dir, card_filename: str = CARD_FILENAME) -> None:
-    """Set label.json -> photos.card so channels/templates know a card exists. No-op if absent."""
+    """Reconcile label.json -> photos.card with the card file's existence: set it when
+    <item_dir>/<card_filename> exists, remove a stale entry when it does not. No-op if
+    label.json is absent."""
     p = Path(item_dir) / "label.json"
     if not p.exists():
         return
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
-        data.setdefault("photos", {})["card"] = card_filename
+        photos = data.setdefault("photos", {})
+        if (Path(item_dir) / card_filename).exists():
+            photos["card"] = card_filename
+        else:
+            photos.pop("card", None)
         p.write_text(json.dumps(data, indent=2), encoding="utf-8")
     except Exception as exc:
         print(f"warning: {p}: {exc}", file=sys.stderr)
@@ -119,11 +131,11 @@ def _batch(items_dir, width: int, fill: float) -> int:
         except Exception as exc:
             print(f"  ! {d.name}: {exc}", file=sys.stderr)
             continue
+        record_photos_card(d)            # reconcile photos.card with card.png existence
         if out is None:
             skipped += 1
             print(f"  - {d.name}: no cutout, skipped")
         else:
-            record_photos_card(d)
             made += 1
             print(f"  ✓ {d.name}: {out.name}")
     print(f"\nbackfill: made={made} skipped={skipped}")

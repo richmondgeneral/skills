@@ -56,3 +56,21 @@ def test_caption_override_from_label_json(tmp_path):
                                "combo_captions": {"provenance": "Kreamer · Size 50"}})
     prov = cb.select_slots(d)["rail"][0]
     assert prov["caption"] == "Kreamer · Size 50"
+
+
+def test_crop_cover_exact_size(tmp_path):
+    out = cb.crop_cover(Image.new("RGB", (800, 400), (10, 20, 30)), 300, 300)
+    assert out.size == (300, 300)
+
+
+def test_crop_cover_is_cover_not_contain(tmp_path):
+    out = cb.crop_cover(Image.new("RGB", (800, 400), (200, 30, 30)), 300, 300)
+    assert out.getpixel((0, 0)) == (200, 30, 30)        # filled, no white letterbox
+    assert out.getpixel((299, 299)) == (200, 30, 30)
+
+
+def test_crop_cover_flattens_alpha_on_white(tmp_path):
+    src = Image.new("RGBA", (400, 400), (0, 0, 0, 0))    # fully transparent
+    out = cb.crop_cover(src, 200, 200)
+    assert out.mode == "RGB"
+    assert out.getpixel((100, 100)) == cb.PANEL_BG       # transparency -> white, not black

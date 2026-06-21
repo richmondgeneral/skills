@@ -117,3 +117,26 @@ def select_slots(item_dir, rail: int = RAIL_DEFAULT, caption_mode: str = "specif
         cap = overrides.get(role) or ROLE_DEFAULT_CAPTION.get(role, "Detail")
         out.append({"path": p, "role": role, "caption": cap})
     return {"hero": hero, "rail": out}
+
+
+def _flatten(img: Image.Image) -> Image.Image:
+    """RGB copy; any alpha is composited over PANEL_BG (white) so cutouts don't go black."""
+    if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+        rgba = img.convert("RGBA")
+        bg = Image.new("RGB", rgba.size, PANEL_BG)
+        bg.paste(rgba, mask=rgba.split()[-1])
+        return bg
+    return img.convert("RGB")
+
+
+def crop_cover(img: Image.Image, w: int, h: int, pos=(0.5, 0.5)) -> Image.Image:
+    """Scale-to-cover then crop to exactly w x h (no letterbox). pos = focal fraction."""
+    img = _flatten(img)
+    sw, sh = img.size
+    scale = max(w / sw, h / sh)
+    nw, nh = max(1, round(sw * scale)), max(1, round(sh * scale))
+    img = img.resize((nw, nh), Image.LANCZOS)
+    mx, my = nw - w, nh - h
+    x = min(max(0, int(round(mx * pos[0]))), mx)
+    y = min(max(0, int(round(my * pos[1]))), my)
+    return img.crop((x, y, x + w, y + h))

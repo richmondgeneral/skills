@@ -422,7 +422,7 @@ def bake_orientation(img: Image.Image) -> Image.Image:
 def standardize(input_path, output_path, do_color=True, do_bg=True, fill=0.85, size=2000,
                 shadow=False, copyright_text=None, sku=None, watermark=False,
                 watermark_logo=DEFAULT_LOGO, wb="background", model=None, allow_rect_mask=False,
-                do_deskew=False, perspective_correct=False, crop_to_face=False):
+                do_deskew=False, perspective_correct=False, crop_to_face=False, do_card=True):
     mask_quality = None
     with tempfile.TemporaryDirectory() as td:
         # Bake EXIF orientation into pixels ONCE, up front, so EVERY downstream
@@ -464,6 +464,17 @@ def standardize(input_path, output_path, do_color=True, do_bg=True, fill=0.85, s
             metadata.add_text("Title", sku)
             
         final_img.save(output_path, "PNG", pnginfo=metadata)
+
+        if do_card:
+            # Float the cutout onto a golden-ratio transparent canvas (card.png).
+            # Lazy import so a missing module degrades to "no card" instead of crashing.
+            # Opaque full-bleed outputs (flat-goods / keep-bg) are skipped inside the composer.
+            try:
+                sys.path.insert(0, SCRIPT_DIR)
+                from golden_card import compose_golden_card
+                compose_golden_card(output_path, Path(output_path).parent / "card.png")
+            except Exception as exc:
+                print(f"warning: golden card compose failed: {exc}", file=sys.stderr)
     return output_path, mask_quality
 
 
@@ -564,6 +575,7 @@ def _run_batch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Non
                 do_deskew=getattr(item_args, "deskew", False),
                 perspective_correct=getattr(item_args, "perspective_correct", False),
                 crop_to_face=getattr(item_args, "crop_to_face", False),
+                do_card=getattr(item_args, "do_card", True),
             )
 
             # flat-goods deskew routed to manual (low confidence / non-rectangular / no cv2)
@@ -605,6 +617,10 @@ def _run_batch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Non
             if changed:
                 entry["overrides"] = changed
             results.append(entry)
+            if getattr(item_args, "do_card", True) and (item_dir / "card.png").exists():
+                sys.path.insert(0, SCRIPT_DIR)
+                from golden_card import record_photos_card
+                record_photos_card(item_dir)
             if not args.json_out:
                 print(f"  \u2713 {item_dir.name}  -> {output.name}")
         except Exception as exc:
@@ -692,6 +708,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", dest="json_out", action="store_true",
                    help="emit JSON result summary")
 
+    # ---- golden-ratio card image (card.png) ----
+    card_grp = p.add_mutually_exclusive_group()
+    card_grp.add_argument("--card", dest="do_card", action="store_true", default=True,
+                          help="also emit a golden-ratio transparent card.png (default on)")
+    card_grp.add_argument("--no-card", dest="do_card", action="store_false",
+                          help="do not emit card.png")
+
     # ---- flat-goods deskew (books/paper/cards/boxed/framed) ----
     p.add_argument("--deskew", action="store_true",
                    help="detect the flat item's rectangular face and perspective-"
@@ -764,6 +787,7 @@ def main() -> None:
         do_deskew=args.deskew,
         perspective_correct=args.perspective_correct,
         crop_to_face=args.crop_to_face,
+        do_card=args.do_card,
     )
     if out is None:
         reason = (mq or {}).get("reason", "needs_manual")

@@ -141,3 +141,42 @@ def crop_cover(img: Image.Image, w: int, h: int, pos=(0.5, 0.5)) -> Image.Image:
     x = min(max(0, int(round(mx * pos[0]))), mx)
     y = min(max(0, int(round(my * pos[1]))), my)
     return img.crop((x, y, x + w, y + h))
+
+
+def _sku(item_dir) -> str:
+    lj = Path(item_dir) / "label.json"
+    if lj.exists():
+        try:
+            s = json.loads(lj.read_text(encoding="utf-8")).get("sku")
+            if s:
+                return s
+        except Exception:
+            pass
+    return Path(item_dir).name
+
+
+def compose_combo(item_dir, out=None, rail: int = RAIL_DEFAULT,
+                  caption_mode: str = "specific", layout: str = "magazine") -> Optional[Path]:
+    item_dir = Path(item_dir)
+    out_path = Path(out) if out else item_dir / COMBO_FILENAME
+    sel = select_slots(item_dir, rail=rail, caption_mode=caption_mode)
+    if sel is None:
+        if out_path.exists():
+            out_path.unlink()
+        return None
+
+    canvas = Image.new("RGB", (CANVAS, CANVAS), CREAM)
+    hero_w = round(CANVAS * HERO_FRAC)
+    canvas.paste(crop_cover(Image.open(sel["hero"]), hero_w, CANVAS, pos=(0.5, 0.42)), (0, 0))
+
+    rail_x = hero_w + GUTTER
+    rail_w = CANVAS - rail_x
+    n = len(sel["rail"])
+    cell_h = (CANVAS - (n - 1) * GUTTER) // n
+    for i, slot in enumerate(sel["rail"]):
+        y = i * (cell_h + GUTTER)
+        h = cell_h if i < n - 1 else CANVAS - y          # last cell absorbs rounding to the edge
+        canvas.paste(crop_cover(Image.open(slot["path"]), rail_w, h), (rail_x, y))
+
+    canvas.save(out_path, "PNG")
+    return out_path

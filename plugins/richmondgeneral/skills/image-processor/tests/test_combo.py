@@ -90,3 +90,39 @@ def test_caption_override_ignores_non_dict(tmp_path):
     d = _item(tmp_path, label={"sku": "RG-9999", "combo_captions": ["oops"]})
     prov = cb.select_slots(d)["rail"][0]
     assert prov["caption"] == "Maker's mark"                # malformed override ignored
+
+
+def _close(a, b, tol=4):
+    # JPEG fixtures + LANCZOS resample shift solid colors by a level or two;
+    # assert the region came from the right source, not byte-exact RGB.
+    return all(abs(x - y) <= tol for x, y in zip(a, b))
+
+
+def test_output_size_is_1600(tmp_path):
+    out = cb.compose_combo(_item(tmp_path))
+    assert out is not None and out.exists()
+    assert Image.open(out).size == (1600, 1600)
+
+
+def test_hero_region_from_hero(tmp_path):
+    im = Image.open(cb.compose_combo(_item(tmp_path))).convert("RGB")
+    assert _close(im.getpixel((12, 800)), (200, 30, 30))   # hero is solid red, left/mid
+
+
+def test_gutter_between_hero_and_rail_is_cream(tmp_path):
+    im = Image.open(cb.compose_combo(_item(tmp_path))).convert("RGB")
+    hero_w = round(1600 * cb.HERO_FRAC)                   # 992
+    assert im.getpixel((hero_w + cb.GUTTER // 2, 800)) == cb.CREAM
+
+
+def test_first_rail_cell_present(tmp_path):
+    im = Image.open(cb.compose_combo(_item(tmp_path))).convert("RGB")
+    rail_x = round(1600 * cb.HERO_FRAC) + cb.GUTTER       # 1008
+    assert _close(im.getpixel((rail_x + 6, 18)), (30, 160, 30))  # first detail green, top of cell
+
+
+def test_skip_removes_stale_combo(tmp_path):
+    d = _item(tmp_path, details=("detail-maker-mark",))   # too few
+    (d / cb.COMBO_FILENAME).write_bytes(b"stale")
+    assert cb.compose_combo(d) is None
+    assert not (d / cb.COMBO_FILENAME).exists()

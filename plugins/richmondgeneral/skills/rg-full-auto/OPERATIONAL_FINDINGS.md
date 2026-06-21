@@ -6,7 +6,7 @@ This file is retained as a short archival note. The prior long-form findings wer
 
 ## Current Operational Baseline
 
-- Catalog creation: Phase 2 uses Square `catalog.batchInsertObjects` with `catalog.upsertCatalogObject` fallback.
+- Catalog creation: Phase 2 uses Square `catalog.batchInsertObjects` (a single item is a one-element batch; the Square MCP has no `upsertCatalogObject`). Updates use `catalog.batchUpdateObjects` with `sparse_update: true`.
 - Inventory: Phase 3 uses Square `inventory.batchChange`.
 - Image upload: Phase 4 uses `square-image-upload` skill flow.
 - Lot/cost/margin logic: delegated to `rg-lot-tracker` (Step 1.1 and Step 1.5).

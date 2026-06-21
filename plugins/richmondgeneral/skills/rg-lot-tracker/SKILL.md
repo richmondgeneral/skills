@@ -384,25 +384,32 @@ the user to manually report sales, proactively check Square for completed orders
 
 1. **Query Square orders** for completed sales at Richmond General's location:
 
+Use the Square MCP `make_api_request` (Square-Version `2026-04-21`). Discover the
+exact shape first with `get_service_info`/`get_type_info` for the `orders` service.
+
 ```
-mcp_square_api:search_resource
-  resource: orders
-  locationIds: ["B87BAEZ0NWV34"]
-  fields: ["id", "line_items[].name", "line_items[].catalog_object_id",
-           "line_items[].total_money", "line_items[].quantity",
-           "created_at", "state", "tenders[].type"]
-  query:
-    filter:
-      state_filter:
-        states: ["COMPLETED"]
-      date_time_filter:
-        created_at:
-          start_at: "{last_reconciliation_date or 30_days_ago}"
-    sort:
-      field: "CREATED_AT"
-      order: "desc"
+mcp__mcp_square_api__make_api_request
+  service: orders
+  method: search          # SearchOrders
+  request:
+    location_ids: ["B87BAEZ0NWV34"]
+    query:
+      filter:
+        state_filter:
+          states: ["COMPLETED"]
+        date_time_filter:
+          created_at:
+            start_at: "{last_reconciliation_date or 30_days_ago}"
+      sort:
+        sort_field: "CREATED_AT"   # must match the date_time_filter field
+        sort_order: "DESC"
+    return_entries: false   # return full Order objects
     limit: 50
 ```
+
+The response returns full `Order` objects; read `id`, `created_at`, `state`,
+`line_items[].name`, `line_items[].catalog_object_id`, `line_items[].quantity`,
+`line_items[].total_money`, and `tenders[].type` from each.
 
 2. **Match against lot files** — For each order line item:
    - Look up catalog_object_id via `square_cache_mcp:square_cache_get_item` to get SKU
@@ -539,7 +546,8 @@ rg-full-auto calls this skill at two points:
 ### Square (v2.0)
 
 This skill reads from Square for sales reconciliation (Phase 5). It uses:
-- `mcp_square_api:search_resource` for querying completed orders
+- `mcp__mcp_square_api__make_api_request` (service `orders`, method `search`,
+  Square-Version `2026-04-21`) for querying completed orders
 - `square_cache_mcp:square_cache_get_item` for SKU lookups
 - `square_cache_mcp:square_cache_search` for fuzzy matching
 

@@ -45,7 +45,7 @@ Use preflight before mutation steps:
 - Merging category sets (for example, legacy food categories -> `Food & Pantry`)
 - Auditing cleanup integrity (hidden/empty legacy categories, channel assignment coverage)
 - Verifying published site/channel mapping
-- Proving API compliance to `Square-Version: 2026-01-22`
+- Proving API compliance to `Square-Version: 2026-04-21`
 
 ## Required Preconditions
 
@@ -108,15 +108,21 @@ The audit verifies:
 - categories with items are visible and assigned to active site/POS channels
 - `New Arrivals` count matches expected intake cap
 
-### 5) Rebuild Catalog Index (dedup)
+### 5) Rebuild Catalog Index (dedup) — DEPRECATED
+
+> ⚠️ **Deprecated (2026-06-19): `catalog_index.jsonl` was retired/deleted — do not recreate it.**
+> The hand/derived snapshot is no longer the dedup source. Treat **live Square** as the
+> source of truth (the derived convenience cache is now `catalog_state.json`, regenerated
+> by the reconcile tool — never hand-authored). For SKU minting, the filesystem/glob index
+> is superseded by the Square version-CAS allocator (`rg-full-auto/scripts/sku_authority.py`).
+> This command is kept only for reference; do not run it as part of intake.
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/generate_catalog_index.py
 ```
 
-Rebuilds `catalog_index.jsonl` (the RG-SKU dedup index) from **live Square**, not the
-local snapshot. Run after each intake batch — it's the Square layer of the dedupe-first
-SOP. `--root` overrides the workspace dir; `--sku-pattern` the SKU regex.
+Rebuilt `catalog_index.jsonl` (the RG-SKU dedup index) from **live Square**, not the
+local snapshot. `--root` overrides the workspace dir; `--sku-pattern` the SKU regex.
 
 ## Post-Mutation Workflow (Required)
 

@@ -1,5 +1,9 @@
 # Square Catalog API Reference
 
+## API Version
+
+- **Square-Version:** `2026-04-21` (the version Richmond General targets). When the remote Square MCP doesn't let you pin the header, verify behavior against this version; switch to the local official server if strict pinning is required.
+
 ## Location & Merchant IDs
 
 - **Location ID:** B87BAEZ0NWV34 (Richmond General - ACTIVE)
@@ -95,12 +99,12 @@ Query all categories with: `catalog.searchObjects` with `object_types: ["CATEGOR
 ## Creating Catalog Items
 
 ### Endpoint
-Primary: `catalog.batchInsertObjects`
-Fallback: `catalog.upsertCatalogObject`
+Create: `catalog.batchInsertObjects` (a single item is just a one-element `objects` array; each batch is inserted all-or-nothing).
+Update: `catalog.batchUpdateObjects` with `sparse_update: true` (see "Updating Existing Items" below).
 
-**Compatibility note:** Connector method availability varies. If `batchInsertObjects` returns method/schema errors, switch to `upsertCatalogObject` using the alternate payload below.
+**No upsert method:** The Square MCP catalog service exposes `batchInsertObjects`, `batchUpdateObjects`, `batchGetobjects`, `batchDeleteobjects`, `searchObjects`, `searchItems`, and `list` — there is **no** `upsertCatalogObject` or `batchUpsertObjects`. Don't call them; they 404 / return a method error.
 
-**Idempotency rule:** `idempotency_key` remains top-level for both methods.
+**Idempotency rule:** `idempotency_key` remains top-level.
 
 ### Complete Item Creation (with required fields)
 
@@ -149,57 +153,17 @@ Fallback: `catalog.upsertCatalogObject`
 }
 ```
 
-### Alternate Item Creation (upsertCatalogObject)
-
-```json
-{
-  "idempotency_key": "uuid-v4-here",
-  "object": {
-    "type": "ITEM",
-    "id": "#temp-id",
-    "present_at_all_locations": false,
-    "present_at_location_ids": ["B87BAEZ0NWV34"],
-    "item_data": {
-      "name": "Product Name",
-      "description_html": "<p>Description paragraph one.</p><p>&nbsp;</p><p><b>Condition:</b> Good.</p>",
-      "categories": [
-        {"id": "TYPE_CATEGORY_ID"},
-        {"id": "TIER_CATEGORY_ID"}
-      ],
-      "reporting_category": {"id": "TYPE_CATEGORY_ID"},
-      "tax_ids": ["LPKEJF7H27NOPK7EE6A5CA7V"],
-      "is_taxable": true,
-      "ecom_visibility": "VISIBLE",
-      "variations": [{
-        "type": "ITEM_VARIATION",
-        "id": "#temp-var-id",
-        "present_at_all_locations": false,
-        "present_at_location_ids": ["B87BAEZ0NWV34"],
-        "item_variation_data": {
-          "item_id": "#temp-id",
-          "name": "Regular",
-          "sku": "RG-XXXX",
-          "pricing_type": "FIXED_PRICING",
-          "price_money": {
-            "amount": 1999,
-            "currency": "USD"
-          },
-          "track_inventory": true,
-          "sellable": true,
-          "stockable": true
-        }
-      }]
-    }
-  }
-}
-```
+> **No alternate `upsertCatalogObject` payload.** That method is not exposed by
+> the Square MCP catalog service, so there is no `{"object": {...}}` fallback
+> shape — use the `batchInsertObjects` payload above for every create (a single
+> item is a one-element `objects` array).
 
 ### Extracting IDs Robustly
 
 Use this order:
 1. `id_mappings` by temp IDs (`#temp-id`, `#temp-var-id`)
 2. `batchInsertObjects`: `objects[0].id` and nested variation ID
-3. `upsertCatalogObject`: `catalog_object.id` and nested variation ID
+3. If still missing, `batchGetobjects` (with `include_related_objects: true`) and resolve by SKU
 
 ### Set Inventory Count (Required after item creation)
 
@@ -228,7 +192,7 @@ Use this order:
 
 ### Updating Existing Items
 
-When updating, you MUST include the current `version` and use `sparse_update: true`:
+Method: `catalog.batchUpdateObjects`. You MUST include the current `version` and use `sparse_update: true` (send ONLY the fields you are changing). A non-sparse update REPLACES the whole object and can DROP the variations (price/SKU) — always sparse, and re-verify `variations` / `price_money` / `image_ids` in the response.
 
 ```json
 {
@@ -317,19 +281,26 @@ For reference, images must be uploaded separately via `catalog.createCatalogImag
 
 ## Useful Queries
 
+> MCP method names (verified): use `list`, `searchObjects`/`searchItems`, and
+> `batchGetobjects` — there is no `listCatalog`, `searchCatalogItems`, or
+> `retrieveCatalogObject` on the Square MCP catalog service. Note the casing
+> quirk: `batchGetobjects` / `batchDeleteobjects` (lowercase `o`) vs
+> `batchInsertObjects` / `batchUpdateObjects` (capital `O`).
+
 ### List All Items
 ```
-catalog.listCatalog with types: ["ITEM"]
+catalog.list with types: "ITEM"            (comma-separated string; excludes deleted)
+catalog.searchObjects with object_types: ["ITEM"]   (use to list; supports include_deleted_objects)
 ```
 
 ### Search by SKU
 ```
-catalog.searchCatalogItems with text_filter containing SKU
+catalog.searchItems with text_filter containing SKU
 ```
 
 ### Get Item Details
 ```
-catalog.retrieveCatalogObject with object_id
+catalog.batchGetobjects with object_ids: ["OBJECT_ID"]   (add include_related_objects: true for variations)
 ```
 
 ## Price Formatting

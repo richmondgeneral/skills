@@ -146,7 +146,7 @@ curl -X POST "https://connect.squareup.com/v2/catalog/images" \
   -F "image_file=@new-image.jpeg;type=image/jpeg"
 ```
 
-To **replace** primary image: delete old image first via `catalog.deleteObjects`, then upload new.
+To **replace** primary image: delete old image first via `catalog.batchDeleteobjects` (note the lowercase `o`; there is no `deleteObjects` method), then upload new.
 
 ### Inventory Adjustment
 

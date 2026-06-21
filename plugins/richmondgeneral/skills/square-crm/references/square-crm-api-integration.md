@@ -19,8 +19,8 @@ For personal access token (own account only):
 
 ## Location Configuration
 
-**Richmond General Location ID**: `L65JWBQEKPVHF` (from SKILL.md)  
-**Note**: Verify this matches current Square account setup
+**Richmond General Location ID**: `B87BAEZ0NWV34` (from SKILL.md — ACTIVE)  
+**Note**: This is the verified active Richmond General location ID.
 
 ## Endpoint Mapping
 
@@ -84,14 +84,13 @@ For personal access token (own account only):
 
 ### Add Customer to Group
 
-**Endpoint**: `POST /v2/customers/{customer_id}/groups/{group_id}`  
+**Endpoint**: `PUT /v2/customers/{customer_id}/groups/{group_id}` (AddGroupToCustomer)  
 **Scope Required**: `CUSTOMERS_MANAGE_GROUPS`  
-**Request Body**: Empty JSON object `{}`
+**Request Body**: None (no body)
 
 Example: Add to Vinyl Collectors group
 ```json
-POST /v2/customers/JDKYHBWT1D4F8MFH63DBMEN8Y4/groups/4A4AG6K8CYAYC7T2HSE2R04EJE
-{}
+PUT /v2/customers/JDKYHBWT1D4F8MFH63DBMEN8Y4/groups/4A4AG6K8CYAYC7T2HSE2R04EJE
 ```
 
 ## Customer Groups Reference
@@ -161,7 +160,7 @@ Benefits:
 - Store customer version locally after each update
 - If local version differs from returned version, another update occurred
 - Re-fetch customer before next update to get current version
-- Don't rely on version field for optimistic locking (not supported)
+- As a best practice, include the `version` field on `customers.update` to enable optimistic concurrency control (supported by the Customers API); a stale version returns a 409 conflict — re-fetch and retry
 
 ## Deprecated Fields to Avoid
 

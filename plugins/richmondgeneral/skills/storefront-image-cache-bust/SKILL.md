@@ -24,7 +24,7 @@ The reliable bust: **create new catalog image objects with new IDs**, point the 
 
 - The Catalog API itself has the wrong photo — that's an upload problem; use `square-image-upload-cowork` instead
 - You are uploading a net-new image for the first time — same, use `square-image-upload-cowork`
-- The issue is image **order** but each image is correct — just patch `item_data.image_ids` directly via `batchUpsertObjects`; no cache-bust needed
+- The issue is image **order** but each image is correct — just patch `item_data.image_ids` directly via `batchUpdateObjects` with `sparse_update: true` (send only `{type, id, version, item_data:{image_ids}}`; a non-sparse write can drop the item's variations/price); no cache-bust needed
 
 ## Prerequisites
 

@@ -2,16 +2,23 @@
 
 All operations are pinned to:
 
-- `Square-Version: 2026-01-22`
-- Release log: https://developer.squareup.com/docs/changelog/connect-logs/2026-01-22
+- `Square-Version: 2026-04-21`
+- Release log: https://developer.squareup.com/docs/changelog/connect-logs/2026-04-21
 
 ## Core Catalog Calls
 
 - List catalog objects: https://developer.squareup.com/reference/square/catalog-api/list-catalog
-- Batch upsert catalog objects: https://developer.squareup.com/reference/square/catalog-api/batch-upsert-catalog-objects
-- Upsert catalog object: https://developer.squareup.com/reference/square/catalog-api/upsert-catalog-object
+- Search catalog objects (use to LIST objects; supports `include_deleted_objects`): https://developer.squareup.com/reference/square/catalog-api/search-catalog-objects
+- Batch update catalog objects: https://developer.squareup.com/reference/square/catalog-api/batch-upsert-catalog-objects
 - Search catalog items: https://developer.squareup.com/reference/square/catalog-api/search-catalog-items
 - Retrieve catalog object: https://developer.squareup.com/reference/square/catalog-api/retrieve-catalog-object
+
+> ⚠️ **Catalog WRITES must be sparse.** Use the batch write with `sparse_update: true`,
+> sending **only** the changed fields. A non-sparse upsert REPLACES the whole object and
+> can DROP item variations (price/SKU) — always sparse, then re-verify `variations`,
+> `price_money`, and `image_ids` in the response. Via the Square MCP the catalog method is
+> **`batchUpdateObjects`** (there is no `batchUpsertObjects` MCP method; note the case
+> quirks — `batchGetobjects`/`batchDeleteobjects` use a lowercase "o").
 
 ## Channel / Site Calls
 

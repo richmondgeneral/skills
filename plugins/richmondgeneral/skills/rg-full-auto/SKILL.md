@@ -289,17 +289,16 @@ If `allocated_cost` available, delegate to `rg-lot-tracker` for margin analysis.
 
 ## Phase 2: Square Catalog Creation
 
-**Method Selection:** Try `catalog.batchInsertObjects` first. Fallback: `catalog.upsertCatalogObject`. `idempotency_key` stays at TOP LEVEL for both. Variation MUST have `present_at_all_locations: false`.
+**Method:** Use `catalog.batchInsertObjects` (the Square MCP exposes no `upsertCatalogObject` — a single object is just a one-element batch, inserted all-or-nothing). `idempotency_key` stays at TOP LEVEL. Variation MUST have `present_at_all_locations: false`. To UPDATE an existing item later, use `catalog.batchUpdateObjects` with `sparse_update: true` (see `references/square-catalog.md`).
 
 **Description format:** Use `description_html` (NOT `description`). Use `<p>` tags + `<p>&nbsp;</p>` spacers + Unicode chars (not HTML entities). See `references/description-formatting.md` for full rules and template.
 
-**Payloads:** See `references/api-payloads.md` for complete JSON templates (Payload A and Payload B).
+**Payloads:** See `references/api-payloads.md` for the complete JSON template (Payload A — `batchInsertObjects`).
 
 ```
 mcp_square_api:make_api_request
   service: catalog
-  method: batchInsertObjects   (primary)
-  method: upsertCatalogObject  (fallback)
+  method: batchInsertObjects   (create; single object = one-element batch)
 ```
 
 **Capture IDs:** Prefer `id_mappings` by temp IDs (`#RG-XXXX` -> CATALOG_ITEM_ID, `#RG-XXXX-var` -> VARIATION_ID). See `references/api-payloads.md` for fallback extraction logic.

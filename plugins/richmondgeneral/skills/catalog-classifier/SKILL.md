@@ -53,9 +53,9 @@ Assigns Square categories based on item attributes. Returns category ID(s) with 
 | **Collectibles** | `YQWBSOJDENMXDGUUQ3TGI3HF` | Games, toys, dolls, ornaments, vintage misc |
 | **Art & Craft Kits** | `F4JQYK4Z5MEBV5VFCDYHIAWT` | Watercolor kits, craft supplies, DIY art |
 | **Wellness & Apothecary** | `I5PMPWGTVR7IDBL4RUJWN3A4` | Teas, serums, tinctures, natural products, R&L brand |
-| **The Apothecary Cabinet** | `6E7UZYZFNZBGFRJFH272RVBE` | Sage bundles, ritual items, candles, display |
-| **Home & Gifts** | `AR3ZTA45KU4BH23AJ7LOLLRA` | Home decor, giftable items |
-| **Analog** | `N35REXL33FZWJNJV24IUQGPN` | Vinyl, pinball, film, analog tech |
+| **The Apothecary Cabinet** | `QIPW32HGKMU5BDPU3A7YZCM4` | Sage bundles, ritual items, candles, display |
+| **Gifts** | `AR3ZTA45KU4BH23AJ7LOLLRA` | Home decor, giftable items |
+| **Analog & Vintage Media** | `N35REXL33FZWJNJV24IUQGPN` | Vinyl, pinball, film, analog tech |
 
 ### RG Tier Categories (secondary overlay)
 
@@ -77,7 +77,7 @@ Legacy categories (do not assign; kept hidden for history): `Chips & Crisps`, `C
 | Category | ID | Use For |
 |----------|-----|---------|
 | Wellness & Apothecary | `I5PMPWGTVR7IDBL4RUJWN3A4` | Teas, serums, natural products, R&L brand |
-| The Apothecary Cabinet | `6E7UZYZFNZBGFRJFH272RVBE` | Sage bundles, ritual items, candles, display |
+| The Apothecary Cabinet | `QIPW32HGKMU5BDPU3A7YZCM4` | Sage bundles, ritual items, candles, display |
 
 ## Classification Flow
 
@@ -100,8 +100,8 @@ Item Input
                                     ├─► Pottery/ceramic/figurine? → Pottery & Ceramics
                                     ├─► Game/toy/doll/misc? → Collectibles
                                     ├─► Craft kit/art supplies? → Art & Craft Kits
-                                    ├─► Home decor/gift? → Home & Gifts
-                                    └─► Vinyl/pinball/analog? → Analog
+                                    ├─► Home decor/gift? → Gifts
+                                    └─► Vinyl/pinball/analog? → Analog & Vintage Media
 
                                     THEN add tier as secondary:
                                     ├─► Genuinely rare/special? → + The Real Rarities
@@ -132,7 +132,7 @@ Some items may warrant multiple categories:
 |----------|------------|
 | Japanese candy | Food & Pantry |
 | French crystal | 🇫🇷 Timeless Treasures (primary) |
-| Vintage radio | Analog + The New Finds (or Real Rarities if rare) |
+| Vintage radio | Analog & Vintage Media + The New Finds (or Real Rarities if rare) |
 
 **Rule:** When multi-assigning, the more specific category is primary.
 

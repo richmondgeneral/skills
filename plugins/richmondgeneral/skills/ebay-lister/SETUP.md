@@ -1,9 +1,9 @@
 # ebay-lister — one-time setup (owner)
 
-> **STATUS (2026-06-19): BLOCKED — awaiting eBay dev-account approval.** The developer
-> account application is submitted but **not yet approved**, so steps 1–4 below cannot be
-> completed and the skill must not be used for live listing yet. When the approval email
-> arrives, work through this file top to bottom, then clear the BLOCKED banner in SKILL.md.
+> **STATUS (2026-06-21): ON HOLD — awaiting eBay developer keys (eBay is NOT blocked).** The
+> developer-account keys aren't issued yet, so steps 1–4 below can't be completed and the API
+> path stays `--dry-run`-only. Meanwhile eBay writes go through the `ebay-chrome` browser skill.
+> When the keys arrive, work through this file top to bottom, then flip the status in SKILL.md.
 
 This is the only part Claude can't do — it needs the eBay developer keys and a browser
 sign-in to the `richmondgeneral` seller account. Claude never sees a password; it only

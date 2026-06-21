@@ -114,9 +114,9 @@ def _basic_auth_header() -> str:
     if not cid or not secret:
         raise EbayAuthError(
             "Missing EBAY_CLIENT_ID / EBAY_CLIENT_SECRET (env, Keychain, or .env). "
-            "NOTE: as of 2026-06-19 the eBay developer account is PENDING APPROVAL — no keys "
-            "exist yet, so live listing is blocked. Use the manual listing pack until the keys "
-            "arrive, then follow SETUP.md. (--dry-run works without keys.)")
+            "NOTE: the eBay developer keys aren't issued yet, so this API path is on hold "
+            "(eBay is NOT blocked). Use the `ebay-chrome` browser skill for eBay writes until "
+            "the keys arrive, then follow SETUP.md. (--dry-run works without keys.)")
     raw = f"{cid}:{secret}".encode("utf-8")
     return "Basic " + base64.b64encode(raw).decode("ascii")
 

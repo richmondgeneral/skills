@@ -1,10 +1,10 @@
 ---
 name: ebay-lister
 description: >
-  ⛔ NOT YET ACTIVE — the eBay developer account is PENDING APPROVAL, so no API keys exist
-  yet. Do NOT invoke this skill to list/publish until keys arrive (2026-06-19); use the manual
-  eBay listing pack in the meantime. `--dry-run` is the only safe call until then.
-  When active: Create and publish Richmond General eBay listings programmatically via eBay's official
+  eBay is NOT blocked — eBay writes (create AND revise) currently route through the BROWSER via the
+  `ebay-chrome` skill, the sanctioned path until further notice. THIS skill is the API path and is ON HOLD
+  pending eBay developer API keys (not yet issued); do NOT invoke it for live listing yet (`--dry-run`
+  only) — use `ebay-chrome` for real eBay work. When keys arrive: Create and publish Richmond General eBay listings programmatically via eBay's official
   Sell **Inventory API** — no browser, no document_idle hang, batchable. Reads
   items/RG-XXXX/label.json (price, condition, attributes, photos from the live GitHub
   Pages URLs) and runs createOrReplaceInventoryItem -> createOffer -> publishOffer, then
@@ -14,20 +14,21 @@ description: >
   "push RG-XXXX to eBay", "eBay API". Requires a one-time owner OAuth (see SETUP.md);
   the skill never handles a password.
 metadata:
-  version: "0.1"
+  version: "0.2"
   author: scottybe
-  updated: "2026-06-19"
-  status: "BLOCKED (2026-06-19) — eBay developer account application submitted, awaiting approval. No API keys issued yet. Do not use for live listing until keys arrive; --dry-run only."
+  updated: "2026-06-21"
+  status: "ON HOLD (2026-06-21) — API path awaiting eBay developer keys (not yet issued); NOT a channel block. eBay writes route through the ebay-chrome browser skill until further notice. --dry-run only until keys arrive."
+  changelog: "0.2 (2026-06-21): reframed BLOCKED -> ON HOLD — eBay is not blocked; writes go through ebay-chrome (browser) until further notice; this API path stays --dry-run-only until eBay developer keys are issued."
 ---
 
 # ebay-lister — list on eBay via the Sell API
 
-> ⛔ **BLOCKED — DO NOT USE FOR LIVE LISTING YET.** The eBay developer account was applied
-> for on 2026-06-19 and is **pending approval**; no App ID / Cert ID / OAuth keys exist.
-> Until the keys arrive: list eBay items via the **manual listing pack** (`ops/RG-XXXX-ebay-listing-pack.md`),
-> not this skill. Only `ebay_lister.py list --sku … --dry-run` is safe to run (it builds
-> payloads locally, makes no API call). When the dev account is approved, follow SETUP.md,
-> then remove this banner and flip `metadata.status` to active.
+> ⏸️ **ON HOLD — API path not active yet (eBay is NOT blocked).** eBay writes — create AND revise —
+> currently go through the **browser** via the **`ebay-chrome`** skill (Claude-in-Chrome), the
+> sanctioned path until further notice. This API path is waiting on eBay developer keys (App ID /
+> Cert ID / OAuth — not yet issued), so only `ebay_lister.py list --sku … --dry-run` is safe here (it
+> builds payloads locally, makes no API call). When the keys arrive, follow SETUP.md, then flip
+> `metadata.status` to active — the API path is the better route for batch/programmatic CREATE.
 
 Replaces the flaky Chrome listing flow (which freezes at `document_idle`) with eBay's
 REST Sell Inventory API. Source of truth for each listing is `items/RG-XXXX/label.json`.

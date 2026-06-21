@@ -74,3 +74,19 @@ def test_crop_cover_flattens_alpha_on_white(tmp_path):
     out = cb.crop_cover(src, 200, 200)
     assert out.mode == "RGB"
     assert out.getpixel((100, 100)) == cb.PANEL_BG       # transparency -> white, not black
+
+
+def test_fills_leftover_slots_and_clamps_rail(tmp_path):
+    d = _item(tmp_path, details=("detail-maker-mark", "detail-lid", "detail-bottom",
+                                  "detail-interior", "detail-side"))
+    sel = cb.select_slots(d, rail=4)
+    assert [s["role"] for s in sel["rail"]] == ["provenance", "feature", "condition", "detail"]
+    assert len(sel["rail"]) == 4
+    assert len(cb.select_slots(d, rail=2)["rail"]) == 3     # clamps up to RAIL_DEFAULT
+    assert len(cb.select_slots(d, rail=99)["rail"]) == 4    # clamps down to RAIL_MAX
+
+
+def test_caption_override_ignores_non_dict(tmp_path):
+    d = _item(tmp_path, label={"sku": "RG-9999", "combo_captions": ["oops"]})
+    prov = cb.select_slots(d)["rail"][0]
+    assert prov["caption"] == "Maker's mark"                # malformed override ignored

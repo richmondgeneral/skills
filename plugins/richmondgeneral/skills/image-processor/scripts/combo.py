@@ -94,7 +94,8 @@ def select_slots(item_dir, rail: int = RAIL_DEFAULT, caption_mode: str = "specif
     lj = item_dir / "label.json"
     if caption_mode == "specific" and lj.exists():
         try:
-            overrides = json.loads(lj.read_text(encoding="utf-8")).get("combo_captions") or {}
+            raw = json.loads(lj.read_text(encoding="utf-8")).get("combo_captions")
+            overrides = raw if isinstance(raw, dict) else {}
         except Exception:
             overrides = {}
 

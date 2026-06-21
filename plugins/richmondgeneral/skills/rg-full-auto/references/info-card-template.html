@@ -81,6 +81,8 @@
         .item-image-container {
             flex: 1 1 0;
             min-height: 0;
+            aspect-ratio: 1.618;
+            width: 100%;
             background: var(--rg-cream);
             display: flex;
             align-items: center;
@@ -493,7 +495,7 @@
             <div class="card-face card-front">
                 <div class="item-image-container">
                     <span class="sku-badge">{{SKU}}</span>
-                    <img src="./hero.png" alt="{{ITEM_TITLE}}" class="item-image">
+                    <img src="./card.png" onerror="this.onerror=null;this.src='./hero.png';" alt="{{ITEM_TITLE}}" class="item-image">
                 </div>
                 <div class="front-info">
                     <h1 class="item-title">{{ITEM_TITLE}}</h1>

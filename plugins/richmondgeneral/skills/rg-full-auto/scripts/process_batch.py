@@ -275,18 +275,49 @@ class BatchOrchestrator:
     def _default_square_image_count(self, item_dir: str) -> "Optional[int]":
         """Live Square image-count lookup for an item, by its catalog object id.
 
-        Returns the number of image ids on the Square catalog item, or None if
-        the count can't be determined (no recorded object_id, Square
-        unreachable). Returning None makes the gate fall back to the image ids
-        recorded in label.json. For v6.x this resolves the count from the
-        square-cache MCP when wired; until then it returns None so the gate
-        uses the label.json fallback (no network in the default path)."""
+        Returns the number of image ids on the Square catalog ITEM, or None if
+        the count genuinely can't be determined — no recorded object_id, no
+        Square access token, the SDK is unavailable, or any Square/network
+        error. Returning None makes the gate fall back to the image ids recorded
+        in label.json -> channels.square.image_ids (see has_square_image), so a
+        Square outage degrades to the label snapshot rather than a false 'has
+        image' pass: the gate stays fail-closed (no positive count anywhere ->
+        block).
+
+        Token + SDK are resolved exactly like sku_authority (env -> macOS
+        Keychain -> workspace .env, the official `square` SDK) and the read uses
+        catalog.batch_get on the object_id, returning len(item_data.image_ids).
+        Everything is lazy/guarded so an offline or un-synced machine degrades
+        to None instead of crashing the batch."""
         object_id = square_object_id(item_dir)
         if not object_id:
             return None
-        # v6.x: resolve image_ids for `object_id` via the square-cache MCP and
-        # return len(...). Until that's wired, return None -> label.json fallback.
-        return None
+        try:
+            # Lazy imports: an un-synced machine (no `square` SDK / no token)
+            # must degrade to None, never raise into the batch loop.
+            from square.client import Square  # type: ignore
+            from sku_authority import _resolve_square_token
+
+            token = _resolve_square_token()
+            if not token:
+                return None
+            client = Square(token=token)
+            got = client.catalog.batch_get(object_ids=[object_id])
+            if getattr(got, "errors", None):
+                print(f"  ⚠ Square batch_get errors for {object_id}: "
+                      f"{got.errors}", file=sys.stderr)
+                return None
+            obj = (getattr(got, "objects", None) or [None])[0]
+            if obj is None:
+                # object_id not found in the catalog -> can't determine count.
+                return None
+            item_data = getattr(obj, "item_data", None)
+            image_ids = getattr(item_data, "image_ids", None) if item_data else None
+            return len(image_ids) if image_ids else 0
+        except Exception as exc:  # noqa: BLE001
+            print(f"  ⚠ Square image-count lookup failed for {object_id}: "
+                  f"{exc}; falling back to label.json", file=sys.stderr)
+            return None
 
     def _advance_item(self, state: ItemState) -> Dict[str, Any]:
         """Drive an item through its phases until blocked or done.

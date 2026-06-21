@@ -73,12 +73,7 @@ URL: https://items-images-production.s3.us-west-2.amazonaws.com/files/.../origin
 
 Square image endpoints require **multipart form data**. Connector behavior varies by client/server version, so this skill provides a stable Python path that works regardless of MCP multipart support.
 
-When testing Square MCP catalog image features directly, use:
-1. `get_service_info(service: "catalog")`
-2. `get_type_info(service: "catalog", method: "createImage")` (or `updateImage`)
-3. `make_api_request(...)`
-
-If MCP image upload behavior differs across clients, fall back to this skill's scripts.
+Note: the `catalog` service in the Square MCP does **not** currently expose image methods — `get_service_info(service: "catalog")` lists only `batchGetobjects`, `batchInsertObjects`, `batchUpdateObjects`, `batchDeleteobjects`, `list`, `searchObjects`, `searchItems`, `updateItemModifierLists`, `updateItemTaxes` (so `get_type_info(service: "catalog", method: "createImage")` errors). The image endpoints require multipart form data and are reached over raw HTTP, which is exactly what this skill's scripts do — use them as the reliable path. If a future MCP/client adds multipart image methods, fall back to this skill's scripts if behavior differs across clients.
 
 ## Quick Start
 

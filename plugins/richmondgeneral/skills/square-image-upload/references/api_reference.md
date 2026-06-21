@@ -111,20 +111,32 @@ Parts:
 
 ## Attaching Images to Items
 
-After uploading, images can be attached to items via `UpsertCatalogObject`:
+The safest way to attach an image is at upload time: pass `object_id` (and optionally `is_primary`) to CreateCatalogImage (POST `/v2/catalog/images`) — this is what this skill's scripts do and it does not touch the item's other fields.
+
+If you instead reorder/attach `image_ids` on the item object directly, do it as a **sparse update** via `catalog.batchUpdateObjects` with `sparse_update: true`:
 
 ```json
 {
-  "object": {
-    "type": "ITEM",
-    "id": "EXISTING_ITEM_ID",
-    "version": 1234567890,
-    "item_data": {
-      "image_ids": ["IMAGE_ID_1", "IMAGE_ID_2"]
+  "idempotency_key": "unique-uuid-string",
+  "batches": [
+    {
+      "objects": [
+        {
+          "type": "ITEM",
+          "id": "EXISTING_ITEM_ID",
+          "version": 1234567890,
+          "item_data": {
+            "image_ids": ["IMAGE_ID_1", "IMAGE_ID_2"]
+          }
+        }
+      ]
     }
-  }
+  ],
+  "sparse_update": true
 }
 ```
+
+> ⚠️ **Do NOT use a non-sparse upsert to set `image_ids`.** A non-sparse write replaces the whole ITEM and will DROP its variations (price/SKU) and any unsent fields. Always send `sparse_update: true`, then re-verify `variations`, `price_money`, and `image_ids` in the response.
 
 The order of `image_ids` determines display order; first ID is the primary image.
 

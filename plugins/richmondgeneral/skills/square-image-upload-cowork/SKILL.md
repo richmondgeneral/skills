@@ -44,7 +44,7 @@ The skill resolves any of these to a file the Mac can read **before** cleanup/up
 |---|---|---|
 | Workspace file | path under `~/workspace/richmondgeneral/...` | already on the shared mount — use directly |
 | Public URL | HTTP/HTTPS (GitHub Pages, vendor page) | download into `~/workspace/richmondgeneral/rg-pending/` first |
-| Existing Square image | 24-char `image_id` | `catalog.batchGetObjects` → `image_data.url` → download into the workspace |
+| Existing Square image | 24-char `image_id` | `catalog.batchGetobjects` → `image_data.url` → download into the workspace |
 
 For the Mac Photos library: the bridge can now reach it too — but the cleanest path is still to have the Mac `photos-library` skill export into the workspace, then proceed here.
 
@@ -89,7 +89,7 @@ Re-fetch the item: confirm the new `image_id` is in `image_ids` (position 0 if `
 ## Worked example
 User: *"There's a price sticker on the photo for RG-0023. Replace the image without the sticker and remove the background."*
 1. Look up RG-0023 → `item_id` + current `image_ids[0]`.
-2. `catalog.batchGetObjects` on `image_ids[0]` → S3 URL → download to `~/workspace/richmondgeneral/rg-pending/RG-0023-src.png`.
+2. `catalog.batchGetobjects` on `image_ids[0]` → S3 URL → download to `~/workspace/richmondgeneral/rg-pending/RG-0023-src.png`.
 3. Bridge-clean: `… clean.py --input '~/workspace/richmondgeneral/rg-pending/RG-0023-src.png' --output '~/workspace/richmondgeneral/rg-pending/RG-0023-clean.png' --remove 'price tag'` (bg removal is clean.py's default storefront treatment).
 4. Show the cleaned file; get sign-off.
 5. `python3 scripts/upload_to_square.py --source ~/workspace/richmondgeneral/rg-pending/RG-0023-clean.png --image-id <existing image_ids[0]> --name "RG-0023 hero (cleaned)" --json`

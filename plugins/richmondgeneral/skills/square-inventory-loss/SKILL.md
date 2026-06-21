@@ -12,6 +12,7 @@ Records a non-sale inventory removal in Square and keeps the audit ledger in syn
 ## Constants for this location
 
 - **Square location_id:** `B87BAEZ0NWV34` (Richmond General — only location)
+- **Square API version:** `2026-04-21` (the version the Square MCP operates at; all request/response shapes below assume it)
 - **Ledger path:** `/Users/scottybe/workspace/richmondgeneral/inventory-waste-ledger.md`
 - **Square MCP tools assumed available:**
   - `mcp__mcp_square_api__make_api_request` (with service/method pairs below)

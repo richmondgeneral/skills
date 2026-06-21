@@ -8,9 +8,18 @@
       "name": "richmondgeneral",
       "source": "./plugins/richmondgeneral",
       "description": "Richmond General full skill set — Square catalog & storefront ops, item lifecycle (intake, lotting, mark-sold), iMessage/CRM, photo library, image processing, appraisal, and Whatnot tooling."
+    },
+    {
+      "name": "square-online",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/richmondgeneral/plugins.git",
+        "path": "square-online"
+      },
+      "description": "Square Online storefront operations beyond Square's REST APIs — Snippets-API category-tile heros, nav/sort dashboard walkthroughs, brand-guidelines & brand-voice, catalog-voice audit/rewrite, and storefront-image-cache-bust (stale Weebly CDN image fixes)."
     }
   ],
   "metadata": {
-    "description": "Richmond General skills — single-plugin marketplace read by the Claude desktop app and Cowork."
+    "description": "Richmond General skills marketplace — richmondgeneral (core ops) + square-online (storefront), read by the Claude desktop app and Cowork."
   }
 }

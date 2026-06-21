@@ -1,5 +1,5 @@
 from __future__ import annotations
-import argparse, json, os, sys
+import argparse, json, os, re, sys
 from pathlib import Path
 from typing import Dict
 
@@ -46,6 +46,40 @@ def run_reconcile(items_dir: str, square_index: Dict, whatnot_index: Dict) -> di
     return {"findings": findings, "summary": summary, "items_scanned": len(records)}
 
 
+def gallery_card_findings(items_dir) -> list:
+    """Detect Listed/Sold items missing a card in the Shop gallery (items/index.html).
+
+    Read-only detection only — mirrors `items/scripts/build_gallery.py --check`
+    (which stays the authority for *adding* cards). A live item page that is
+    absent from the landing grid is real drift (see the 2026-06-21 backfill of
+    RG-0028/0029/0034/0052/0053/0054). Pure: filesystem reads only, no network.
+    """
+    index_path = Path(items_dir) / "index.html"
+    carded = set()
+    if index_path.exists():
+        carded = set(re.findall(
+            r'href="\./(RG-\d{4})/" class="item-card"',
+            index_path.read_text(encoding="utf-8")))
+    findings = []
+    for child in sorted(Path(items_dir).glob("RG-*")):
+        lj = child / "label.json"
+        if not lj.exists():
+            continue
+        try:
+            state = str(json.loads(lj.read_text(encoding="utf-8")).get("state", "")).strip()
+        except (json.JSONDecodeError, OSError):
+            continue
+        if state in ("Listed", "Sold") and child.name not in carded:
+            findings.append({
+                "sku": child.name, "field": "gallery_card", "channel": "github_page",
+                "severity": "warning", "expected": "card in items/index.html",
+                "actual": "absent",
+                "message": (f"{child.name} is {state} but has no card in the Shop gallery "
+                            f"(items/index.html) — run build_gallery.py --apply."),
+            })
+    return findings
+
+
 def heal_guidance(finding: dict) -> str:
     sku, ch = finding["sku"], finding["channel"]
     field = finding["field"]
@@ -55,6 +89,8 @@ def heal_guidance(finding: dict) -> str:
         return f"{sku}: sold-state conflict on {ch} — run `rg-item-mark-sold {sku}` (propagates sold across channels + deletes the payment link)."
     if field == "presence":
         return f"{sku}: page lists {ch} but it wasn't confirmed there — verify the {ch} listing."
+    if field == "gallery_card":
+        return f"{sku}: Listed/Sold but missing from the Shop gallery — run `python items/scripts/build_gallery.py --apply` (then --check)."
     return f"{sku}: {field} drift on {ch} — review."
 
 
@@ -74,6 +110,12 @@ def main(argv=None):
     whatnot_index = build_whatnot_index(whatnot_csv)
 
     report = run_reconcile(args.items_dir, square_index, whatnot_index)
+
+    # Gallery-presence gate (read-only): fold "Listed item missing its gallery card"
+    # into the drift report alongside the channel findings.
+    for f in gallery_card_findings(args.items_dir):
+        report["findings"].append(f)
+        report["summary"][f["severity"]] = report["summary"].get(f["severity"], 0) + 1
 
     out = args.json_out
     if out is None:

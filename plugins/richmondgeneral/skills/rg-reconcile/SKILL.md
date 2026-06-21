@@ -20,6 +20,7 @@ mutated — the output is a report.
 |-------|----------|------|
 | sold_state | CRITICAL | page sold ≠ channel sold (risk of double-selling a unique item) |
 | price | WARNING | channel price ≠ intended/reference price (skipped on sold items) |
+| gallery_card | WARNING | item is `Listed`/`Sold` but has **no card in the Shop gallery** (`items/index.html`) — a live page absent from the landing grid. Heal: `python items/scripts/build_gallery.py --apply`. |
 
 > **Channel authority.** Square is *authoritative* — a live catalog that can both confirm a
 > listing and report it absent (`present=false`). The Whatnot **import CSV is affirm-only**: it
@@ -61,3 +62,4 @@ whatnot_index)` is pure (injected indexes) and unit-testable without network.
 |---------|----------|
 | price divergence | `rg-item-update` (propagate the correct price to all channels) |
 | sold-state conflict | `rg-item-mark-sold` (retire listing, kill payment link) |
+| gallery_card missing | `python items/scripts/build_gallery.py --apply` (idempotent; then `--check` to confirm) |

@@ -93,18 +93,29 @@ def compose_golden_card(hero_path, out_path=None, width: int = DEFAULT_WIDTH,
 
 def record_photos_card(item_dir, card_filename: str = CARD_FILENAME) -> None:
     """Reconcile label.json -> photos.card with the card file's existence: set it when
-    <item_dir>/<card_filename> exists, remove a stale entry when it does not. No-op if
-    label.json is absent."""
+    <item_dir>/<card_filename> exists, remove a stale entry when it does not. Writes ONLY
+    when the value actually changes (so a bulk backfill never reformats unchanged files,
+    and never adds an empty 'photos' block to a no-card item). No-op if label.json is absent."""
     p = Path(item_dir) / "label.json"
     if not p.exists():
         return
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
-        photos = data.setdefault("photos", {})
-        if (Path(item_dir) / card_filename).exists():
-            photos["card"] = card_filename
-        else:
-            photos.pop("card", None)
+    except Exception as exc:
+        print(f"warning: {p}: {exc}", file=sys.stderr)
+        return
+    has_card = (Path(item_dir) / card_filename).exists()
+    photos = data.get("photos")
+    current = photos.get("card") if isinstance(photos, dict) else None
+    desired = card_filename if has_card else None
+    if current == desired:
+        return  # already correct — do not rewrite the file
+    photos = data.setdefault("photos", {})
+    if desired is None:
+        photos.pop("card", None)
+    else:
+        photos["card"] = desired
+    try:
         p.write_text(json.dumps(data, indent=2), encoding="utf-8")
     except Exception as exc:
         print(f"warning: {p}: {exc}", file=sys.stderr)

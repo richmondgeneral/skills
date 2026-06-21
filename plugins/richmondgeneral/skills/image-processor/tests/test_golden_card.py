@@ -119,3 +119,27 @@ def test_record_photos_card_reconciles(tmp_path):
     (tmp_path / "card.png").write_bytes(b"x")
     gc.record_photos_card(tmp_path)
     assert json.loads(label.read_text())["photos"]["card"] == "card.png"
+
+
+def test_record_photos_card_no_write_when_no_change(tmp_path):
+    # Item with no card and no photos.card: record_photos_card must NOT modify the file
+    # (no reformat, no empty "photos": {} added).
+    label = tmp_path / "label.json"
+    original = '{\n  "sku": "RG-9999"\n}\n'
+    label.write_text(original)
+    gc.record_photos_card(tmp_path)                 # no card.png present
+    assert label.read_text() == original            # byte-identical, untouched
+
+
+def test_record_photos_card_idempotent_when_already_set(tmp_path):
+    import json
+    label = tmp_path / "label.json"
+    (tmp_path / "card.png").write_bytes(b"x")        # card exists
+    gc.record_photos_card(tmp_path)                  # creates photos.card
+    after_first = label.read_text() if label.exists() else None
+    # label.json didn't exist at first call -> record is a no-op when label.json is absent;
+    # create it now WITH the correct value and confirm a second call doesn't rewrite it.
+    label.write_text(json.dumps({"photos": {"card": "card.png"}}, indent=2))
+    before = label.read_text()
+    gc.record_photos_card(tmp_path)                  # already correct -> no write
+    assert label.read_text() == before

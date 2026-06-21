@@ -2,10 +2,29 @@
 name: image-processor
 description: Unified image processing with background removal, generation, editing, listing-photo standardization, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "standardize listing photos", "make photos professional/catalog-quality", "square crop / center / color-correct photo", "transparent hero", "photos library", "get from photos", or when rg-full-auto needs image processing.
 metadata:
-  version: "1.10"
+  version: "1.12"
   author: scottybe
-  updated: "2026-06-19"
+  updated: "2026-06-21"
   changelog: |
+    v1.12 - Local faithful enhance stage (torch/Metal, two-agent handoff):
+    - NEW scripts upres.py / sharpen.py / enhance.py — non-generative, faithful
+      enhancement on Apple-Silicon MPS for the 896px legacy batch + any soft hero.
+      upres.py = Real-ESRGAN x2/x4 (RRDBNet via spandrel, BSD); sharpen.py =
+      deterministic PIL unsharp (default) or NAFNet deblur (--deblur, MIT, base
+      spandrel); enhance.py = non-destructive one-pass upres->sharpen ->
+      hero.enhanced.png (matte stays the separate downstream step). All record
+      label.json -> image_pipeline[] for reproducibility.
+    - ENV: dedicated venv ~/.cache/rg-enhance (py3.12; torch/torchvision MPS +
+      spandrel + pillow/numpy) — torch has no 3.14 wheels, so NOT in the plugin
+      env (same isolation as ~/.cache/rg-matte). Invoke by absolute interpreter
+      path: `~/.cache/rg-enhance/bin/python .../upres.py --item-dir items/RG-XXXX`.
+      spandrel REPLACES realesrgan+basicsr (basicsr imports the removed
+      torchvision.transforms.functional_tensor and won't load on MPS torchvision).
+    - Two-agent handoff PROVEN: env runs + reaches MPS under a non-interactive
+      `osascript do shell script`, so Cowork can drive it over the bridge.
+    - GUARD unchanged: these three are non-generative (safe to auto-run, even on
+      labeled goods). Generative upres/restore (SUPIR/genai) stays showcase-only +
+      clean.py --agentic judge-gated. Verified faithful on RG-0025 (896->1792, ~3s).
     v1.11 - Agentic Image Evaluation Loop (Anti-Hallucination):
     - Added `--agentic` flag to `clean.py` for a Best-of-3 generation loop.
     - Added `AgentJudge` powered by `gemini-2.5-pro` using native Google GenAI SDK (structured output) to validate candidate images.
@@ -172,6 +191,40 @@ Apply only to the **curated public subset**; the raw archive (Photos library, ta
 (reliable auto-deskew needs opencv, which isn't installed — shoot straight; the square crop never rotates).
 Clean single-object shots cut out best; multi-object layouts produce rough masks. The canonical logo
 lives at `brand/assets/richmond-general-logo.{png,jpg}` (transparent PNG + original).
+
+## Local Enhance Stage (Real-ESRGAN / unsharp / NAFNet — torch/MPS)
+
+**Non-generative, faithful** upscale + sharpen for the 896px legacy batch and any soft/low-res hero.
+These run on Apple-Silicon **MPS** from a **dedicated venv** `~/.cache/rg-enhance` (py3.12; torch has no
+3.14 wheels, so it is NOT in the plugin env — same isolation as `~/.cache/rg-matte`). Invoke by absolute
+interpreter path; the env is provisioned once by the code agent and is bridge-safe (runs + reaches MPS
+under a non-interactive `osascript do shell script`, so Cowork can drive it).
+
+- **`upres.py`** — Real-ESRGAN x2/x4 (RRDBNet via `spandrel`, BSD) to a target min width. Faithful:
+  sharpens/enlarges existing pixels, never invents label text or marks. Records `image_pipeline[]`.
+- **`sharpen.py`** — deterministic PIL **unsharp** (default, torch-free) or **NAFNet deblur** (`--deblur`,
+  MIT, base-`spandrel`) for genuinely motion/defocus-blurred shots.
+- **`enhance.py`** — non-destructive one-pass `upres -> sharpen` → `hero.enhanced.png` (review, then
+  promote). `matte.py` stays the separate downstream step (different venv + RGBA alpha).
+
+```bash
+# provision once (code agent):
+uv venv ~/.cache/rg-enhance --python 3.12
+uv pip install --python ~/.cache/rg-enhance torch torchvision pillow numpy spandrel
+# weights -> ~/.cache/rg-enhance/weights/{RealESRGAN_x2plus,RealESRGAN_x4plus,NAFNet-deblur}.pth
+
+# upscale the 896px batch to >=1500px (default suffixed output; never clobbers the source):
+~/.cache/rg-enhance/bin/python scripts/upres.py --item-dir items/RG-XXXX --target-w 1500
+# finishing sharpen, or deblur a genuinely blurry shot:
+~/.cache/rg-enhance/bin/python scripts/sharpen.py --item-dir items/RG-XXXX           # unsharp
+~/.cache/rg-enhance/bin/python scripts/sharpen.py --item-dir items/RG-XXXX --deblur  # NAFNet
+# one-pass review output, then promote + matte:
+~/.cache/rg-enhance/bin/python scripts/enhance.py --item-dir items/RG-XXXX           # -> hero.enhanced.png
+```
+
+**GUARD:** these three are non-generative and safe to auto-run, even on labeled goods. **Generative**
+upres/restore (SUPIR / genai) is a SEPARATE, **showcase-only** path that MUST keep the `clean.py
+--agentic` marks/text judge — never auto-run it on items with printed labels.
 
 ## Quick Start
 

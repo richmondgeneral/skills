@@ -17,6 +17,7 @@ how flat-goods / keep-bg items are excluded automatically.
 CLI:
   golden_card.py <hero.png> [--out card.png] [--width 2000] [--fill 0.85]
   golden_card.py --batch <items_dir>      # backfill every items/RG-*/ that has a cutout
+  (exit code 2 = source was opaque/degenerate and was skipped — not an error)
 """
 import argparse
 import json
@@ -31,10 +32,11 @@ PHI = 1.6180339887            # golden ratio; height is ALWAYS width/PHI so the 
 DEFAULT_WIDTH = 2000
 DEFAULT_FILL = 0.85           # fraction of the canvas the object fills on its limiting dimension
 OPAQUE_ALPHA_THRESHOLD = 250  # min alpha >= this => effectively opaque => no cutout => skip
+MIN_CUTOUT_PX = 64            # bbox long side below this => alpha speck/noise, not a real cutout => skip
 CARD_FILENAME = "card.png"
 
 
-def golden_size(width: int = DEFAULT_WIDTH) -> tuple:
+def golden_size(width: int = DEFAULT_WIDTH) -> tuple[int, int]:
     """(width, height) of a horizontal golden rectangle for the given width."""
     return width, int(round(width / PHI))
 
@@ -58,8 +60,13 @@ def compose_golden_card(hero_path, out_path=None, width: int = DEFAULT_WIDTH,
     if not _has_cutout(rgba):
         return None  # opaque full-bleed (flat-goods / keep-bg) -> no card
 
-    bbox = rgba.getchannel("A").getbbox() or rgba.getbbox()
-    obj = rgba.crop(bbox) if bbox else rgba
+    bbox = rgba.getchannel("A").getbbox()
+    if bbox is None:
+        return None  # fully transparent — nothing to float
+    bx0, by0, bx1, by1 = bbox
+    if max(bx1 - bx0, by1 - by0) < MIN_CUTOUT_PX:
+        return None  # degenerate speck (alpha noise), not a real cutout
+    obj = rgba.crop(bbox)
     ow, oh = obj.size
 
     cw, ch = golden_size(width)

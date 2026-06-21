@@ -78,3 +78,21 @@ def test_custom_width_derives_golden_height(tmp_path):
     _cutout(800, 800, 400, 400).save(src)
     im = Image.open(gc.compose_golden_card(src, tmp_path / "card.png", width=1000))
     assert im.size == (1000, round(1000 / gc.PHI))           # 1000 x 618
+
+
+def test_fully_transparent_input_is_skipped(tmp_path):
+    src = tmp_path / "hero.png"
+    Image.new("RGBA", (800, 600), (0, 0, 0, 0)).save(src)   # nothing to float
+    out = gc.compose_golden_card(src, tmp_path / "card.png")
+    assert out is None
+    assert not (tmp_path / "card.png").exists()
+
+
+def test_tiny_speck_is_skipped(tmp_path):
+    src = tmp_path / "hero.png"
+    img = Image.new("RGBA", (800, 600), (0, 0, 0, 0))
+    img.putpixel((400, 300), (255, 0, 0, 255))   # a single opaque pixel (alpha noise)
+    img.save(src)
+    out = gc.compose_golden_card(src, tmp_path / "card.png")
+    assert out is None
+    assert not (tmp_path / "card.png").exists()

@@ -166,8 +166,120 @@ def _tilt_from_mask(mask: np.ndarray, h: int, w: int, method: str) -> dict:
     size_term = min(1.0, area_frac / 0.20)
     rect_term = max(0.0, min(1.0, (rect_fill - 0.5) / 0.4))  # 0.5->0, 0.9->1
     confidence = float(round(size_term * rect_term, 3))
+    # Radial-symmetry probe (on the SAME mask): a starburst/round/floral subject
+    # has no dominant axis, so its measured `tilt` is meaningless garbage (the
+    # RG-0023 brooch read 41.6°). is_radially_symmetric flags it so the gate can
+    # skip the level check instead of false-failing. A clearly-oriented subject
+    # (book/label/long brooch/jacket) reads NOT symmetric and is still gated.
+    sym = is_radially_symmetric(mask)
     return {"tilt_deg": round(tilt, 3), "confidence": confidence, "method": method,
-            "area_frac": round(area_frac, 3), "rect_fill": round(rect_fill, 3)}
+            "area_frac": round(area_frac, 3), "rect_fill": round(rect_fill, 3),
+            "radial_symmetric": sym["symmetric"],
+            "symmetry_max_iou": sym["max_iou"],
+            "symmetry_mean_iou": sym["mean_iou"]}
+
+
+def _rotate_mask(mask: np.ndarray, deg: float) -> np.ndarray:
+    """Rotate a binary mask about its image centre, preserving canvas size."""
+    h, w = mask.shape[:2]
+    M = cv2.getRotationMatrix2D((w / 2.0, h / 2.0), deg, 1.0)
+    return cv2.warpAffine(mask, M, (w, h), flags=cv2.INTER_NEAREST,
+                          borderValue=0)
+
+
+# Probe angles for rotational self-similarity. These are the non-trivial
+# discrete-symmetry rotations (360/N for N=3..12): a shape with N-fold radial
+# symmetry self-overlaps almost perfectly at 360/N and its multiples. We measure
+# the BEST (max) overlap across these angles because a star/flower only matches
+# at the angles tied to its OWN symmetry order (a 12-point star matches at 30/60
+# but not at 45/72), so a strict min would wrongly penalise it — yet its *best*
+# match is still ~0.97. A circle/round medallion matches at every angle (~1.0).
+# A square matches at 90 (~1.0; a square IS 4-fold symmetric -> correctly N/A).
+#
+# Critically we EXCLUDE small angles (<30): EVERY blob trivially self-overlaps a
+# lot under a tiny rotation (a 1:2 rectangle reads ~0.76 at 15°), which would
+# mask true orientation. Over these >=30 angles a genuinely oriented subject
+# scores low at its BEST: 1:2 rect ~0.62, long brooch ~0.36, book/label
+# similar. So max-overlap cleanly separates symmetric (>=~0.95) from oriented
+# (<=~0.63). 180 is also excluded — a plain rectangle passes 180.
+_SYMMETRY_ANGLES = (30.0, 36.0, 45.0, 360.0 / 7, 60.0, 72.0, 90.0, 120.0)
+
+
+def _mask_iou(a: np.ndarray, b: np.ndarray) -> float:
+    """IoU of two binary (0/255) masks."""
+    aa = a > 0
+    bb = b > 0
+    inter = int(np.count_nonzero(aa & bb))
+    union = int(np.count_nonzero(aa | bb))
+    return inter / float(union) if union else 0.0
+
+
+def rotational_symmetry(mask: np.ndarray) -> dict:
+    """Measure rotational self-similarity of a binary object mask.
+
+    For each probe angle in _SYMMETRY_ANGLES, rotate the mask about its CENTROID
+    and compute IoU with the original. A radially symmetric subject (starburst
+    brooch, round medallion, floral/sunburst pin, circular plate) self-overlaps
+    almost perfectly at the rotation(s) matching its symmetry order -> high
+    `max_iou`. A clearly-oriented subject (book, rectangular label, long brooch,
+    jacket) never aligns at any of these angles -> low `max_iou`.
+
+    To make IoU rotation-invariant we first translate the mask so its centroid
+    sits at the image centre (rotation is then a pure spin about that centre).
+
+    Returns {max_iou, mean_iou, min_iou, per_angle:{deg:iou}, aspect}. The
+    decision uses `max_iou` (see is_radially_symmetric). `aspect` is the
+    min-area-rect short/long ratio (a secondary signal — a near-1 aspect is
+    consistent with symmetry; a thin/long shape never is).
+    """
+    out = {"max_iou": 0.0, "mean_iou": 0.0, "min_iou": 0.0,
+           "per_angle": {}, "aspect": 0.0}
+    cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not cnts:
+        return out
+    c = max(cnts, key=cv2.contourArea)
+    M = cv2.moments(c)
+    if M["m00"] <= 0:
+        return out
+    h, w = mask.shape[:2]
+    cx, cy = M["m10"] / M["m00"], M["m01"] / M["m00"]
+    # Centre the centroid so rotation about the image centre == rotation about
+    # the subject's centroid.
+    T = np.float32([[1, 0, w / 2.0 - cx], [0, 1, h / 2.0 - cy]])
+    centred = cv2.warpAffine(mask, T, (w, h), flags=cv2.INTER_NEAREST,
+                             borderValue=0)
+    per = {}
+    for deg in _SYMMETRY_ANGLES:
+        per[deg] = _mask_iou(centred, _rotate_mask(centred, deg))
+    vals = list(per.values())
+    (_, _), (rw, rh), _ = cv2.minAreaRect(c)
+    aspect = (min(rw, rh) / max(rw, rh)) if max(rw, rh) > 0 else 0.0
+    out.update({"max_iou": float(round(max(vals), 3)),
+                "mean_iou": float(round(sum(vals) / len(vals), 3)),
+                "min_iou": float(round(min(vals), 3)),
+                "per_angle": {f"{k:.0f}": round(v, 3) for k, v in per.items()},
+                "aspect": float(round(aspect, 3))})
+    return out
+
+
+# A subject is treated as radially symmetric (no meaningful tilt axis) when its
+# BEST self-overlap across the discrete-symmetry probe angles is high. Empirical
+# separation (synthetic + real RG-0023): stars 0.96–0.98, circle/square ~1.0,
+# vs a 1:2 rectangle 0.62, a long brooch 0.36, books/labels similar. 0.85 sits
+# in the wide gap with margin on both sides.
+SYMMETRY_MAX_IOU = 0.85
+
+
+def is_radially_symmetric(mask: np.ndarray) -> dict:
+    """True if the object mask has no dominant orientation axis (the tilt
+    estimate is therefore meaningless and must not be used to fail `level`).
+
+    Decision rule: max IoU across the discrete-symmetry probe rotations
+    >= SYMMETRY_MAX_IOU. Returns the full metrics dict plus boolean `symmetric`.
+    """
+    m = rotational_symmetry(mask)
+    m["symmetric"] = bool(m["max_iou"] >= SYMMETRY_MAX_IOU)
+    return m
 
 
 def _border_is_busy(bgr: np.ndarray, ring: float = 0.03) -> bool:

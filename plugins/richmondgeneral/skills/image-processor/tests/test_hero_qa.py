@@ -9,6 +9,7 @@ Fixtures are self-generated (the RG-0031 prototype imgs are not on disk):
 import os
 import sys
 import json
+import math
 
 import numpy as np
 import cv2
@@ -295,6 +296,85 @@ def test_residual_tilt_no_stale_mask_across_images():
     straight = results[1::2]
     assert all(t > 10 for t in tilted), f"tilted misread: {results}"
     assert all(s < 3 for s in straight), f"straight inherited a stale mask: {results}"
+
+
+# --------------------------------------------------------------------------
+# Radial-symmetry skip — the RG-0023 starburst-brooch false-positive.
+# A radially symmetric subject has no orientation axis, so its min-area-rect
+# tilt is garbage (RG-0023 read 41.6° while dead-straight). The level check
+# must mark it N/A / pass, while genuinely tilted asymmetric items still fail.
+# --------------------------------------------------------------------------
+def _starburst_alpha(points=12, size=420, r_out=170, r_in=70, angle=0.0):
+    """RGBA: a radially symmetric N-point star/sunburst (a stand-in for the
+    RG-0023 Weiss starburst brooch). No dominant axis -> meaningless tilt."""
+    bgr = np.full((size, size, 3), 210, np.uint8)
+    alpha = np.zeros((size, size), np.uint8)
+    cx = cy = size / 2.0
+    verts = []
+    for i in range(points * 2):
+        rad = r_out if i % 2 == 0 else r_in
+        th = math.pi * i / points + math.radians(angle)
+        verts.append([cx + rad * math.cos(th), cy + rad * math.sin(th)])
+    cv2.fillPoly(alpha, [np.array(verts, np.int32)], 255)
+    # a filled centre disc so it reads as a solid symmetric medallion
+    cv2.circle(alpha, (int(cx), int(cy)), r_in, 255, -1)
+    bgr[alpha > 0] = (40, 40, 40)
+    return bgr, alpha
+
+
+def test_symmetry_detector_flags_starburst():
+    from deskew import is_radially_symmetric
+    _, alpha = _starburst_alpha(points=12)
+    mask = (alpha > 8).astype(np.uint8) * 255
+    res = is_radially_symmetric(mask)
+    assert res["symmetric"] is True, res
+
+
+def test_symmetry_detector_does_not_flag_rectangle():
+    from deskew import is_radially_symmetric
+    # a long rectangle is invariant only under 180°, NOT under the probe angles
+    _, alpha = _rect_alpha(angle=0, rw=160, rh=320)
+    mask = (alpha > 8).astype(np.uint8) * 255
+    res = is_radially_symmetric(mask)
+    assert res["symmetric"] is False, res
+
+
+def test_symmetry_detector_does_not_flag_tilted_rectangle():
+    from deskew import is_radially_symmetric
+    _, alpha = _rect_alpha(angle=15, rw=160, rh=320)
+    mask = (alpha > 8).astype(np.uint8) * 255
+    assert is_radially_symmetric(mask)["symmetric"] is False
+
+
+def test_level_skipped_for_symmetric_subject():
+    # The RG-0023 failure mode: a symmetric subject whose rect-tilt is garbage.
+    bgr, alpha = _starburst_alpha(points=12)
+    # rotate the WHOLE star a bit so the rect-tilt reading would be non-zero
+    M = cv2.getRotationMatrix2D((bgr.shape[1] / 2, bgr.shape[0] / 2), 13, 1.0)
+    alpha = cv2.warpAffine(alpha, M, (alpha.shape[1], alpha.shape[0]))
+    bgr = np.full_like(bgr, 210); bgr[alpha > 0] = (40, 40, 40)
+    p = _save_png("level_starburst.png", bgr, alpha)
+    r = hq.check_level(p)
+    assert r["ok"] is True
+    assert r.get("level_skipped_radial_symmetry") is True
+    assert "radially symmetric" in r.get("note", "")
+
+
+def test_level_still_fails_tilted_asymmetric():
+    # The guard must NOT let a genuinely crooked, clearly-oriented item pass.
+    bgr, alpha = _rect_alpha(angle=16, rw=160, rh=320)
+    p = _save_png("level_tilt16_asym.png", bgr, alpha)
+    r = hq.check_level(p)
+    assert r["ok"] is False
+    assert not r.get("level_skipped_radial_symmetry")
+    assert r["level_deg"] > 1.5
+
+
+def test_gate_records_symmetry_skip():
+    bgr, alpha = _starburst_alpha(points=12)
+    p = _save_png("gate_starburst.png", bgr, alpha)
+    r = hq.hero_qa_gate(p, item_class="cutout")
+    assert r["checks"].get("level_skipped_radial_symmetry") is True
 
 
 # --------------------------------------------------------------------------

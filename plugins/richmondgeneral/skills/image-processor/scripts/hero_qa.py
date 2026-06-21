@@ -180,12 +180,30 @@ def check_defects(hero_path: str, original_path: Optional[str] = None) -> Dict[s
 
 def check_level(hero_path: str) -> Dict[str, Any]:
     """Fail if the dominant object is tilted > TILT_MAX_DEG with a trustworthy
-    reading (confidence >= TILT_MIN_CONF). Mirrors the validated prototype gate."""
+    reading (confidence >= TILT_MIN_CONF). Mirrors the validated prototype gate.
+
+    RADIAL-SYMMETRY SKIP (added 2026-06-20, RG-0023): a radially symmetric
+    subject (starburst brooch, round medallion, floral/sunburst pin, circular
+    plate) has NO dominant orientation axis, so the min-area-rect / PCA tilt is
+    meaningless garbage — the real RG-0023 Weiss starburst brooch read 41.6°
+    while visually dead-straight, false-failing this check and blocking publish.
+    residual_tilt_deg now probes rotational self-similarity on the same object
+    mask; when it reports `radial_symmetric`, we mark level N/A (pass) with a
+    recorded reason instead of penalising the garbage angle. Clearly-oriented
+    (non-symmetric) items still fail when genuinely crooked."""
     bgr, alpha = _imread(hero_path)
     if bgr is None:
         return {"ok": False, "level_deg": None, "reason": "unreadable_hero"}
     r = residual_tilt_deg(bgr, alpha)
     tilt, conf = r["tilt_deg"], r["confidence"]
+    if r.get("radial_symmetric"):
+        return {"ok": True, "level_deg": tilt, "confidence": conf,
+                "level_skipped_radial_symmetry": True,
+                "symmetry_max_iou": r.get("symmetry_max_iou"),
+                "note": ("level N/A — radially symmetric subject (no orientation "
+                         f"axis); tilt reading {tilt}° is not meaningful "
+                         f"(rotational self-overlap max IoU "
+                         f"{r.get('symmetry_max_iou')})")}
     failed = (tilt > TILT_MAX_DEG) and (conf >= TILT_MIN_CONF)
     out = {"ok": not failed, "level_deg": tilt, "confidence": conf}
     if failed:
@@ -230,6 +248,8 @@ def hero_qa_gate(hero_path: str, original_path: Optional[str] = None,
     df = check_defects(hero_path, original_path)
     checks = {"upright": up["ok"], "level_deg": lv.get("level_deg"),
               "full_face": ff["ok"], "bg_ok": bg["ok"], "defects_ok": df["ok"]}
+    if lv.get("level_skipped_radial_symmetry"):
+        checks["level_skipped_radial_symmetry"] = True
     reasons = [c["reason"] for c in (up, lv, ff, bg, df)
                if not c["ok"] and c.get("reason")]
     hard_ok = up["ok"] and lv["ok"] and ff["ok"] and bg["ok"] and df["ok"]

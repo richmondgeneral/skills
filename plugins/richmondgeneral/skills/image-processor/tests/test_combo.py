@@ -126,3 +126,22 @@ def test_skip_removes_stale_combo(tmp_path):
     (d / cb.COMBO_FILENAME).write_bytes(b"stale")
     assert cb.compose_combo(d) is None
     assert not (d / cb.COMBO_FILENAME).exists()
+
+
+def _luma(im, box):
+    px = im.convert("RGB").crop(box).getdata()
+    return sum(0.299 * r + 0.587 * g + 0.114 * b for r, g, b in px) / len(px)
+
+
+def test_caption_darkens_cell_lower_left(tmp_path):
+    im = Image.open(cb.compose_combo(_item(tmp_path))).convert("RGB")
+    rail_x = round(1600 * cb.HERO_FRAC) + cb.GUTTER
+    cell_h = (1600 - 2 * cb.GUTTER) // 3
+    top = _luma(im, (rail_x + 4, 4, rail_x + 180, 60))
+    low = _luma(im, (rail_x + 4, cell_h - 70, rail_x + 180, cell_h - 6))
+    assert low < top - 20            # scrim pill present in lower-left
+
+
+def test_compose_with_captions_keeps_size(tmp_path):
+    im = Image.open(cb.compose_combo(_item(tmp_path)))
+    assert im.size == (1600, 1600)   # wordmark + captions don't break the canvas

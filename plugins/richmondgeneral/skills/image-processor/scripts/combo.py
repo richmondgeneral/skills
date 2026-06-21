@@ -168,6 +168,7 @@ def compose_combo(item_dir, out=None, rail: int = RAIL_DEFAULT,
     canvas = Image.new("RGB", (CANVAS, CANVAS), CREAM)
     hero_w = round(CANVAS * HERO_FRAC)
     canvas.paste(crop_cover(Image.open(sel["hero"]), hero_w, CANVAS, pos=(0.5, 0.42)), (0, 0))
+    _draw_wordmark(canvas, (0, 0, hero_w, CANVAS), _sku(item_dir))
 
     rail_x = hero_w + GUTTER
     rail_w = CANVAS - rail_x
@@ -177,6 +178,50 @@ def compose_combo(item_dir, out=None, rail: int = RAIL_DEFAULT,
         y = i * (cell_h + GUTTER)
         h = cell_h if i < n - 1 else CANVAS - y          # last cell absorbs rounding to the edge
         canvas.paste(crop_cover(Image.open(slot["path"]), rail_w, h), (rail_x, y))
+        _draw_caption(canvas, (rail_x, y, rail_w, h), slot["caption"])
 
     canvas.save(out_path, "PNG")
     return out_path
+
+
+_FONT_CANDIDATES = (
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/System/Library/Fonts/Helvetica.ttc",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/Library/Fonts/Arial.ttf",
+)
+
+
+def _load_font(size: int):
+    for path in _FONT_CANDIDATES:
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:
+            continue
+    try:
+        return ImageFont.load_default(size)   # Pillow >= 10.1
+    except TypeError:
+        return ImageFont.load_default()
+
+
+def _draw_caption(canvas: Image.Image, rect, text: str) -> None:
+    x, y, w, h = rect
+    font = _load_font(max(22, h // 14))
+    draw = ImageDraw.Draw(canvas, "RGBA")
+    pad = 12
+    tb = draw.textbbox((0, 0), text, font=font)
+    tw, th = tb[2] - tb[0], tb[3] - tb[1]
+    bx0, by1 = x + pad, y + h - pad
+    bx1, by0 = bx0 + tw + 2 * pad, by1 - th - 2 * pad
+    draw.rounded_rectangle((bx0, by0, bx1, by1), radius=10, fill=(*CAP_SCRIM, 178))
+    draw.text((bx0 + pad - tb[0], by0 + pad - tb[1]), text, font=font, fill=(*CAP_TEXT, 255))
+
+
+def _draw_wordmark(canvas: Image.Image, rect, sku: str) -> None:
+    x, y, w, h = rect
+    font = _load_font(26)
+    draw = ImageDraw.Draw(canvas, "RGBA")
+    text = f"RICHMOND GENERAL · {sku}"
+    tx, ty = x + 22, y + h - 46
+    draw.text((tx + 1, ty + 1), text, font=font, fill=(0, 0, 0, 150))      # legibility shadow
+    draw.text((tx, ty), text, font=font, fill=(247, 242, 231, 205))        # faint cream

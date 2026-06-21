@@ -38,6 +38,8 @@ from item_state import (
     PendingQuestion,
     PhaseStatus,
     can_list,
+    has_square_image,
+    square_object_id,
 )
 from onboarding_queue import DEFAULT_QUEUE_PATH, OnboardingQueue, QueueEntry
 from sku_authority import default_next_sku
@@ -99,6 +101,8 @@ class BatchOrchestrator:
         next_sku: Optional[Callable[[], str]] = None,
         audit_log: Optional[AuditLog] = None,
         hero_gate: Optional[Callable[[str], "tuple[bool, str]"]] = None,
+        image_gate: Optional[Callable[[str], "tuple[bool, str]"]] = None,
+        square_image_count: Optional[Callable[[str], "Optional[int]"]] = None,
     ):
         self.items_dir = Path(items_dir)
         self.queue_path = queue_path
@@ -108,6 +112,13 @@ class BatchOrchestrator:
         self.audit_log = audit_log or AuditLog()
         # Injectable so orchestration-only tests can bypass the real gate.
         self.hero_gate = hero_gate or self._default_hero_gate
+        # Live Square image-count lookup for the listing-image gate. Injectable
+        # so unit tests never hit the network; when None, the gate falls back to
+        # label.json -> channels.square.image_ids (see has_square_image).
+        self.square_image_count = square_image_count or self._default_square_image_count
+        # The full image gate (count -> pass/block). Injectable so
+        # orchestration-only tests can bypass it entirely.
+        self.image_gate = image_gate or self._default_image_gate
 
     # ── Intake ──
 
@@ -244,6 +255,39 @@ class BatchOrchestrator:
         except Exception as exc:  # noqa: BLE001
             print(f"  ⚠ hero_qa runner failed for {item_dir}: {exc}", file=sys.stderr)
 
+    def _default_image_gate(self, item_dir: str) -> "tuple[bool, str]":
+        """Listing-image gate: pass iff the item's Square catalog item has >=1
+        image. Closes the RG-0023 gap where an item reached Listed with zero
+        images and the storefront showed a placeholder.
+
+        Sources the image count via self.square_image_count (live Square
+        lookup, injectable/mockable). If that returns None — Square unreachable
+        or no count available — has_square_image falls back to the image ids
+        recorded in label.json -> channels.square.image_ids."""
+        try:
+            count = self.square_image_count(item_dir)
+        except Exception as exc:  # noqa: BLE001
+            print(f"  ⚠ square image lookup failed for {item_dir}: {exc}; "
+                  f"falling back to label.json", file=sys.stderr)
+            count = None
+        return has_square_image(item_dir, image_count=count)
+
+    def _default_square_image_count(self, item_dir: str) -> "Optional[int]":
+        """Live Square image-count lookup for an item, by its catalog object id.
+
+        Returns the number of image ids on the Square catalog item, or None if
+        the count can't be determined (no recorded object_id, Square
+        unreachable). Returning None makes the gate fall back to the image ids
+        recorded in label.json. For v6.x this resolves the count from the
+        square-cache MCP when wired; until then it returns None so the gate
+        uses the label.json fallback (no network in the default path)."""
+        object_id = square_object_id(item_dir)
+        if not object_id:
+            return None
+        # v6.x: resolve image_ids for `object_id` via the square-cache MCP and
+        # return len(...). Until that's wired, return None -> label.json fallback.
+        return None
+
     def _advance_item(self, state: ItemState) -> Dict[str, Any]:
         """Drive an item through its phases until blocked or done.
 
@@ -275,6 +319,24 @@ class BatchOrchestrator:
                     self._sync_queue(state)
                     phases_run.append({"phase": phase, "result": "blocked",
                                        "reason": f"hero_qa: {reason}"})
+                    continue
+                # BLOCKING LISTING-IMAGE GATE — the Square catalog item must
+                # have >=1 image before phase_4 (Square primary) / phase_7
+                # (GitHub publish). Closes the RG-0023 gap (Listed with zero
+                # images → storefront placeholder). On fail, BLOCK the phase
+                # (do not run it) and park a question, like the hero gate.
+                ok, reason = self.image_gate(item_dir)
+                if not ok:
+                    q = PendingQuestion(
+                        question_id=f"q-listingimg-{phase}",
+                        phase=phase,
+                        question=reason,
+                    )
+                    state.block_phase(phase, q)
+                    state.save()
+                    self._sync_queue(state)
+                    phases_run.append({"phase": phase, "result": "blocked",
+                                       "reason": f"listing_image: {reason}"})
                     continue
             state.start_phase(phase)
             state.save()

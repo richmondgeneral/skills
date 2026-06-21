@@ -139,6 +139,65 @@ def can_list(item_dir: str) -> "tuple[bool, str]":
     return False, f"hero_qa status={status or 'not_checked'} (must be 'pass' before publish)"
 
 
+def square_image_ids(item_dir: str) -> "list[str]":
+    """Best-effort read of the item's recorded Square image ids from label.json.
+
+    Reads label.json -> channels.square.image_ids (the field the team has
+    started recording on upload). Pure JSON read (no network) so the
+    orchestrator can call it cheaply; returns [] if the file or field is
+    absent/unreadable. This is the fallback/offline source for the
+    listing-image gate — the live source is a Square catalog lookup of the
+    item's image_ids (see BatchOrchestrator._default_image_gate)."""
+    p = Path(item_dir) / "label.json"
+    if not p.exists():
+        return []
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    square = ((data.get("channels") or {}).get("square") or {})
+    ids = square.get("image_ids")
+    if isinstance(ids, list):
+        return [str(x) for x in ids if x]
+    return []
+
+
+def square_object_id(item_dir: str) -> "Optional[str]":
+    """Read the item's Square catalog object id from label.json, if recorded.
+
+    label.json -> channels.square.object_id. Returns None if absent. Used by
+    the listing-image gate to do a live Square lookup of the object's
+    image_ids when a Square client is available."""
+    p = Path(item_dir) / "label.json"
+    if not p.exists():
+        return None
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    square = ((data.get("channels") or {}).get("square") or {})
+    oid = square.get("object_id")
+    return str(oid) if oid else None
+
+
+def has_square_image(item_dir: str, image_count: "Optional[int]" = None) -> "tuple[bool, str]":
+    """Read-side chokepoint mirroring can_list(): True only if the Square
+    catalog item has >=1 image.
+
+    image_count, when provided, is the authoritative count from a live Square
+    catalog lookup of the item's image_ids (injected by the orchestrator's
+    image gate). When None, falls back to the count of image ids recorded in
+    label.json -> channels.square.image_ids. No item may go Listed / publish
+    while its Square item has zero images (the RG-0023 placeholder gap)."""
+    if image_count is None:
+        image_count = len(square_image_ids(item_dir))
+    oid = square_object_id(item_dir) or "<unknown>"
+    if image_count >= 1:
+        return True, f"square item {oid} has {image_count} image(s)"
+    return False, (f"Square item {oid} has no image — upload a hero "
+                   f"before listing")
+
+
 @dataclass
 class ItemState:
     """Per-item state container; persists to <items_dir>/<sku>/.state.json."""

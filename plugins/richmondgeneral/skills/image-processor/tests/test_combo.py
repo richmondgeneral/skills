@@ -16,6 +16,14 @@ def _img(path, color, size=(600, 600)):
     Image.new("RGB", size, color).save(path)
 
 
+def _cutout(path, color, block, size=(400, 400)):
+    """Transparent `size` RGBA PNG with a centered opaque `block`x`block` square of `color`."""
+    im = Image.new("RGBA", size, (0, 0, 0, 0))
+    b = Image.new("RGBA", (block, block), (*color, 255))
+    im.paste(b, ((size[0] - block) // 2, (size[1] - block) // 2))
+    im.save(path)
+
+
 def _item(tmp_path, details=("detail-maker-mark", "detail-lid", "detail-bottom"),
           hero=True, label=None):
     d = tmp_path / "RG-9999"
@@ -206,3 +214,50 @@ def test_batch_backfills_eligible_only(tmp_path):
     _img(thin / "detail-mark.jpeg", (20, 20, 20))                                   # only 1 detail
     made, skipped = cb._batch(items)
     assert made == 1 and skipped == 1
+
+
+def test_hero_prefers_cutout_over_raw(tmp_path):
+    d = _item(tmp_path)                                  # has hero.jpeg + 3 details
+    _cutout(d / "cutout.png", (10, 200, 10), 200)        # add a transparent master
+    assert cb.select_slots(d)["hero"].name == "cutout.png"
+
+
+def test_transparent_hero_is_contained_with_white_padding(tmp_path):
+    d = _item(tmp_path)
+    _cutout(d / "cutout.png", (10, 200, 10), 200)        # 200x200 green block in 400x400
+    im = Image.open(cb.compose_combo(d)).convert("RGB")
+    hero_w = round(1600 * cb.HERO_FRAC)                   # 992
+    assert im.getpixel((hero_w // 2, 6)) == cb.PANEL_BG   # contain leaves a white band at the top
+    assert _close(im.getpixel((hero_w // 2, 800)), (10, 200, 10), 6)  # subject fills the middle
+
+
+def test_raw_hero_still_covers(tmp_path):
+    d = _item(tmp_path)                                  # only hero.jpeg (opaque) -> cover path
+    im = Image.open(cb.compose_combo(d)).convert("RGB")
+    assert _close(im.getpixel((12, 800)), (200, 30, 30), 4)   # red hero fills, no white band mid-left
+
+
+def test_subcrop_normalized_size(tmp_path):
+    base = Image.new("RGB", (1000, 800), (0, 0, 0))
+    out = cb._subcrop(base, [0.25, 0.5, 0.5, 0.25])
+    assert out.size == (500, 200)
+
+
+def test_operator_crop_box_aims_the_panel(tmp_path):
+    # provenance detail = green base with a RED patch at normalized [0.6,0.6,0.2,0.2].
+    d = tmp_path / "RG-9999"
+    d.mkdir()
+    _img(d / "hero.jpeg", (200, 30, 30))
+    base = Image.new("RGB", (500, 500), (30, 160, 30))
+    base.paste(Image.new("RGB", (100, 100), (220, 20, 20)), (300, 300))  # red at x,y=0.6,0.6
+    base.save(d / "detail-maker-mark.jpeg")
+    _img(d / "detail-lid.jpeg", (30, 30, 200))
+    _img(d / "detail-bottom.jpeg", (200, 160, 30))
+    (d / "label.json").write_text(json.dumps(
+        {"sku": "RG-9999", "combo_crops": {"provenance": [0.6, 0.6, 0.2, 0.2]}}))
+    im = Image.open(cb.compose_combo(d)).convert("RGB")
+    rail_x = round(1600 * cb.HERO_FRAC) + cb.GUTTER
+    cell_h = (1600 - 2 * cb.GUTTER) // 3
+    # center of the FIRST rail cell should now be the red patch (not the green base)
+    px = im.getpixel((rail_x + 592 // 2, cell_h // 2))
+    assert _close(px, (220, 20, 20), 8)

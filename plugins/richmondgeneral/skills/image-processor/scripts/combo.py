@@ -40,7 +40,7 @@ CAP_SCRIM = (26, 24, 20)
 CAP_TEXT = (246, 241, 230)
 COMBO_FILENAME = "combo.png"
 
-HERO_NAMES = ("hero.png", "hero.jpg", "hero.jpeg", "hero.webp")
+HERO_NAMES = ("cutout.png", "square.png", "card.png", "hero.png", "hero.jpg", "hero.jpeg", "hero.webp")
 DETAIL_EXTS = (".png", ".jpg", ".jpeg", ".webp")
 
 PROVENANCE = ("maker-mark", "makers-mark", "stamp", "ext-mark", "mark", "signature", "label", "tag")
@@ -90,14 +90,18 @@ def select_slots(item_dir, rail: int = RAIL_DEFAULT, caption_mode: str = "specif
         return None
     rail = max(RAIL_DEFAULT, min(rail, RAIL_MAX))
 
-    overrides = {}
+    overrides, crops = {}, {}
     lj = item_dir / "label.json"
-    if caption_mode == "specific" and lj.exists():
+    if lj.exists():
         try:
-            raw = json.loads(lj.read_text(encoding="utf-8")).get("combo_captions")
-            overrides = raw if isinstance(raw, dict) else {}
+            data = json.loads(lj.read_text(encoding="utf-8"))
+            if caption_mode == "specific":
+                raw = data.get("combo_captions")
+                overrides = raw if isinstance(raw, dict) else {}
+            rc = data.get("combo_crops")
+            crops = rc if isinstance(rc, dict) else {}
         except Exception:
-            overrides = {}
+            overrides, crops = {}, {}
 
     used, chosen = [], []
     for role, keys in (("provenance", PROVENANCE), ("feature", FEATURE), ("condition", CONDITION)):
@@ -116,7 +120,9 @@ def select_slots(item_dir, rail: int = RAIL_DEFAULT, caption_mode: str = "specif
     out = []
     for p, role in chosen:
         cap = overrides.get(role) or ROLE_DEFAULT_CAPTION.get(role, "Detail")
-        out.append({"path": p, "role": role, "caption": cap})
+        box = crops.get(role)
+        out.append({"path": p, "role": role, "caption": cap,
+                    "crop": box if (isinstance(box, (list, tuple)) and len(box) == 4) else None})
     return {"hero": hero, "rail": out}
 
 
@@ -143,6 +149,38 @@ def crop_cover(img: Image.Image, w: int, h: int, pos=(0.5, 0.5)) -> Image.Image:
     return img.crop((x, y, x + w, y + h))
 
 
+def fit_hero(img: Image.Image, w: int, h: int, bg=PANEL_BG) -> Image.Image:
+    """Hero-panel fit. A transparent matted master (cutout/square/card) is cropped to its
+    alpha bbox (tight subject) and CONTAIN-fit centered on `bg` (the WHOLE item shows, padded).
+    An opaque raw photo falls back to cover-crop (fills the panel, hides surrounding clutter)."""
+    has_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
+    if has_alpha:
+        rgba = img.convert("RGBA")
+        bbox = rgba.getchannel("A").getbbox()
+        if bbox:
+            rgba = rgba.crop(bbox)
+        sub = _flatten(rgba)
+        sw, sh = sub.size
+        scale = min(w / sw, h / sh)
+        nw, nh = max(1, round(sw * scale)), max(1, round(sh * scale))
+        sub = sub.resize((nw, nh), Image.LANCZOS)
+        canvas = Image.new("RGB", (w, h), bg)
+        canvas.paste(sub, ((w - nw) // 2, (h - nh) // 2))
+        return canvas
+    return crop_cover(img, w, h, pos=(0.5, 0.42))
+
+
+def _subcrop(img: Image.Image, box) -> Image.Image:
+    """Crop to a normalized [x, y, w, h] (fractions 0..1) sub-rectangle, clamped to the image."""
+    iw, ih = img.size
+    x, y, w, h = box
+    x0 = max(0, min(int(round(x * iw)), iw - 1))
+    y0 = max(0, min(int(round(y * ih)), ih - 1))
+    x1 = max(x0 + 1, min(int(round((x + w) * iw)), iw))
+    y1 = max(y0 + 1, min(int(round((y + h) * ih)), ih))
+    return img.crop((x0, y0, x1, y1))
+
+
 def _sku(item_dir) -> str:
     lj = Path(item_dir) / "label.json"
     if lj.exists():
@@ -167,7 +205,8 @@ def compose_combo(item_dir, out=None, rail: int = RAIL_DEFAULT,
 
     canvas = Image.new("RGB", (CANVAS, CANVAS), CREAM)
     hero_w = round(CANVAS * HERO_FRAC)
-    canvas.paste(crop_cover(Image.open(sel["hero"]), hero_w, CANVAS, pos=(0.5, 0.42)), (0, 0))
+    with Image.open(sel["hero"]) as hsrc:
+        canvas.paste(fit_hero(hsrc, hero_w, CANVAS), (0, 0))
     _draw_wordmark(canvas, (0, 0, hero_w, CANVAS), _sku(item_dir))
 
     rail_x = hero_w + GUTTER
@@ -177,7 +216,9 @@ def compose_combo(item_dir, out=None, rail: int = RAIL_DEFAULT,
     for i, slot in enumerate(sel["rail"]):
         y = i * (cell_h + GUTTER)
         h = cell_h if i < n - 1 else CANVAS - y          # last cell absorbs rounding to the edge
-        canvas.paste(crop_cover(Image.open(slot["path"]), rail_w, h), (rail_x, y))
+        with Image.open(slot["path"]) as dsrc:
+            src = _subcrop(dsrc, slot["crop"]) if slot.get("crop") else dsrc
+            canvas.paste(crop_cover(src, rail_w, h), (rail_x, y))
         _draw_caption(canvas, (rail_x, y, rail_w, h), slot["caption"])
 
     canvas.save(out_path, "PNG")

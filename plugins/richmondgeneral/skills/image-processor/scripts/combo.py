@@ -181,6 +181,9 @@ def compose_combo(item_dir, out=None, rail: int = RAIL_DEFAULT,
         _draw_caption(canvas, (rail_x, y, rail_w, h), slot["caption"])
 
     canvas.save(out_path, "PNG")
+    # Append-only by design (shared recorder): each compose/backfill run adds one
+    # "combo" provenance record. The idempotent registry entry is photos.combo
+    # (see record_photos_combo); image_pipeline is the running provenance log.
     append_pipeline(str(item_dir), {
         "op": "combo",
         "tool": "combo.py",
@@ -255,7 +258,10 @@ def record_photos_combo(item_dir, made: bool) -> None:
         photos.pop("combo", None)
     else:
         photos["combo"] = desired
-    p.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    try:
+        p.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    except Exception as exc:
+        print(f"warning: {p}: {exc}", file=sys.stderr)
 
 
 def _batch(items_dir, rail: int = RAIL_DEFAULT, caption_mode: str = "specific"):

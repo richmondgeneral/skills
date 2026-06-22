@@ -261,3 +261,11 @@ def test_operator_crop_box_aims_the_panel(tmp_path):
     # center of the FIRST rail cell should now be the red patch (not the green base)
     px = im.getpixel((rail_x + 592 // 2, cell_h // 2))
     assert _close(px, (220, 20, 20), 8)
+
+
+def test_operator_crop_box_ignores_non_numeric(tmp_path):
+    d = _item(tmp_path, label={"sku": "RG-9999",
+                               "combo_crops": {"provenance": [".6", ".6", ".2", ".2"]}})
+    sel = cb.select_slots(d)
+    assert sel["rail"][0]["crop"] is None        # non-numeric box ignored, not crashed
+    assert cb.compose_combo(d) is not None        # and compose does not raise

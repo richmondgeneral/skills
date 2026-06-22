@@ -299,7 +299,7 @@ python scripts/photos.py --stats
 
 ### Marketplace Combo Collage
 
-`combo.py` — 1:1 marketplace "combo" collage: hero-dominant magazine (big hero + auto-mapped detail crops with captions); deterministic, non-generative; `--item-dir` / `--batch`.
+`combo.py` — 1:1 marketplace "combo" collage: hero-dominant magazine (big hero + auto-mapped detail crops with captions); deterministic, non-generative; `--item-dir` / `--batch`. The clean full hero remains the primary listing image; combo.png is an additional "at-a-glance" photo for an extra marketplace slot.
 
 ```bash
 uv run python scripts/combo.py --item-dir items/RG-XXXX            # -> combo.png (1600x1600)

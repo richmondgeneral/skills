@@ -121,8 +121,10 @@ def select_slots(item_dir, rail: int = RAIL_DEFAULT, caption_mode: str = "specif
     for p, role in chosen:
         cap = overrides.get(role) or ROLE_DEFAULT_CAPTION.get(role, "Detail")
         box = crops.get(role)
+        valid = (isinstance(box, (list, tuple)) and len(box) == 4
+                 and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in box))
         out.append({"path": p, "role": role, "caption": cap,
-                    "crop": box if (isinstance(box, (list, tuple)) and len(box) == 4) else None})
+                    "crop": list(box) if valid else None})
     return {"hero": hero, "rail": out}
 
 

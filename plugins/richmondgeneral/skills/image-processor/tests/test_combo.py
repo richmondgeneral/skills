@@ -1,12 +1,15 @@
 """Tests for combo.py — deterministic 1:1 marketplace combo collage."""
 import json
 import os
+import subprocess
 import sys
 
 from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import combo as cb
+
+SCRIPT = os.path.join(os.path.dirname(__file__), "..", "scripts", "combo.py")
 
 
 def _img(path, color, size=(600, 600)):
@@ -177,3 +180,29 @@ def test_record_removes_combo_when_skipped(tmp_path):
     cb.record_photos_combo(d, made=False)
     data = json.loads((d / "label.json").read_text())
     assert "combo" not in data.get("photos", {})
+
+
+def test_cli_builds_and_records(tmp_path):
+    d = _item(tmp_path, label={"sku": "RG-9999"})
+    rc = subprocess.run([sys.executable, SCRIPT, "--item-dir", str(d)]).returncode
+    assert rc == 0
+    assert (d / "combo.png").exists()
+    assert json.loads((d / "label.json").read_text())["photos"]["combo"] == "combo.png"
+
+
+def test_cli_exit_2_on_skip(tmp_path):
+    d = _item(tmp_path, details=("detail-maker-mark",))   # too few details
+    rc = subprocess.run([sys.executable, SCRIPT, "--item-dir", str(d)]).returncode
+    assert rc == 2
+
+
+def test_batch_backfills_eligible_only(tmp_path):
+    items = tmp_path / "items"
+    items.mkdir()
+    _item(items, details=("detail-maker-mark", "detail-lid", "detail-bottom"))      # RG-9999 eligible
+    thin = items / "RG-0001"
+    thin.mkdir()
+    _img(thin / "hero.jpeg", (10, 10, 10))
+    _img(thin / "detail-mark.jpeg", (20, 20, 20))                                   # only 1 detail
+    made, skipped = cb._batch(items)
+    assert made == 1 and skipped == 1

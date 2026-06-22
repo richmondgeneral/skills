@@ -256,3 +256,53 @@ def record_photos_combo(item_dir, made: bool) -> None:
     else:
         photos["combo"] = desired
     p.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def _batch(items_dir, rail: int = RAIL_DEFAULT, caption_mode: str = "specific"):
+    items_dir = Path(items_dir).expanduser().resolve()
+    made = skipped = 0
+    for d in sorted(items_dir.glob("RG-*")):
+        if not d.is_dir():
+            continue
+        try:
+            out = compose_combo(d, rail=rail, caption_mode=caption_mode)
+        except Exception as exc:
+            print(f"  ! {d.name}: {exc}", file=sys.stderr)
+            continue
+        record_photos_combo(d, made=out is not None)
+        if out is None:
+            skipped += 1
+            print(f"  - {d.name}: too few views, skipped")
+        else:
+            made += 1
+            print(f"  ✓ {d.name}: {out.name}")
+    print(f"\nbackfill: made={made} skipped={skipped}")
+    return made, skipped
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Compose a 1:1 marketplace combo collage.")
+    ap.add_argument("--item-dir", help="item dir (items/RG-XXXX)")
+    ap.add_argument("--out", help="output path (default: <item-dir>/combo.png)")
+    ap.add_argument("--rail", type=int, default=RAIL_DEFAULT, help="rail cells, 3 or 4 (default 3)")
+    ap.add_argument("--caption-mode", choices=("specific", "generic"), default="specific")
+    ap.add_argument("--layout", choices=("magazine",), default="magazine")
+    ap.add_argument("--batch", metavar="ITEMS_DIR", help="backfill every items/RG-*/ with enough views")
+    args = ap.parse_args()
+
+    if args.batch:
+        _batch(args.batch, rail=args.rail, caption_mode=args.caption_mode)
+        sys.exit(0)
+    if not args.item_dir:
+        ap.error("--item-dir is required (or use --batch ITEMS_DIR)")
+    out = compose_combo(args.item_dir, out=args.out, rail=args.rail,
+                        caption_mode=args.caption_mode, layout=args.layout)
+    record_photos_combo(args.item_dir, made=out is not None)
+    if out is None:
+        print("skipped: no hero or too few detail views", file=sys.stderr)
+        sys.exit(2)
+    print(out)
+
+
+if __name__ == "__main__":
+    main()

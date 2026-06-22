@@ -60,10 +60,58 @@ Suggested (via "Apply all" or individually) — observed values offered:
 - **Confirmation dialog** buttons: View listing / Create new listing / Create similar listing / Share
   listing / **Feedback** / **Done**.
 
+## CREATE a new listing — end-to-end (mapped 2026-06-21, RG-0055 Kreamer tin → live item 298439755483)
+
+The full browser CREATE flow. No Gemini, no permission churn — `browser_batch` the whole thing.
+
+1. **Idempotency first.** Seller Hub → Active (`/sh/lst/active`): search the maker/title in "Search by
+   title, SKU, or item number" → expect **0 results**. Then left-rail **Drafts** → scan titles (the
+   create form auto-saves a draft on a crash, so a half-done one may already exist). Only then create.
+2. **Start:** click **Create listing** → lands on `…/sl/prelist/home`. Type a descriptive phrase
+   (brand + form + material) in **"Enter brand, model, description, etc."** → Search.
+3. **Find a match** page: eBay suggests a **category** (breadcrumb, e.g. *Collectibles › Kitchen & Home ›
+   Kitchen Storage & Organization › Canisters & Jars*) and shows related listings (handy live comps).
+   For a one-off, click **"Continue without match"** (bottom center) to take the suggested category.
+4. **Confirm details** modal: **Select the condition** (New / New other / Seller refurbished / **Used** /
+   For parts) → **Continue to listing**. Lands on **"Complete your listing"** (`/lstng?draftId=…&mode=AddItem`).
+5. **Photos** — do NOT click "Upload from computer" (opens a native picker you can't see). `find`
+   "photo file upload input element" → returns the **`<input type=file>`** ref → `file_upload` with
+   **workspace absolute paths** (`/Users/.../items/RG-XXXX/hero.jpeg`, …). **First file = Main.** Keep each
+   `file_upload` call **< 10 MB** (≈4–5 jpegs); split into batches, re-`find` the input ref between batches.
+6. **Title** — plain `<input>`, click → `cmd+a` → `Backspace` → type (80-char max; tab title echoes it).
+7. **Custom label (SKU)** — plain `<input>`; type `RG-XXXX`.
+8. **Item specifics** — a **"Suggested item specifics"** card (eBay.ai, from photos+title) with checkboxes
+   (Set Includes, Size, Material, Vintage, Original, etc.); review for accuracy → **"Apply all"**. Then a
+   **Required** block (here: Item Height/Length/Width — free-text, type e.g. `18 in`). Then **Additional
+   (optional)** dropdowns: **Type** (prefilled), **Brand** (combobox → search box → "Add custom value: +
+   Kreamer" since brand often isn't in the list), **Color** (combobox → type → pick), Country of Origin
+   (combobox → "United States"), and **Yes/No** chips (Antique = Yes). Ignore wrong AI suggestions (it
+   suggested Brand "Unbranded" + Color "Green" — both overridden).
+9. **Condition** — Item condition shows from step 4; **Condition description** = plain `<textarea>`
+   (1000-char) → type the as-found note.
+10. **Description** — for CREATE this is an **inline contenteditable RTE** (toolbar: Arial / size / B / I /
+    lists / Custom template / **Show HTML Code**) directly on the page — **NOT** the `se-rte-frame__summary`
+    iframe that Revise uses. Click into the body and type (newlines make paragraphs). "Show HTML Code" for raw.
+11. **Pricing** — **Item price** `<input>` (type `65.00`); **Quantity** 1; **Payment policy** dropdown;
+    **Allow offers** toggle = Best Offer (was already ON). **Schedule** toggle off = goes live now.
+12. **Shipping** — **Shipping policy** dropdown lists your business policies; for pickup-only items pick
+    **"Local Pickup Only"** (the create default may be "Local Pickup + Calculated Ship + International" —
+    change it!). Package weight/dims can be left blank for pickup-only.
+13. **Preferences → Your settings** (pencil edit): Item location (ZIP/City/State) + **Return policy**
+    dropdown → for as-found pickup goods pick **"No Returns"** → **Done**.
+14. **Charity / Promote / Item disclosures** — optional, leave off.
+15. **List it** (blue button at bottom; also Save for later / Preview). Success modal **"Your listing is
+    now live"** shows the title + **`ID-<itemId>`** and View/Create-new/Create-similar/Share/Done. The
+    public URL is `https://www.ebay.com/itm/<itemId>`. Click **Done**.
+16. **After:** write `item_id` + `url` into `items/RG-XXXX/label.json → channels.ebay` (status `listed`),
+    commit, and confirm price/pickup consistent with the other channels.
+
+⚠️ eBay's create form can crash the tab mid-listing — the draft auto-saves, so resume via Seller Hub → Drafts.
+
 ## Not yet mapped (TODO — fill in next sessions)
 
-- Photo add/remove/reorder via the extension (tile grid + hidden file input).
-- The **Create listing** (new) flow end-to-end (this skill has only covered Revise so far).
-- Shipping / package dimensions section refs + oversize handling.
-- Best Offer / auto-accept-decline thresholds.
+- Photo **reorder/remove** via the extension (upload + main-slot are mapped; drag-reorder is not).
+- Auction (Starting bid) format — only Buy It Now mapped.
+- Best Offer **auto-accept / auto-decline** thresholds (Minimum offer / Auto accept fields).
+- Oversize package handling on CREATE (only relevant when shipping, not pickup-only).
 - Full dropdown option lists for the jewelry Item specifics.

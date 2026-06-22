@@ -99,6 +99,21 @@ def _patch_token(monkeypatch):
     monkeypatch.setattr(sl, "resolve_token", lambda: "T")
 
 
+def _patch_qr(monkeypatch):
+    """Install a fake gen_qr_png; returns the list of (url, out_path) calls.
+
+    Monkeypatched so the suite never needs the real `qrcode` image lib and
+    never writes a PNG.
+    """
+    qr_calls = []
+
+    def fake_qr(url, out_path):
+        qr_calls.append({"url": url, "out_path": out_path})
+
+    monkeypatch.setattr(sl, "gen_qr_png", fake_qr)
+    return qr_calls
+
+
 # ---------------------------------------------------------------------------
 # build_catalog_object — EXACT shape (mirrors process_new_item).
 # ---------------------------------------------------------------------------
@@ -172,6 +187,8 @@ def test_create_path_calls(monkeypatch, item_dir):
                      "object_id": "VAR_REAL"},
                 ],
             }
+        if path == "/v2/inventory/batch-change":
+            return 200, {"counts": [{"quantity": "1"}]}
         if path == "/v2/online-checkout/payment-links":
             return 200, {"payment_link": {
                 "id": "PL_REAL",
@@ -182,6 +199,7 @@ def test_create_path_calls(monkeypatch, item_dir):
 
     calls = _patch_request(monkeypatch, handler)
     uploads = _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
 
     summary = sl.list_item(str(item_dir), dry_run=False)
 
@@ -237,11 +255,14 @@ def test_idempotent_update_no_duplicate_create(monkeypatch, item_dir):
 
     calls = _patch_request(monkeypatch, handler)
     uploads = _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
 
     summary = sl.list_item(str(item_dir), dry_run=False, force=False)
 
     # NO create.
     assert not any(c["path"] == "/v2/catalog/batch-upsert" for c in calls)
+    # NO inventory call on a re-run/UPDATE (create-only).
+    assert not any(c["path"] == "/v2/inventory/batch-change" for c in calls)
     # A sparse single-object upsert (POST /v2/catalog/object) was issued.
     upserts = [c for c in calls
                if c["method"] == "POST" and c["path"] == "/v2/catalog/object"]
@@ -298,6 +319,7 @@ def test_paylink_recreated_on_price_change(monkeypatch, item_dir):
 
     calls = _patch_request(monkeypatch, handler)
     _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
 
     summary = sl.list_item(str(item_dir), dry_run=False, force=False)
 
@@ -355,6 +377,7 @@ def test_paylink_orphan_no_recorded_price_deletes_then_creates(
 
     calls = _patch_request(monkeypatch, handler)
     _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
 
     summary = sl.list_item(str(item_dir), dry_run=False, force=False)
 
@@ -418,6 +441,8 @@ def test_writeback(monkeypatch, item_dir):
                 {"client_object_id": "#RG-0099", "object_id": "ITEM_REAL"},
                 {"client_object_id": "#RG-0099-var", "object_id": "VAR_REAL"},
             ]}
+        if path == "/v2/inventory/batch-change":
+            return 200, {"counts": [{"quantity": "1"}]}
         if path == "/v2/online-checkout/payment-links":
             return 200, {"payment_link": {
                 "id": "PL_REAL",
@@ -428,6 +453,7 @@ def test_writeback(monkeypatch, item_dir):
 
     _patch_request(monkeypatch, handler)
     _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
 
     sl.list_item(str(item_dir), dry_run=False)
 
@@ -440,5 +466,292 @@ def test_writeback(monkeypatch, item_dir):
     assert sq["order_id"] == "ORD_REAL"
     assert sq["price"] == "65.00"
     assert sq["status"] == "listed"
+    # I2: top-level lifecycle state promoted to "Listed" on success.
+    assert written["state"] == "Listed"
     # File ends with a trailing newline (formatting contract).
     assert label_path.read_text(encoding="utf-8").endswith("\n")
+
+
+# ---------------------------------------------------------------------------
+# C1 — CREATE sets inventory to 1 (item must be purchasable, not "Sold out").
+# A plain re-run / UPDATE issues ZERO inventory calls.
+# ---------------------------------------------------------------------------
+
+def _create_handler(method, path, body):
+    """Shared CREATE-path response handler (upsert + inventory + paylink)."""
+    if path == "/v2/catalog/batch-upsert":
+        return 200, {"id_mappings": [
+            {"client_object_id": "#RG-0099", "object_id": "ITEM_REAL"},
+            {"client_object_id": "#RG-0099-var", "object_id": "VAR_REAL"},
+        ]}
+    if path == "/v2/inventory/batch-change":
+        return 200, {"counts": [{"quantity": "1"}]}
+    if path == "/v2/online-checkout/payment-links":
+        return 200, {"payment_link": {
+            "id": "PL_REAL",
+            "url": "https://square.link/u/abc",
+            "order_id": "ORD_REAL",
+        }}
+    raise AssertionError(f"unexpected request: {method} {path}")
+
+
+def test_create_sets_inventory(monkeypatch, item_dir):
+    _write_label(item_dir)  # no object_id → CREATE
+    _patch_token(monkeypatch)
+    calls = _patch_request(monkeypatch, _create_handler)
+    _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
+
+    sl.list_item(str(item_dir), dry_run=False)
+
+    inv = [c for c in calls if c["path"] == "/v2/inventory/batch-change"]
+    # Exactly ONE inventory batch-change on create.
+    assert len(inv) == 1
+    assert inv[0]["method"] == "POST"
+    change = inv[0]["body"]["changes"][0]
+    assert change["type"] == "PHYSICAL_COUNT"
+    pc = change["physical_count"]
+    # Set quantity 1 IN_STOCK for the NEW variation.
+    assert pc["catalog_object_id"] == "VAR_REAL"
+    assert pc["quantity"] == "1"
+    assert pc["state"] == "IN_STOCK"
+    assert pc["location_id"] == sc.LOCATION_ID
+
+
+def test_update_makes_zero_inventory_calls(monkeypatch, item_dir):
+    _write_label(item_dir, channels={"square": {
+        "object_id": "ITEM_EXISTING",
+        "variation_id": "VAR_EXISTING",
+        "payment_link_id": "PL_EXISTING",
+        "price": "65.00",  # unchanged → keep link
+    }})
+    _patch_token(monkeypatch)
+
+    def handler(method, path, body):
+        if method == "GET" and path == "/v2/catalog/object/ITEM_EXISTING":
+            return 200, {"object": {
+                "type": "ITEM", "id": "ITEM_EXISTING", "version": 5}}
+        if method == "POST" and path == "/v2/catalog/object":
+            return 200, {"catalog_object": {
+                "id": "ITEM_EXISTING", "version": 6}}
+        raise AssertionError(f"unexpected request: {method} {path}")
+
+    calls = _patch_request(monkeypatch, handler)
+    _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
+
+    sl.list_item(str(item_dir), dry_run=False)
+
+    # ZERO inventory calls on a plain re-run (create-only behavior).
+    assert not any(c["path"] == "/v2/inventory/batch-change" for c in calls)
+
+
+# ---------------------------------------------------------------------------
+# I1 — ids are persisted to label.json IMMEDIATELY after a successful create,
+# BEFORE the image/inventory/paylink steps, so a later failure can't strand the
+# run into double-creating on re-run.
+# ---------------------------------------------------------------------------
+
+def test_create_persists_ids_before_paylink(monkeypatch, item_dir):
+    label_path, _ = _write_label(item_dir)  # CREATE path
+    _patch_token(monkeypatch)
+    _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
+
+    def handler(method, path, body):
+        if path == "/v2/catalog/batch-upsert":
+            return 200, {"id_mappings": [
+                {"client_object_id": "#RG-0099", "object_id": "ITEM_REAL"},
+                {"client_object_id": "#RG-0099-var", "object_id": "VAR_REAL"},
+            ]}
+        if path == "/v2/inventory/batch-change":
+            return 200, {"counts": [{"quantity": "1"}]}
+        if path == "/v2/online-checkout/payment-links":
+            # Simulate the paylink CREATE blowing up AFTER the item was created.
+            raise RuntimeError("simulated paylink failure")
+        raise AssertionError(f"unexpected request: {method} {path}")
+
+    _patch_request(monkeypatch, handler)
+
+    # The run errors out at the paylink step...
+    with pytest.raises(RuntimeError, match="simulated paylink failure"):
+        sl.list_item(str(item_dir), dry_run=False)
+
+    # ...but label.json on disk ALREADY has the catalog ids, so a re-run resumes
+    # in the UPDATE branch and never double-creates.
+    written = json.loads(label_path.read_text(encoding="utf-8"))
+    sq = written["channels"]["square"]
+    assert sq["object_id"] == "ITEM_REAL"
+    assert sq["variation_id"] == "VAR_REAL"
+
+
+# ---------------------------------------------------------------------------
+# I3 — UPDATE path with a MISSING variation_id (foreign/hand-edited label):
+# recover it from the fetched catalog object BEFORE touching the payment link;
+# never delete-then-create a paylink with a None line item.
+# ---------------------------------------------------------------------------
+
+def test_update_recovers_missing_variation_id_before_paylink(
+        monkeypatch, item_dir):
+    # object_id present, payment_link_id present + price CHANGED → recreate, but
+    # variation_id is ABSENT from channels.square.
+    _write_label(item_dir, price="48.00", channels={"square": {
+        "object_id": "ITEM_EXISTING",
+        "payment_link_id": "PL_OLD",
+        "price": "65.00",  # differs from 48.00 → recreate the link
+        # intentionally NO "variation_id"
+    }})
+    _patch_token(monkeypatch)
+
+    def handler(method, path, body):
+        if method == "GET" and path == "/v2/catalog/object/ITEM_EXISTING":
+            # The fetched object carries the variation id we must recover.
+            return 200, {"object": {
+                "type": "ITEM", "id": "ITEM_EXISTING", "version": 9,
+                "item_data": {"variations": [{"id": "VAR_FETCHED"}]},
+            }}
+        if method == "POST" and path == "/v2/catalog/object":
+            return 200, {"catalog_object": {
+                "id": "ITEM_EXISTING", "version": 10}}
+        if (method == "DELETE"
+                and path == "/v2/online-checkout/payment-links/PL_OLD"):
+            return 200, {}
+        if (method == "POST"
+                and path == "/v2/online-checkout/payment-links"):
+            return 200, {"payment_link": {
+                "id": "PL_NEW",
+                "url": "https://square.link/u/new",
+                "order_id": "ORD_NEW",
+            }}
+        raise AssertionError(f"unexpected request: {method} {path}")
+
+    calls = _patch_request(monkeypatch, handler)
+    _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
+
+    summary = sl.list_item(str(item_dir), dry_run=False, force=False)
+
+    # The recreated paylink uses the FETCHED variation id (never None).
+    creates = [c for c in calls if c["method"] == "POST"
+               and c["path"] == "/v2/online-checkout/payment-links"]
+    assert len(creates) == 1
+    li = creates[0]["body"]["order"]["line_items"][0]
+    assert li["catalog_object_id"] == "VAR_FETCHED"
+    # The summary + write-back carry the recovered id.
+    assert summary["variation_id"] == "VAR_FETCHED"
+
+
+def test_update_missing_variation_unresolvable_raises_before_delete(
+        monkeypatch, item_dir):
+    # variation_id absent from the label AND absent from the fetched object →
+    # must raise BEFORE deleting any payment link.
+    _write_label(item_dir, price="48.00", channels={"square": {
+        "object_id": "ITEM_EXISTING",
+        "payment_link_id": "PL_OLD",
+        "price": "65.00",
+    }})
+    _patch_token(monkeypatch)
+
+    def handler(method, path, body):
+        if method == "GET" and path == "/v2/catalog/object/ITEM_EXISTING":
+            # No variations on the fetched object → unresolvable.
+            return 200, {"object": {
+                "type": "ITEM", "id": "ITEM_EXISTING", "version": 9,
+                "item_data": {},
+            }}
+        raise AssertionError(f"unexpected request: {method} {path}")
+
+    calls = _patch_request(monkeypatch, handler)
+    _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
+
+    with pytest.raises(RuntimeError, match="variation_id"):
+        sl.list_item(str(item_dir), dry_run=False, force=False)
+
+    # The old link was NEVER deleted (we raised before touching it).
+    assert not any(c["method"] == "DELETE" for c in calls)
+
+
+# ---------------------------------------------------------------------------
+# M2 — the buy QR is rendered and recorded (the "two QR codes" contract).
+# ---------------------------------------------------------------------------
+
+def test_create_generates_qr_buy(monkeypatch, item_dir):
+    label_path, _ = _write_label(item_dir)  # CREATE path
+    _patch_token(monkeypatch)
+    _patch_request(monkeypatch, _create_handler)
+    _patch_image(monkeypatch)
+    qr_calls = _patch_qr(monkeypatch)
+
+    sl.list_item(str(item_dir), dry_run=False)
+
+    # gen_qr_png invoked once with the NEW buy link, targeting qr-buy.png.
+    assert len(qr_calls) == 1
+    assert qr_calls[0]["url"] == "https://square.link/u/abc"
+    assert qr_calls[0]["out_path"].endswith("qr-buy.png")
+
+    # Recorded in label.json -> qr_codes.buy.
+    written = json.loads(label_path.read_text(encoding="utf-8"))
+    buy = written["qr_codes"]["buy"]
+    assert buy["file"] == "qr-buy.png"
+    assert buy["url"] == "https://square.link/u/abc"
+    assert "scan to buy" in buy["use"].lower()
+
+
+def test_qr_missing_dep_degrades_not_crash(monkeypatch, item_dir):
+    # If qrcode is absent, gen_qr_png raises ImportError — the listing must
+    # still succeed (warn, don't crash) and just not record qr_codes.buy.
+    label_path, _ = _write_label(item_dir)
+    _patch_token(monkeypatch)
+    _patch_request(monkeypatch, _create_handler)
+    _patch_image(monkeypatch)
+
+    def boom_qr(url, out_path):
+        raise ImportError("No module named 'qrcode'")
+
+    monkeypatch.setattr(sl, "gen_qr_png", boom_qr)
+
+    summary = sl.list_item(str(item_dir), dry_run=False)
+
+    # The listing still completed (ids written, status listed).
+    assert summary["created"] is True
+    written = json.loads(label_path.read_text(encoding="utf-8"))
+    assert written["channels"]["square"]["status"] == "listed"
+    # No qr_codes.buy recorded (generation failed gracefully).
+    assert "buy" not in (written.get("qr_codes") or {})
+
+
+# ---------------------------------------------------------------------------
+# I2 — never DOWNGRADE a Sold/Archived item's top-level state to "Listed".
+# ---------------------------------------------------------------------------
+
+def test_state_not_downgraded_from_sold(monkeypatch, item_dir):
+    _write_label(item_dir, state="Sold", channels={"square": {
+        "object_id": "ITEM_EXISTING",
+        "variation_id": "VAR_EXISTING",
+        "payment_link_id": "PL_EXISTING",
+        "price": "65.00",
+    }})
+    _patch_token(monkeypatch)
+
+    def handler(method, path, body):
+        if method == "GET" and path == "/v2/catalog/object/ITEM_EXISTING":
+            return 200, {"object": {
+                "type": "ITEM", "id": "ITEM_EXISTING", "version": 5}}
+        if method == "POST" and path == "/v2/catalog/object":
+            return 200, {"catalog_object": {
+                "id": "ITEM_EXISTING", "version": 6}}
+        raise AssertionError(f"unexpected request: {method} {path}")
+
+    _patch_request(monkeypatch, handler)
+    _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
+
+    label_path = item_dir / "label.json"
+    sl.list_item(str(item_dir), dry_run=False)
+
+    written = json.loads(label_path.read_text(encoding="utf-8"))
+    # Top-level state stays "Sold" (not clobbered to "Listed").
+    assert written["state"] == "Sold"
+    # But the channel status still reflects the sparse update ran.
+    assert written["channels"]["square"]["status"] == "listed"

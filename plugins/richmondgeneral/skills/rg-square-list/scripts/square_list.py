@@ -52,7 +52,9 @@ from square_client import (  # noqa: E402
     create_payment_link,
     delete_payment_link,
     dollars_to_cents,
+    gen_qr_png,
     resolve_token,
+    set_inventory_count,
     square_request,
 )
 
@@ -144,9 +146,9 @@ def build_catalog_object(sku: str, label: dict) -> dict:
         }],
     }
     if notes:
-        # Plain `description` plus an HTML mirror (`<p>…</p>`) — the storefront
-        # renders description_html; the plain field is kept for API consumers.
-        item_data["description"] = notes
+        # ONLY description_html (per process_new_item v3.2): the storefront
+        # renders this; the deprecated plain `description` field would show raw
+        # HTML tags on richmondgeneral.com, so it is intentionally NOT set.
         item_data["description_html"] = f"<p>{notes}</p>"
 
     return {
@@ -216,8 +218,12 @@ def _extract_catalog_ids(result: dict, sku: str) -> tuple[str, str]:
     return item_id, variation_id
 
 
-def _get_object_version(token: str, object_id: str) -> int:
-    """Fetch an object's current ``version`` (required for a sparse update)."""
+def _get_catalog_object(token: str, object_id: str) -> dict:
+    """GET a catalog object and return its parsed ``object`` dict.
+
+    The single readback used both for the sparse-update version and to recover a
+    missing variation id (so the UPDATE path needs only ONE GET, not two).
+    """
     status, parsed = square_request(
         "GET", f"/v2/catalog/object/{object_id}", token
     )
@@ -226,24 +232,44 @@ def _get_object_version(token: str, object_id: str) -> int:
             f"GET catalog object {object_id} failed: {status}: "
             f"{json.dumps(parsed)}"
         )
-    obj = parsed.get("object") or {}
+    return parsed.get("object") or {}
+
+
+def _get_object_version(token: str, object_id: str) -> int:
+    """Fetch an object's current ``version`` (required for a sparse update)."""
+    obj = _get_catalog_object(token, object_id)
     version = obj.get("version")
     if version is None:
         raise RuntimeError(
-            f"No version on fetched object {object_id}: {json.dumps(parsed)}"
+            f"No version on fetched object {object_id}: version missing"
         )
     return version
 
 
-def _sparse_update_item(token: str, object_id: str, label: dict) -> None:
+def _variation_id_from_object(obj: dict) -> Optional[str]:
+    """Pull the first variation id out of a fetched catalog ITEM object."""
+    variations = (obj.get("item_data") or {}).get("variations") or []
+    if variations:
+        return variations[0].get("id")
+    return None
+
+
+def _sparse_update_item(token: str, object_id: str, label: dict,
+                        version: Optional[int] = None) -> None:
     """Issue a sparse ITEM update — ONLY name/description, preserving everything
-    else (variation, price, categories, images)."""
-    version = _get_object_version(token, object_id)
+    else (variation, price, categories, images).
+
+    ``version`` may be supplied by a caller that already fetched the object (the
+    UPDATE path reuses its single GET); otherwise it is fetched here.
+    """
+    if version is None:
+        version = _get_object_version(token, object_id)
     name = label["product_name"]
     notes = label.get("condition_notes") or ""
     item_data = {"name": name}
     if notes:
-        item_data["description"] = notes
+        # description_html only — plain `description` is deprecated (renders raw
+        # HTML tags on the storefront). Matches build_catalog_object.
         item_data["description_html"] = f"<p>{notes}</p>"
 
     body = {
@@ -289,7 +315,6 @@ def _ensure_payment_link(token: str, sku: str, label: dict, variation_id: str,
     ``id``/``url``/``order_id``) or, when kept, a dict echoing the recorded
     fields.
     """
-    price_str = f"{price_cents / 100:.2f}"
     old_id = existing.get("payment_link_id")
     recorded_price = existing.get("price")
 
@@ -319,6 +344,20 @@ def _ensure_payment_link(token: str, sku: str, label: dict, variation_id: str,
         idempotency_key=str(uuid.uuid4()),
     )
     return create_payment_link(token, body)
+
+
+def _write_label(label_path: Path, label: dict) -> None:
+    """Write ``label`` to ``label_path`` as pretty JSON with a trailing newline.
+
+    The single label.json writer — used both for the early post-create id
+    persist (I1) and the final full write-back, so the formatting contract
+    (2-space indent, ``ensure_ascii=False``, trailing ``\\n``) is identical for
+    every write.
+    """
+    label_path.write_text(
+        json.dumps(label, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -358,13 +397,45 @@ def list_item(item_dir: str, dry_run: bool = False, force: bool = False) -> dict
 
     # --- Item: CREATE vs sparse UPDATE (never duplicate) ---------------------
     if existing_object_id:
-        _sparse_update_item(token, existing_object_id, label)
+        # UPDATE path. Re-fetch the catalog object ONCE: it gives both the
+        # version for the sparse update AND lets us recover a missing
+        # variation_id (foreign / hand-edited label) BEFORE any payment-link
+        # work — otherwise a paylink recreate would delete the old link and
+        # build a new one with catalog_object_id=None (I3).
+        obj = _get_catalog_object(token, existing_object_id)
+        version = obj.get("version")
+        if version is None:
+            raise RuntimeError(
+                f"No version on fetched object {existing_object_id}: "
+                "version missing"
+            )
         item_id = existing_object_id
         variation_id = square.get("variation_id")
+        if not variation_id:
+            variation_id = _variation_id_from_object(obj)
+        if not variation_id:
+            raise RuntimeError(
+                f"Could not resolve variation_id for {existing_object_id} "
+                "(missing from label.json AND from the fetched catalog object); "
+                "refusing to touch the payment link without it."
+            )
+        _sparse_update_item(token, existing_object_id, label, version=version)
         created = False
     else:
         item_id, variation_id = _create_item(token, sku, label)
         created = True
+        # I1: persist the new ids to label.json IMMEDIATELY — before the image /
+        # inventory / paylink steps — so if any of those fail, a re-run resumes
+        # in the UPDATE branch instead of double-creating the catalog item.
+        square["object_id"] = item_id
+        square["variation_id"] = variation_id
+        channels["square"] = square
+        label["channels"] = channels
+        _write_label(label_path, label)
+        # C1: a freshly-created item tracks inventory but lists at 0 → "Sold
+        # out". Set the on-hand count to 1 so it's purchasable. Create path ONLY
+        # (a re-run/UPDATE never re-stocks).
+        set_inventory_count(token, variation_id, qty=1)
 
     # --- Image: only on create, or on an explicit --force update -------------
     image_uploaded = False
@@ -386,6 +457,28 @@ def list_item(item_dir: str, dry_run: bool = False, force: bool = False) -> dict
     buy_link = link.get("url")
     order_id = link.get("order_id")
 
+    # --- M2: render the buy QR (the "two QR codes" contract) -----------------
+    qr_buy_recorded = False
+    if buy_link:
+        qr_path = item_path / "qr-buy.png"
+        try:
+            gen_qr_png(buy_link, str(qr_path))
+            qr_codes = label.get("qr_codes") or {}
+            qr_codes["buy"] = {
+                "url": buy_link,
+                "file": "qr-buy.png",
+                "use": "Square checkout — scan to buy",
+            }
+            label["qr_codes"] = qr_codes
+            qr_buy_recorded = True
+        except ImportError:
+            # Optional dep (`qrcode[pil]`) absent → degrade with a clear note,
+            # never crash a successful listing over a missing QR image.
+            print(
+                "  [warn] qr-buy.png NOT generated: the `qrcode` package is not "
+                "installed (re-run under uv with --with \"qrcode[pil]\")."
+            )
+
     # --- Write back into channels.square -------------------------------------
     square.update({
         "object_id": item_id,
@@ -398,10 +491,11 @@ def list_item(item_dir: str, dry_run: bool = False, force: bool = False) -> dict
     })
     channels["square"] = square
     label["channels"] = channels
-    label_path.write_text(
-        json.dumps(label, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    # I2: the gallery gate + reconcile key off the TOP-LEVEL `state`. Promote to
+    # "Listed" on success — but never DOWNGRADE a "Sold"/"Archived" item.
+    if label.get("state") not in ("Sold", "Archived"):
+        label["state"] = "Listed"
+    _write_label(label_path, label)
 
     return {
         "dry_run": False,
@@ -414,6 +508,7 @@ def list_item(item_dir: str, dry_run: bool = False, force: bool = False) -> dict
         "order_id": order_id,
         "price": price_str,
         "image_uploaded": image_uploaded,
+        "qr_buy": qr_buy_recorded,
     }
 
 

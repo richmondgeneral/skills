@@ -34,6 +34,8 @@ import os
 import subprocess
 import urllib.error
 import urllib.request
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -66,7 +68,7 @@ def _resolve_square_token() -> Optional[str]:
     """Resolve the Square access token with NO cross-skill import, so this works
     standalone, from the orchestrator, and over the osascript bridge's bare shell.
     Order: env (SQUARE_ACCESS_TOKEN/SQUARE_TOKEN) -> macOS Keychain -> workspace .env."""
-    for name in ("SQUARE_ACCESS_TOKEN", "SQUARE_TOKEN"):
+    for name in _TOKEN_KEYS:
         v = os.environ.get(name)
         if v:
             return v
@@ -88,7 +90,7 @@ def _resolve_square_token() -> Optional[str]:
                 if not line or line.startswith("#") or "=" not in line:
                     continue
                 key, _, val = line.partition("=")
-                if key.strip() in ("SQUARE_ACCESS_TOKEN", "SQUARE_TOKEN"):
+                if key.strip() in _TOKEN_KEYS:
                     return val.strip().strip('"').strip("'") or None
     except Exception:  # noqa: BLE001
         pass
@@ -250,6 +252,47 @@ def delete_payment_link(token: str, link_id: str) -> int:
             f"{json.dumps(parsed)}"
         )
     return status
+
+
+# -----------------------------------------------------------------------------
+# Inventory — set the on-hand count so the item is purchasable (not "Sold out").
+# -----------------------------------------------------------------------------
+
+def set_inventory_count(token: str, variation_id: str, qty: int = 1) -> dict:
+    """POST a PHYSICAL_COUNT change so the variation has ``qty`` in stock.
+
+    Mirrors rg-full-auto/process_new_item._set_inventory: a single
+    ``/v2/inventory/batch-change`` with a PHYSICAL_COUNT setting the variation
+    IN_STOCK at ``LOCATION_ID``. Required on CREATE — ``build_catalog_object``
+    sets ``track_inventory: True``, so without this the item lists at 0 → "Sold
+    out" → a catalog-linked payment link fails at checkout. ``occurred_at`` is a
+    UTC ISO-8601 timestamp. Raises ``RuntimeError`` with the Square error body on
+    any non-2xx (a money-path step must never fail silently).
+    """
+    body = {
+        "idempotency_key": str(uuid.uuid4()),
+        "changes": [{
+            "type": "PHYSICAL_COUNT",
+            "physical_count": {
+                "catalog_object_id": variation_id,
+                "state": "IN_STOCK",
+                "location_id": LOCATION_ID,
+                "quantity": str(qty),
+                "occurred_at": datetime.now(timezone.utc).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
+            },
+        }],
+    }
+    status, parsed = square_request(
+        "POST", "/v2/inventory/batch-change", token, body=body
+    )
+    if not (200 <= status < 300):
+        raise RuntimeError(
+            f"set_inventory_count failed: Square returned {status}: "
+            f"{json.dumps(parsed)}"
+        )
+    return parsed
 
 
 # -----------------------------------------------------------------------------

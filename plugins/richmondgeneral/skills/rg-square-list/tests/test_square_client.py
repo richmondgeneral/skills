@@ -35,6 +35,7 @@ def test_constants():
     assert sc.TAX_ID == "LPKEJF7H27NOPK7EE6A5CA7V"
     assert sc.CAT_COLLECTIBLES == "YQWBSOJDENMXDGUUQ3TGI3HF"
     assert sc.CAT_NEW_ARRIVALS == "TGWDFETSQPR6BF67YJCTOLW6"
+    assert sc.CAT_VINTAGE_MARKET == "TX6SBQLJDMZOCVXBUD3KT3CL"
     assert sc.BASE == "https://connect.squareup.com"
 
 
@@ -232,6 +233,66 @@ def test_delete_payment_link_404_ok(monkeypatch):
     monkeypatch.setattr(sc, "_http", fake_http)
     # 404 == already gone → treated as OK (returns the status, does not raise).
     assert sc.delete_payment_link("T", "GONE") == 404
+
+
+# ---------------------------------------------------------------------------
+# set_inventory_count — PHYSICAL_COUNT to make the item purchasable (C1).
+# ---------------------------------------------------------------------------
+
+def test_set_inventory_count_body_shape(monkeypatch):
+    captured = {}
+
+    def fake_http(method, url, headers, data):
+        captured["method"] = method
+        captured["url"] = url
+        captured["data"] = data
+        return 200, json.dumps({"counts": [{"quantity": "1"}]}).encode("utf-8")
+
+    monkeypatch.setattr(sc, "_http", fake_http)
+
+    out = sc.set_inventory_count("T", "VAR123", qty=1)
+    assert out == {"counts": [{"quantity": "1"}]}
+
+    assert captured["method"] == "POST"
+    assert captured["url"] == sc.BASE + "/v2/inventory/batch-change"
+
+    body = json.loads(captured["data"].decode("utf-8"))
+    assert "idempotency_key" in body
+    assert len(body["changes"]) == 1
+    change = body["changes"][0]
+    assert change["type"] == "PHYSICAL_COUNT"
+    pc = change["physical_count"]
+    assert pc["catalog_object_id"] == "VAR123"
+    assert pc["state"] == "IN_STOCK"
+    assert pc["location_id"] == sc.LOCATION_ID
+    assert pc["quantity"] == "1"
+    # occurred_at is a UTC ISO-8601 timestamp ending in Z.
+    assert pc["occurred_at"].endswith("Z")
+    assert "T" in pc["occurred_at"]
+
+
+def test_set_inventory_count_default_qty_is_one(monkeypatch):
+    captured = {}
+
+    def fake_http(method, url, headers, data):
+        captured["data"] = data
+        return 200, b"{}"
+
+    monkeypatch.setattr(sc, "_http", fake_http)
+    sc.set_inventory_count("T", "VAR123")  # qty defaults to 1
+    body = json.loads(captured["data"].decode("utf-8"))
+    assert body["changes"][0]["physical_count"]["quantity"] == "1"
+
+
+def test_set_inventory_count_raises_on_error(monkeypatch):
+    def fake_http(method, url, headers, data):
+        return 400, json.dumps(
+            {"errors": [{"code": "BAD_REQUEST"}]}).encode("utf-8")
+
+    monkeypatch.setattr(sc, "_http", fake_http)
+    with pytest.raises(Exception) as ei:
+        sc.set_inventory_count("T", "VAR123", qty=1)
+    assert "BAD_REQUEST" in str(ei.value) or "400" in str(ei.value)
 
 
 # ---------------------------------------------------------------------------

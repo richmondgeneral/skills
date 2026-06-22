@@ -340,9 +340,23 @@ def test_cascade_invokes_page_and_gallery(monkeypatch, item_dir):
     assert "RG-0099" in page_argv
     assert "--update-card" in gallery_argv
     assert "RG-0099" in gallery_argv
-    # cwd is the repo root (parent of items/), passed to subprocess.run.
+    # cwd is the repo root (parent of items/), passed to subprocess.run. Assert it
+    # actually contains items/scripts/build_item_page.py so a future fixed-
+    # parents[N] regression (e.g. resolving to ~/.claude/plugins/cache, which has
+    # no items/) is caught here, not in production.
     page_kwargs = runs[page_idx]["kwargs"]
+    gallery_kwargs = runs[gallery_idx]["kwargs"]
     assert "cwd" in page_kwargs
+    assert "cwd" in gallery_kwargs
+    marker = os.path.join("items", "scripts", "build_item_page.py")
+    assert os.path.exists(os.path.join(page_kwargs["cwd"], marker)), (
+        f"page cwd {page_kwargs['cwd']!r} is not a workspace root "
+        f"(missing {marker})"
+    )
+    assert os.path.exists(os.path.join(gallery_kwargs["cwd"], marker)), (
+        f"gallery cwd {gallery_kwargs['cwd']!r} is not a workspace root "
+        f"(missing {marker})"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -409,3 +423,136 @@ def test_dry_run_no_side_effects(monkeypatch, item_dir):
     assert plan.get("sku") == "RG-0099"
     assert plan.get("new_price") == "65.00"
     assert plan.get("old_price") == "45.00"
+
+
+# ---------------------------------------------------------------------------
+# _find_repo_root — cwd-anchored workspace resolution (the cache-safe fix).
+# ---------------------------------------------------------------------------
+
+def test_find_repo_root_from_cwd(tmp_path, monkeypatch):
+    """With items/scripts/build_item_page.py under cwd, _find_repo_root returns
+    that dir — proving it anchors to the RUN location (not this file's path, so
+    the dual-copy cache still finds the real workspace)."""
+    marker = tmp_path / "items" / "scripts" / "build_item_page.py"
+    marker.parent.mkdir(parents=True)
+    marker.write_text("# stub builder\n", encoding="utf-8")
+
+    monkeypatch.chdir(tmp_path)
+    found = rp._find_repo_root()
+
+    # Compare resolved paths (macOS /var → /private/var symlink etc.).
+    assert found.resolve() == tmp_path.resolve(), (
+        f"_find_repo_root returned {found!r}, expected the cwd holding the marker"
+    )
+
+
+def test_find_repo_root_prefers_cwd_over_file_ancestors(tmp_path, monkeypatch):
+    """cwd is searched BEFORE this file's ancestors: when the planted marker is
+    nearer than the real workspace, _find_repo_root returns the cwd one. This is
+    the cache-safety property — run location wins over __file__."""
+    nested = tmp_path / "a" / "b"
+    marker = nested / "items" / "scripts" / "build_item_page.py"
+    marker.parent.mkdir(parents=True)
+    marker.write_text("# stub builder\n", encoding="utf-8")
+
+    monkeypatch.chdir(nested)
+    found = rp._find_repo_root()
+
+    assert found.resolve() == nested.resolve()
+    # And it is NOT this test file's real-workspace root (the planted one wins).
+    assert found.resolve() != os.path.dirname(os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))))
+
+
+def test_find_repo_root_raises_when_missing(tmp_path, monkeypatch):
+    """From a cwd with no marker, AND when this file's ancestors also lack one,
+    _find_repo_root raises the actionable RuntimeError. We make the __file__
+    branch miss by pointing reprice.__file__ at the bare tmp dir (whose ancestors
+    contain no items/scripts/build_item_page.py)."""
+    # cwd: a tmp dir with no marker anywhere above it.
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    monkeypatch.chdir(empty)
+    # Make the __file__ fallback also miss: ancestors of this path have no marker.
+    monkeypatch.setattr(rp, "__file__", str(tmp_path / "nope" / "reprice.py"))
+
+    with pytest.raises(RuntimeError, match="cannot locate the workspace root"):
+        rp._find_repo_root()
+
+
+def test_find_repo_root_does_not_run_at_import():
+    """Importing the module must never raise (resolution is lazy). The module is
+    already imported at top of this file; assert the function exists and REPO_ROOT
+    is NOT computed eagerly at import time."""
+    assert callable(rp._find_repo_root)
+    # A fixed eager REPO_ROOT would reintroduce the cache bug.
+    assert not hasattr(rp, "REPO_ROOT"), (
+        "REPO_ROOT must not be a module-level constant — resolve lazily via "
+        "_find_repo_root() so the dual-copy cache anchors to cwd, not __file__."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Loud builder-failure warning — a non-zero builder exit goes to stderr.
+# ---------------------------------------------------------------------------
+
+def test_builder_nonzero_exit_warns_loudly(monkeypatch, item_dir, capsys):
+    """When build_item_page.py exits non-zero, reprice keeps going (check=False)
+    but prints a loud STALE-price warning to STDERR and the plan still carries
+    page_exit/gallery_exit."""
+    _patch_token(monkeypatch)
+    _patch_request(monkeypatch, _ok_catalog_get())
+    _patch_paylinks(monkeypatch)
+    _patch_qr(monkeypatch)
+
+    class _Fail:
+        returncode = 2
+        stdout = ""
+        stderr = ""
+
+    def fake_run(argv, **kwargs):
+        return _Fail()
+
+    monkeypatch.setattr(rp.subprocess, "run", fake_run)
+
+    plan = rp.reprice("RG-0099", 65, date="2026-06-21", items_root=str(item_dir))
+
+    err = capsys.readouterr().err
+    assert "rg-reprice" in err and "STALE" in err
+    assert "build_item_page.py exited 2" in err
+    assert "build_gallery.py exited 2" in err
+    # The money path still completed and the exits are reported in the plan.
+    assert plan["page_exit"] == 2
+    assert plan["gallery_exit"] == 2
+    label = json.loads((item_dir / "RG-0099" / "label.json").read_text())
+    assert label["price"] == "65.00"
+
+
+def test_main_returns_nonzero_on_builder_failure(monkeypatch, item_dir, capsys):
+    """main() exits non-zero when a builder failed (so CI/automation notices a
+    possibly-stale public page), after the loud per-step warnings."""
+    _patch_token(monkeypatch)
+    _patch_request(monkeypatch, _ok_catalog_get())
+    _patch_paylinks(monkeypatch)
+    _patch_qr(monkeypatch)
+
+    class _Fail:
+        returncode = 2
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(rp.subprocess, "run", lambda argv, **kw: _Fail())
+    # Point the real-run items/ default at our tmp dir by patching argv parsing:
+    # main() doesn't take items_root, so patch reprice() to inject it.
+    real_reprice = rp.reprice
+    monkeypatch.setattr(
+        rp, "reprice",
+        lambda sku, price, **kw: real_reprice(
+            sku, price, items_root=str(item_dir),
+            **{k: v for k, v in kw.items() if k != "items_root"}),
+    )
+
+    rc = rp.main(["RG-0099", "65", "--date", "2026-06-21"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "a page/gallery builder failed" in err

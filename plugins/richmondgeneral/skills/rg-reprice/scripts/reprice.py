@@ -67,10 +67,30 @@ from square_client import (  # noqa: E402
     dollars_to_cents,
 )
 
-# REPO_ROOT = the workspace root. This file lives at
-#   <root>/skills/plugins/richmondgeneral/skills/rg-reprice/scripts/reprice.py
-# → six parents up is <root>. The page/gallery builders run with cwd=REPO_ROOT.
-REPO_ROOT = Path(__file__).resolve().parents[6]
+# The page/gallery builders (steps e/f) run with cwd = the workspace root. We do
+# NOT derive that from this file's path: code-mode runs a dual-copy of this skill
+# out of ~/.claude/plugins/cache/.../rg-reprice/scripts/reprice.py, where a fixed
+# ``parents[6]`` resolves to ~/.claude/plugins/cache — which has NO items/ — so
+# the page/gallery subprocesses would fail (exit 2) and, being check=False, fail
+# SILENTLY, leaving the public page + gallery on the OLD price after a successful
+# Square reprice. Instead, locate the workspace by its items/ build scripts,
+# searching cwd (always the workspace when reprice is run) then this file's
+# ancestors as a fallback. Resolved lazily (only where the subprocess cwd is
+# needed) so importing the module never raises.
+
+
+def _find_repo_root():
+    """Locate the workspace root by the items/ build scripts, searching cwd then this file's ancestors."""
+    marker = Path("items") / "scripts" / "build_item_page.py"
+    for base in (Path.cwd(), Path(__file__).resolve()):
+        for d in (base, *base.parents):
+            if (d / marker).exists():
+                return d
+    raise RuntimeError(
+        "rg-reprice: cannot locate the workspace root (items/scripts/build_item_page.py "
+        "not found above the current directory or this script). Run rg-reprice from the "
+        "richmondgeneral workspace."
+    )
 
 # Public item-page base — the payment-link redirect (and the page URL) target.
 ITEM_PAGE_BASE = "https://richmondgeneral.github.io/items"
@@ -219,7 +239,8 @@ def reprice(sku: str, new_price, dry_run: bool = False, date=None,
     first so the local builders pick up the new price + buy link.
 
     ``date`` defaults to today (ISO). ``items_root`` overrides the items/ parent
-    (default ``REPO_ROOT/items``) — used by tests to point at a tmp dir.
+    (default ``<workspace-root>/items``, resolved via ``_find_repo_root``) — used
+    by tests to point at a tmp dir.
 
     With ``dry_run=True`` it builds + prints the plan and returns it WITHOUT
     resolving a token, calling Square, writing files, generating a QR, or
@@ -228,7 +249,16 @@ def reprice(sku: str, new_price, dry_run: bool = False, date=None,
     if date is None:
         date = datetime.date.today().isoformat()
 
-    root = Path(items_root) if items_root else (REPO_ROOT / "items")
+    # Resolve the workspace root lazily, anchored to where reprice is RUN (cwd),
+    # not to this file — so the cache dual-copy still finds the real items/.
+    # Only needed when items_root isn't supplied (tests pass it) or for the
+    # page/gallery subprocess cwd; both real-run uses are below.
+    repo_root = None
+    if items_root:
+        root = Path(items_root)
+    else:
+        repo_root = _find_repo_root()
+        root = repo_root / "items"
     item_dir = root / sku
     label_path = item_dir / "label.json"
     label = json.loads(label_path.read_text(encoding="utf-8"))
@@ -320,22 +350,43 @@ def reprice(sku: str, new_price, dry_run: bool = False, date=None,
     print(f"  buy link:     {new_buy_link}")
     print(f"  payment link: {new_link_id}")
 
+    # The page/gallery builders run with cwd = the workspace root, resolved from
+    # the run location (cache-safe). Reuse the value from above if we computed it.
+    if repo_root is None:
+        repo_root = _find_repo_root()
+
     # --- (e) Item page rebuild -----------------------------------------------
     # check=False + don't hard-fail: build_item_page.py SKIPS protected/living/
     # sold pages (returns a non-write result), which is expected, not an error.
     page_res = subprocess.run(
         ["uv", "run", "python", "items/scripts/build_item_page.py", sku],
-        cwd=str(REPO_ROOT), check=False,
+        cwd=str(repo_root), check=False,
     )
     print(f"  item page:    build_item_page.py exit {page_res.returncode}")
+    if page_res.returncode != 0:
+        print(
+            f"⚠ rg-reprice: build_item_page.py exited {page_res.returncode} for "
+            f"{sku} — if this item is a protected/living-test/sold page this is "
+            f"expected; OTHERWISE the public page may now show a STALE price. "
+            f"Verify items/{sku}/index.html.",
+            file=sys.stderr,
+        )
 
     # --- (f) Gallery card rebuild --------------------------------------------
     gallery_res = subprocess.run(
         ["uv", "run", "python", "items/scripts/build_gallery.py",
          "--update-card", sku],
-        cwd=str(REPO_ROOT), check=False,
+        cwd=str(repo_root), check=False,
     )
     print(f"  gallery card: build_gallery.py exit {gallery_res.returncode}")
+    if gallery_res.returncode != 0:
+        print(
+            f"⚠ rg-reprice: build_gallery.py exited {gallery_res.returncode} for "
+            f"{sku} — if this item is a protected/living-test/sold page this is "
+            f"expected; OTHERWISE the gallery card may now show a STALE price. "
+            f"Verify the landing-grid card for {sku}.",
+            file=sys.stderr,
+        )
 
     # --- (g) Pricing-report reminder -----------------------------------------
     print(f"⚠ Update ops/pricing/{sku}-pricing.md with the new comp basis "
@@ -376,7 +427,25 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
 
-    reprice(args.sku, args.price, dry_run=args.dry_run, date=args.date)
+    plan = reprice(args.sku, args.price, dry_run=args.dry_run, date=args.date)
+
+    # Surface a non-zero builder exit prominently (the cascade itself already
+    # warned to stderr per-step). A protected/living-test/sold page is a
+    # deliberate skip, so we don't crash — but a failed builder means the public
+    # page/gallery may be on a STALE price, so we exit non-zero to flag it.
+    if not args.dry_run:
+        page_rc = plan.get("page_exit") or 0
+        gallery_rc = plan.get("gallery_exit") or 0
+        if page_rc != 0 or gallery_rc != 0:
+            print(
+                f"⚠ rg-reprice: a page/gallery builder failed for {args.sku} "
+                f"(item-page exit {page_rc}, gallery exit {gallery_rc}). If "
+                f"{args.sku} is a protected/living-test/sold page this is "
+                f"expected; otherwise its public price may be STALE — verify and "
+                f"re-run rg-reprice (it's idempotent).",
+                file=sys.stderr,
+            )
+            return 1
     return 0
 
 

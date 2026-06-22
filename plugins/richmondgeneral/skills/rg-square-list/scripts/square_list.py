@@ -45,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from square_client import (  # noqa: E402
     CAT_COLLECTIBLES,
     CAT_NEW_ARRIVALS,
+    CAT_VINTAGE_MARKET,
     LOCATION_ID,
     TAX_ID,
     build_payment_link_body,
@@ -102,11 +103,13 @@ def build_catalog_object(sku: str, label: dict) -> dict:
     """Build the ITEM upsert object for ``catalog/batch-upsert`` (CREATE path).
 
     Mirrors rg-full-auto's ``_build_catalog_object`` exactly for the rg-square-list
-    case: TYPE = Collectibles, TIER = New Arrivals (the intake default), so
-    ``categories = [type, tier]`` and ``reporting_category = type``. One
-    FIXED_PRICING ITEM_VARIATION priced from ``label["price"]``. ``#``-prefixed
-    temp ids (``#RG-XXXX`` / ``#RG-XXXX-var``) are resolved to real ids from the
-    response ``id_mappings``.
+    case: TYPE = Collectibles, TIER = New Arrivals (the intake default), plus the
+    ROOM = The Vintage Market (Collectibles' parent room per ROOM_BY_TYPE), so
+    ``categories = [type, tier, room]`` and ``reporting_category = type``. The
+    room category is required or the item is missing from the room-level Shop All
+    grid. One FIXED_PRICING ITEM_VARIATION priced from ``label["price"]``.
+    ``#``-prefixed temp ids (``#RG-XXXX`` / ``#RG-XXXX-var``) are resolved to real
+    ids from the response ``id_mappings``.
     """
     price_cents = dollars_to_cents(label["price"])
     name = label["product_name"]
@@ -115,8 +118,9 @@ def build_catalog_object(sku: str, label: dict) -> dict:
     item_data = {
         "name": name,
         "categories": [
-            {"id": CAT_COLLECTIBLES},   # TYPE
-            {"id": CAT_NEW_ARRIVALS},   # TIER (intake default)
+            {"id": CAT_COLLECTIBLES},     # TYPE
+            {"id": CAT_NEW_ARRIVALS},     # TIER (intake default)
+            {"id": CAT_VINTAGE_MARKET},   # ROOM (Collectibles' parent, ROOM_BY_TYPE)
         ],
         "reporting_category": {"id": CAT_COLLECTIBLES},
         "tax_ids": [TAX_ID],
@@ -280,24 +284,29 @@ def _ensure_payment_link(token: str, sku: str, label: dict, variation_id: str,
     """Idempotently ensure a payment link at the current price.
 
     Keep the recorded link if its price matches; recreate (delete old → create
-    new) if the price changed; create one if none exists. Returns the live
-    ``payment_link`` object (with ``id``/``url``/``order_id``) or, when kept, a
-    dict echoing the recorded fields.
+    new) if the price changed OR the recorded price is unknown; create one if
+    none exists. Returns the live ``payment_link`` object (with
+    ``id``/``url``/``order_id``) or, when kept, a dict echoing the recorded
+    fields.
     """
     price_str = f"{price_cents / 100:.2f}"
     old_id = existing.get("payment_link_id")
     recorded_price = existing.get("price")
 
-    if old_id and recorded_price is not None:
+    if old_id:
+        # A recorded link id whose price matches the current price → keep it.
         # Compare in cents so "65" / "65.0" / "65.00" / "$65.00" all match.
-        if dollars_to_cents(recorded_price) == price_cents:
+        if recorded_price is not None and \
+                dollars_to_cents(recorded_price) == price_cents:
             return {
                 "id": old_id,
                 "url": existing.get("buy_link"),
                 "order_id": existing.get("order_id"),
                 "kept": True,
             }
-        # Price changed → kill the stale link before minting a fresh one.
+        # Price changed OR is unknown (foreign/hand-edited label with a link id
+        # but no sibling `price`) → kill the stale link before minting a fresh
+        # one, never blind-create a SECOND live link beside a chargeable old one.
         delete_payment_link(token, old_id)
 
     body = build_payment_link_body(

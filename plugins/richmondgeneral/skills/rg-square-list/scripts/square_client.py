@@ -48,6 +48,7 @@ MERCHANT_ID = "7MM9AFJAD0XHW"
 TAX_ID = "LPKEJF7H27NOPK7EE6A5CA7V"
 CAT_COLLECTIBLES = "YQWBSOJDENMXDGUUQ3TGI3HF"
 CAT_NEW_ARRIVALS = "TGWDFETSQPR6BF67YJCTOLW6"
+CAT_VINTAGE_MARKET = "TX6SBQLJDMZOCVXBUD3KT3CL"  # The Vintage Market — room/parent of Collectibles (ROOM_BY_TYPE)
 BASE = "https://connect.squareup.com"
 
 # Token env var names: primary, then legacy fallback.

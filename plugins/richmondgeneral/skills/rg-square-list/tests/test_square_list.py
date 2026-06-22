@@ -113,13 +113,18 @@ def test_build_catalog_object_shape():
 
     data = obj["item_data"]
     assert data["name"] == "RG-0099 — Test Widget"
-    # reporting_category is the TYPE (Collectibles).
+    # reporting_category is the TYPE (Collectibles) — unchanged by the room add.
     assert data["reporting_category"] == {"id": sc.CAT_COLLECTIBLES}
-    # categories == [Collectibles (type), New Arrivals (tier)].
+    # categories == [Collectibles (type), New Arrivals (tier), Vintage Market
+    # (room)] — the room category is required for room-level Shop All visibility.
     assert data["categories"] == [
         {"id": sc.CAT_COLLECTIBLES},
         {"id": sc.CAT_NEW_ARRIVALS},
+        {"id": sc.CAT_VINTAGE_MARKET},
     ]
+    # All THREE categories present, and the room id specifically is included.
+    assert len(data["categories"]) == 3
+    assert {"id": sc.CAT_VINTAGE_MARKET} in data["categories"]
     assert data["tax_ids"] == [sc.TAX_ID]
     assert data["ecom_visibility"] == "VISIBLE"
 
@@ -309,6 +314,63 @@ def test_paylink_recreated_on_price_change(monkeypatch, item_dir):
 
     assert summary["payment_link_id"] == "PL_NEW"
     assert summary["buy_link"] == "https://square.link/u/new"
+
+
+# ---------------------------------------------------------------------------
+# Orphan-link hardening — a recorded payment_link_id WITHOUT a sibling price
+# (foreign / hand-edited label) must NOT blind-create a second live link. The
+# old link's price is unknown → delete it THEN create, never leave two
+# chargeable links side by side.
+# ---------------------------------------------------------------------------
+
+def test_paylink_orphan_no_recorded_price_deletes_then_creates(
+        monkeypatch, item_dir):
+    # object_id + payment_link_id present, but NO `price` in channels.square.
+    _write_label(item_dir, channels={"square": {
+        "object_id": "ITEM_EXISTING",
+        "variation_id": "VAR_EXISTING",
+        "payment_link_id": "PL_ORPHAN",
+        # intentionally NO "price" key
+    }})
+    _patch_token(monkeypatch)
+
+    def handler(method, path, body):
+        if method == "GET" and path == "/v2/catalog/object/ITEM_EXISTING":
+            return 200, {"object": {
+                "type": "ITEM", "id": "ITEM_EXISTING", "version": 11}}
+        if method == "POST" and path == "/v2/catalog/object":
+            return 200, {"catalog_object": {
+                "id": "ITEM_EXISTING", "version": 12}}
+        if (method == "DELETE"
+                and path == "/v2/online-checkout/payment-links/PL_ORPHAN"):
+            return 200, {}
+        if (method == "POST"
+                and path == "/v2/online-checkout/payment-links"):
+            return 200, {"payment_link": {
+                "id": "PL_FRESH",
+                "url": "https://square.link/u/fresh",
+                "order_id": "ORD_FRESH",
+            }}
+        raise AssertionError(f"unexpected request: {method} {path}")
+
+    calls = _patch_request(monkeypatch, handler)
+    _patch_image(monkeypatch)
+
+    summary = sl.list_item(str(item_dir), dry_run=False, force=False)
+
+    deletes = [c for c in calls if c["method"] == "DELETE"
+               and c["path"] == "/v2/online-checkout/payment-links/PL_ORPHAN"]
+    creates = [c for c in calls if c["method"] == "POST"
+               and c["path"] == "/v2/online-checkout/payment-links"]
+    # Exactly one delete (of the OLD id) THEN exactly one create.
+    assert len(deletes) == 1
+    assert len(creates) == 1
+    del_idx = calls.index(deletes[0])
+    new_idx = calls.index(creates[0])
+    assert del_idx < new_idx  # delete the old link BEFORE creating the new one
+
+    assert summary["payment_link_id"] == "PL_FRESH"
+    assert summary["buy_link"] == "https://square.link/u/fresh"
 
 
 # ---------------------------------------------------------------------------

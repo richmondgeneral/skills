@@ -181,6 +181,14 @@ def compose_combo(item_dir, out=None, rail: int = RAIL_DEFAULT,
         _draw_caption(canvas, (rail_x, y, rail_w, h), slot["caption"])
 
     canvas.save(out_path, "PNG")
+    append_pipeline(str(item_dir), {
+        "op": "combo",
+        "tool": "combo.py",
+        "layout": layout,
+        "out": out_path.name,
+        "hero": sel["hero"].name,
+        "rail": [s["path"].name for s in sel["rail"]],
+    })
     return out_path
 
 
@@ -225,3 +233,26 @@ def _draw_wordmark(canvas: Image.Image, rect, sku: str) -> None:
     tx, ty = x + 22, y + h - 46
     draw.text((tx + 1, ty + 1), text, font=font, fill=(0, 0, 0, 150))      # legibility shadow
     draw.text((tx, ty), text, font=font, fill=(247, 242, 231, 205))        # faint cream
+
+
+def record_photos_combo(item_dir, made: bool) -> None:
+    """Idempotently reconcile label.json -> photos.combo with combo.png; write only on change."""
+    p = Path(item_dir) / "label.json"
+    if not p.exists():
+        return
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"warning: {p}: {exc}", file=sys.stderr)
+        return
+    photos = data.get("photos") if isinstance(data.get("photos"), dict) else None
+    current = photos.get("combo") if photos else None
+    desired = COMBO_FILENAME if made else None
+    if current == desired:
+        return
+    photos = data.setdefault("photos", {})
+    if desired is None:
+        photos.pop("combo", None)
+    else:
+        photos["combo"] = desired
+    p.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

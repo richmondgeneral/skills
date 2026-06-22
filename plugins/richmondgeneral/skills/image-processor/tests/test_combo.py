@@ -145,3 +145,35 @@ def test_caption_darkens_cell_lower_left(tmp_path):
 def test_compose_with_captions_keeps_size(tmp_path):
     im = Image.open(cb.compose_combo(_item(tmp_path)))
     assert im.size == (1600, 1600)   # wordmark + captions don't break the canvas
+
+
+def test_records_photos_combo(tmp_path):
+    d = _item(tmp_path, label={"sku": "RG-9999"})
+    cb.compose_combo(d)
+    cb.record_photos_combo(d, made=True)
+    data = json.loads((d / "label.json").read_text())
+    assert data["photos"]["combo"] == "combo.png"
+
+
+def test_record_is_idempotent(tmp_path):
+    d = _item(tmp_path, label={"sku": "RG-9999"})
+    cb.compose_combo(d)
+    cb.record_photos_combo(d, made=True)
+    first = (d / "label.json").read_text()
+    cb.record_photos_combo(d, made=True)                 # second call must not rewrite
+    assert (d / "label.json").read_text() == first
+
+
+def test_records_image_pipeline_entry(tmp_path):
+    d = _item(tmp_path, label={"sku": "RG-9999"})
+    cb.compose_combo(d)
+    data = json.loads((d / "label.json").read_text())
+    ops = [e.get("op") for e in data.get("image_pipeline", [])]
+    assert "combo" in ops
+
+
+def test_record_removes_combo_when_skipped(tmp_path):
+    d = _item(tmp_path, label={"sku": "RG-9999", "photos": {"combo": "combo.png"}})
+    cb.record_photos_combo(d, made=False)
+    data = json.loads((d / "label.json").read_text())
+    assert "combo" not in data.get("photos", {})

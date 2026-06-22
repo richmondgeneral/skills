@@ -2,7 +2,7 @@
 name: image-processor
 description: Unified image processing with background removal, generation, editing, listing-photo standardization, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "standardize listing photos", "make photos professional/catalog-quality", "square crop / center / color-correct photo", "transparent hero", "photos library", "get from photos", or when rg-full-auto needs image processing.
 metadata:
-  version: "1.12"
+  version: "1.13"
   author: scottybe
   updated: "2026-06-21"
   changelog: |
@@ -295,6 +295,16 @@ python scripts/photos.py --search "IMG_*.jpg"
 python scripts/photos.py --since 2025-12-01 --limit 20
 python scripts/photos.py --copy UUID --output ~/Desktop/photo.jpg
 python scripts/photos.py --stats
+```
+
+### Marketplace Combo Collage
+
+`combo.py` — 1:1 marketplace "combo" collage: hero-dominant magazine (big hero + auto-mapped detail crops with captions); deterministic, non-generative; `--item-dir` / `--batch`. The clean full hero remains the primary listing image; combo.png is an additional "at-a-glance" photo for an extra marketplace slot.
+
+```bash
+uv run python scripts/combo.py --item-dir items/RG-XXXX            # -> combo.png (1600x1600)
+uv run python scripts/combo.py --item-dir items/RG-XXXX --rail 4   # 4 detail crops instead of 3
+uv run python scripts/combo.py --batch items/                      # every item with a hero
 ```
 
 ## Models

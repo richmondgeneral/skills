@@ -98,6 +98,13 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-crm/scripts/sync_to_apple_contacts.p
 | Resellers | `34THMX8DN921VQ04KGHV7KZ0AA` |
 | VIP | `6NGXFHDNJ6MVEFMJKXE8PZ8VMZ` |
 | Trades | `7XP6P4G6KDYQZ32HHCRNH9RJKM` |
+| Atari / Vintage Computing | `6B1ZES5TGR5VA1XBG4EYMS4JAS` |
+
+Reference IDs also support `email:<address>` for contacts known only by email (e.g. `email:aneonxeon@gmail.com`).
+
+## Sister CRM: real estate = Follow Up Boss (+ Ylopo)
+
+Scott's real-estate side runs on **Follow Up Boss** (`starhometeam1.followupboss.com`) fed by **Ylopo** lead alerts (Gmail label collects `notification@ylopo.com` PRIORITY LEAD emails) and Zillow Flex SMS leads. Square CRM = retail; FUB = real estate. Cross-referrals: a retail customer who mentions buying/selling a home gets a note here AND a manual FUB entry (no API bridge yet); FUB contacts who visit the store get a Square record with `note: Source: FUB/real-estate`. Some people live in both worlds (e.g. Sue Miller, Laura/First REO) — link them by matching phone in both systems.
 
 ## API Examples
 

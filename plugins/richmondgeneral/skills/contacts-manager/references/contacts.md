@@ -27,6 +27,16 @@
 | Josh (White Dually) | +18479803301 | SMS | Neighbor | Helped with truck breakdown Dec 8-9. |
 | Pete (eBay) | +18082228761 | RCS | Reseller | 75+ RG items on eBay. May move to area. |
 
+## Quick Lookup - Atari / Vintage Computing (Jul 2026, Square group `6B1ZES5TGR5VA1XBG4EYMS4JAS`)
+
+| Name | Contact | Status | Notes |
+|------|---------|--------|-------|
+| Clark | aneonxeon@gmail.com | Hot | Whole-collection prospect (~$6k itemized). Catalog 7/3, chest-1 update 7/7. Asked about dealer ad binder. Waiting: 4 more container counts. |
+| (unknown) | +17739348276 | Lead | Asked 4/6 about "weird Atari things" in enclosed room; also offered to sell own stuff $1,800. Follow up when items list. |
+| (unknown) | aek123@mail.com | Partner | Atari valuation spreadsheet + PC pricing doc collaborator (Apr 2026). Waiting on updated list. |
+| Joshua Bohlman | +14148757568 | Network | (Also in Trades.) Atari collector network — buys whole lots or brokers to heavy collectors; runs retro show tables. |
+| mrbillw60 | eBay member | Buyer | eBay: asked re: Typo Attack cart 6/21 (local-pickup-only). "Will keep an eye out." No direct contact info — eBay messages only. |
+
 ---
 
 ## Detailed Profiles - Core

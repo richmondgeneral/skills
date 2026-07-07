@@ -102,9 +102,9 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-crm/scripts/sync_to_apple_contacts.p
 
 Reference IDs also support `email:<address>` for contacts known only by email (e.g. `email:aneonxeon@gmail.com`).
 
-## Sister CRM: real estate = Follow Up Boss (+ Ylopo)
+## Sister CRM: real estate = Dawn's Follow Up Boss (current); starhometeam1 = LEGACY
 
-Scott's real-estate side runs on **Follow Up Boss** (`starhometeam1.followupboss.com`) fed by **Ylopo** lead alerts (Gmail label collects `notification@ylopo.com` PRIORITY LEAD emails) and Zillow Flex SMS leads. Square CRM = retail; FUB = real estate. Cross-referrals: a retail customer who mentions buying/selling a home gets a note here AND a manual FUB entry (no API bridge yet); FUB contacts who visit the store get a Square record with `note: Source: FUB/real-estate`. Some people live in both worlds (e.g. Sue Miller, Laura/First REO) — link them by matching phone in both systems.
+The **current** real-estate CRM is **Dawn's own Follow Up Boss account** — the one to integrate first (subdomain + API key TBD, get from Dawn). ⚠️ `starhometeam1.followupboss.com` is the **old BHGRE brokerage FUB** Scott no longer works under — do NOT treat its Ylopo alerts (`notification@ylopo.com` Gmail label) or Zillow Flex SMS as live leads; it gets restored as an archive later. iMessage history = store + personal contacts only, not a real-estate feed. Square CRM = retail; Dawn's FUB = real estate. Cross-referrals: a retail customer who mentions buying/selling a home gets a note here AND a manual entry in Dawn's FUB (no API bridge yet); real-estate contacts who visit the store get a Square record with `note: Source: real-estate`. Some people live in both worlds (e.g. Sue Miller, Laura/First REO) — link them by matching phone in both systems.
 
 ## API Examples
 

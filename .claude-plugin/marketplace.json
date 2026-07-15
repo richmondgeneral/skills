@@ -11,11 +11,7 @@
     },
     {
       "name": "square-online",
-      "source": {
-        "source": "git-subdir",
-        "url": "https://github.com/richmondgeneral/plugins.git",
-        "path": "square-online"
-      },
+      "source": "./plugins/square-online",
       "description": "Square Online storefront operations beyond Square's REST APIs — Snippets-API category-tile heros, nav/sort dashboard walkthroughs, brand-guidelines & brand-voice, catalog-voice audit/rewrite, and storefront-image-cache-bust (stale Weebly CDN image fixes)."
     }
   ],

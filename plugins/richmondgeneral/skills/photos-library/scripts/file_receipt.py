@@ -101,7 +101,10 @@ def export_receipts(plan, by_uuid, receipts_dir):
 def main():
     p = argparse.ArgumentParser(description="File receipt photos into ops/receipts/ + ledger.")
     p.add_argument("--uuids", required=True, help="comma-separated ZUUIDs (one receipt, multi-page ok)")
-    p.add_argument("--vendor", required=True, help='e.g. "Goodwill Crystal Lake"')
+    p.add_argument("--vendor", help='e.g. "Goodwill Crystal Lake" (required unless --dismiss)')
+    p.add_argument("--dismiss", action="store_true",
+                   help="personal / non-business receipt: just tag rg-sorted + rg-receipt "
+                        "(no export, no ledger, no album) so it leaves the queue")
     p.add_argument("--date", help="YYYY-MM-DD (default: the photo's creation date)")
     p.add_argument("--total", help="receipt total, e.g. 12.99")
     p.add_argument("--lot", help="lot code to link, e.g. GIBA-C2")
@@ -117,6 +120,13 @@ def main():
             p.error(f"bad uuid {u!r}")
     if args.date and not re.match(r"^\d{4}-\d{2}-\d{2}$", args.date):
         p.error(f"bad --date {args.date!r}; expected YYYY-MM-DD")
+
+    if args.dismiss:
+        tag = fc.tag_keywords(["rg-sorted", "rg-receipt"], uuids)
+        print(json.dumps({"mode": "dismiss", "tagged": len(uuids), "tag": tag}, indent=2))
+        return
+    if not args.vendor:
+        p.error("--vendor is required (or use --dismiss for a personal receipt)")
 
     originals, offloaded = fc.resolve_originals(uuids)
     if not originals:

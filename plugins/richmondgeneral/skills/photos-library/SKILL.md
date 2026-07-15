@@ -1,11 +1,25 @@
 ---
 name: photos-library
-description: Query and extract photos from macOS Photos Library, and sort intake photos into per-SKU libraries. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, pull images from Photos app, sort the intake album into items, file photos into a SKU, clear the intake queue, or route downloaded photos into the right album. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll", "sort intake", "sort my intake photos", "file these into their SKU", "out of intake", "photos from downloads into the right album".
+description: Query and extract photos from macOS Photos Library, sort intake photos into per-SKU libraries, and sort receipt photos into ops/receipts + the receipts ledger. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, pull images from Photos app, sort the intake album into items, file photos into a SKU, clear the intake queue, route downloaded photos into the right album, or sort/file receipts out of the photo library. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll", "sort intake", "sort my intake photos", "file these into their SKU", "out of intake", "photos from downloads into the right album", "sort receipts", "file receipts", "receipt photos", "receipts out of the library".
 metadata:
-  version: "1.7"
+  version: "1.8"
   author: scottybe
-  updated: "2026-06-19"
+  updated: "2026-07-15"
   changelog: |
+    v1.8 - Receipt sorter (agent loop):
+    - find_receipts.py: queue of receipt photos via Apple's OWN ML labels in
+      the Photos search index (database/search/psi.sqlite "Receipt" scene
+      group; new psi_db.py reconstructs ZUUIDs from little-endian uuid_0/uuid_1
+      halves; psi strings are NUL-terminated — matched via 'receipt'||char(0)).
+      --hide-sorted excludes filed ones; prints ML-label coverage date.
+    - file_receipt.py: the ONE canonical receipt filing step — sips-exports to
+      ops/receipts/YYYY-MM-DD-<vendor>.jpeg (never clobbers), appends the row
+      to ops/receipts/receipts-log.md (the lot-tracker's cost feed), adds to
+      the "Receipts" album, tags rg-sorted + rg-receipt. --plan dry-runs;
+      --dismiss tag-only-drops a personal receipt from the queue.
+    - file_cluster.py: tag_keywords() extracted (tag_sorted now wraps it).
+    - Photos labels lazily (overnight/on-power) — a freshly shot receipt may
+      take a day to appear in the queue.
     v1.7 - Intake photo sorter (agent loop) + downloads router:
     - file_cluster.py: the ONE canonical filing step — mints (sku_authority) or
       uses a SKU, exports a cluster's originals into items/RG-XXXX/ (hero +
@@ -348,6 +362,49 @@ as: sweep → look → propose → confirm → file.
 drops out of the queue — no album to empty, no structural mutation. The photos just stay in your
 library, now carrying their SKU in keywords (searchable by `RG-XXXX`). This additive tag-sweep model
 replaced the rejected album-rebuild approach (Photos' async album deletion is unreliable — see changelog).
+
+## Receipt Sorter (agent loop — ML-labeled queue)
+
+Receipts from buying trips get photographed alongside products. Photos' own ML
+labels them (no aspect-ratio guessing — a photographed receipt is a normal 4:3
+photo; only ML/vision can see the receipt inside the frame); this loop files
+them into `ops/receipts/` + the ledger so the lot-tracker sees every cost.
+Same shape as the item sorter: sweep → look → confirm → file.
+
+1. **Sweep the queue** — receipt-labeled photos, already-filed excluded:
+   ```bash
+   python3 scripts/find_receipts.py --hide-sorted --days 30 --json
+   ```
+   ⚠️ Photos labels lazily (overnight / on power): the output's
+   `newest_labeled` date shows coverage — a receipt shot today may not be in
+   the queue until tomorrow.
+
+2. **Look at each candidate** (real vision) — confirm it IS a purchase receipt
+   and READ vendor / date / total off it (use the FULL uuids from the JSON):
+   ```bash
+   python3 scripts/extract_photos.py --uuids <uuid,…> --resize 1024x1024 -o /tmp/rg-receipts
+   ```
+
+3. **Confirm with the user** — vendor, date, total, lot code (if this receipt
+   belongs to a tracked lot, e.g. GIBA-C2). Multi-page receipt = one filing
+   with several uuids. Personal (non-business) receipts: dismiss so the queue
+   stays clean —
+   ```bash
+   python3 scripts/file_receipt.py --dismiss --uuids <uuids>
+   ```
+   (tags `rg-sorted` + `rg-receipt` only; no export, no ledger, no album).
+
+4. **File it** — the ONE canonical step (dry-run first if unsure):
+   ```bash
+   python3 scripts/file_receipt.py --plan --uuids <uuids> --vendor "Goodwill" --total 12.99
+   python3 scripts/file_receipt.py --uuids <uuids> --vendor "Goodwill" \
+       --total 12.99 [--date YYYY-MM-DD] [--lot GIBA-C2]
+   ```
+   Exports to `ops/receipts/YYYY-MM-DD-<vendor>.jpeg`, appends the row to
+   `ops/receipts/receipts-log.md`, adds to the "Receipts" album under
+   "Richmond General Archive", and tags `rg-sorted` + `rg-receipt` — the photo
+   drops out of this queue AND the item intake sweep. After filing, offer to
+   record the cost against the lot (rg-lot-tracker).
 
 ## Downloads → Album (agent decides per photo)
 

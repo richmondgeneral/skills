@@ -2,10 +2,18 @@
 name: photos-library
 description: Query and extract photos from macOS Photos Library, sort intake photos into per-SKU libraries, and sort receipt photos into ops/receipts + the receipts ledger. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, pull images from Photos app, sort the intake album into items, file photos into a SKU, clear the intake queue, route downloaded photos into the right album, or sort/file receipts out of the photo library. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll", "sort intake", "sort my intake photos", "file these into their SKU", "out of intake", "photos from downloads into the right album", "sort receipts", "file receipts", "receipt photos", "receipts out of the library".
 metadata:
-  version: "1.9"
+  version: "1.10"
   author: scottybe
   updated: "2026-07-15"
   changelog: |
+    v1.10 - Duplicate-mint guard + live-model verification (RG-0060 void postmortem):
+    - file_cluster scans items/*/.filed.json before minting — a --mint retry ADOPTS the
+      already-filed SKU instead of minting a duplicate; conflicts exit 4; Void records
+      are never adopted. Void-SKU recovery flow documented.
+    - find_product_clusters --verify-live: filters the queue against Photos' LIVE model
+      (sqlite flushes lazily; prevents the re-file trap after a fresh filing run)
+    - SOP: commit new item dirs right after filing
+
     v1.9 - Intake filing hardened (2026-07-15 Cowork-struggle postmortem):
     - file_cluster.py tags BEFORE the album step; album add is best-effort/non-fatal
       (the flaky AppleScript used to abort pre-tag, stranding exported items in the queue)
@@ -379,6 +387,26 @@ as: sweep → look → propose → confirm → file.
    ```bash
    python3 scripts/file_cluster.py --tag-only --sku RG-00NN --uuids <uuids>
    ```
+
+**Duplicate-mint guard + Void-SKU recovery.** `file_cluster` scans every item's `.filed.json`
+before minting: if any of the cluster's uuids were already filed, it **adopts that SKU** (no new
+mint) — so a `--mint` retry after a crash can no longer create an RG-0060-style duplicate. If the
+uuids span two SKUs, or `--sku` disagrees with where the photos already live, it exits 4 with the
+conflict instead of filing a duplicate. In the RARE case a duplicate record still exists
+(discovered later): the **earlier-filed SKU stays live**; the extra record gets
+`label.json → state: "Void"` plus a `void: {reason, superseded_by, date}` note (RG-0033/RG-0060
+precedent). Voided SKU numbers are never reused (sequence gaps are fine), voided dirs never get a
+gallery card or listing, and the guard skips Void records when adopting.
+
+**Fresh tags lag the sqlite — use `--verify-live` after filing.** Photos flushes keyword writes
+to Photos.sqlite lazily (can be minutes), so a sweep run right after filing may re-report
+just-tagged photos as unsorted. Do NOT re-file them — re-run the sweep with
+`find_product_clusters.py --hide-sorted --verify-live`, which also checks Photos' live model and
+hides photos already rg-sorted there.
+
+**After filing: commit the new item dirs** (`git -C items add items/RG-XXXX && commit` — explicit
+paths, worktree-safe per CLAUDE.md multi-writer rules). Exported photos + label stubs sitting
+uncommitted are one reset away from re-doing the whole sweep.
 
 **"Out of the queue" = the `rg-sorted` tag + `--hide-sorted` filter.** Filing tags each photo
 `rg-sorted` + `RG-XXXX`, and the sweep (step 1) excludes `rg-sorted`, so a filed photo instantly

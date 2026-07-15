@@ -129,6 +129,35 @@ def split_filed(manifest, photos):
     return already, todo
 
 
+def find_existing_sku(items_dir, uuids):
+    """Scan every item's .filed.json for these uuids. Returns {sku: [matched uuids]}.
+
+    This is the duplicate-mint guard: a --mint run that died mid-flight (e.g. the
+    RG-0060 void, 2026-07-15 — first run minted + exported, crashed at the album step,
+    the retry minted RG-0061 for the same cluster) already left a manifest behind.
+    A retry must ADOPT that SKU, not mint a fresh one."""
+    hits = {}
+    want = set(uuids)
+    if not os.path.isdir(items_dir):
+        return hits
+    for name in sorted(os.listdir(items_dir)):
+        if not RG_RE.match(name):
+            continue
+        # never adopt a VOIDED record (e.g. RG-0060) — its live successor is the target
+        label_path = os.path.join(items_dir, name, "label.json")
+        try:
+            with open(label_path) as f:
+                if str(json.load(f).get("state", "")).lower() == "void":
+                    continue
+        except (OSError, json.JSONDecodeError):
+            pass
+        manifest = load_manifest(os.path.join(items_dir, name))
+        matched = sorted(want & set(manifest))
+        if matched:
+            hits[name] = matched
+    return hits
+
+
 def parse_tag_result(raw):
     """Parse per-uuid AppleScript status lines ('<uuid>:ok' / '<uuid>:fail <msg>')."""
     ok, failed = [], {}
@@ -367,6 +396,27 @@ def main():
         if offloaded:
             print(f"  ⚠︎ OFFLOADED (download first, not filed): {', '.join(u[:8] for u in offloaded)}")
         return
+
+    # Duplicate-mint guard: if any of these uuids were already filed somewhere,
+    # adopt that SKU (resume) instead of minting/filing a second record.
+    hits = find_existing_sku(args.items_dir, uuids)
+    if len(hits) > 1:
+        print(json.dumps({"error": "uuids span multiple existing SKUs — resolve manually "
+                          "(void the later record per the Void-SKU flow)",
+                          "matches": hits}, indent=2))
+        sys.exit(4)
+    if hits:
+        (found_sku, matched), = hits.items()
+        if args.mint:
+            print(f"[resume] {len(matched)} of these photo(s) already filed under {found_sku} "
+                  f"— ADOPTING it, no new mint", file=sys.stderr, flush=True)
+            args.sku, args.mint = found_sku, False
+        elif args.sku and args.sku != found_sku:
+            print(json.dumps({"error": f"these uuids were already filed under {found_sku}, "
+                              f"not {args.sku} — filing under two SKUs creates a duplicate "
+                              "(Void-SKU flow if one is wrong)",
+                              "matches": hits}, indent=2))
+            sys.exit(4)
 
     sku = resolve_sku(args.sku, args.mint, _allocate)
     item_dir = os.path.join(args.items_dir, sku)

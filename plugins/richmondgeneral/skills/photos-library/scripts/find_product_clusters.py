@@ -170,6 +170,60 @@ def find_product_clusters(db_path, days=3, min_width=2000, cluster_gap=300,
     return result
 
 
+def live_sorted_uuids(uuids):
+    """AppleScript-check which uuids ALREADY carry rg-sorted in Photos' live model.
+
+    Photos flushes keyword writes to Photos.sqlite lazily (minutes), so a sweep right
+    after filing re-reports freshly tagged photos as unsorted — the "don't re-file
+    them" trap (2026-07-15). This asks the live app instead. Batched into one call.
+    """
+    import subprocess
+    if not uuids:
+        return set()
+    uuid_list = "{" + ", ".join(f'"{u}"' for u in uuids) + "}"
+    script = f"""
+tell application "Photos"
+    set out to {{}}
+    repeat with u in {uuid_list}
+        try
+            set mi to (first media item whose id starts with (contents of u))
+            set kw to keywords of mi
+            if kw is not missing value and kw contains "rg-sorted" then
+                set end of out to (contents of u)
+            end if
+        end try
+    end repeat
+    set AppleScript's text item delimiters to linefeed
+    return out as string
+end tell"""
+    try:
+        res = subprocess.run(["osascript", "-e", script], check=True,
+                             capture_output=True, text=True, timeout=180)
+        return {line.strip() for line in res.stdout.splitlines() if line.strip()}
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        print(f"⚠️  --verify-live check failed ({e}); showing unfiltered queue",
+              file=os.sys.stderr)
+        return set()
+
+
+def filter_live_sorted(clusters, sorted_uuids):
+    """Drop photos already sorted in the live model; drop clusters that empty out.
+    Returns (clusters, hidden_photo_count). Pure — unit-tested."""
+    if not sorted_uuids:
+        return clusters, 0
+    hidden = 0
+    out = []
+    for c in clusters:
+        keep = [p for p in c["photos"] if p.get("uuid") not in sorted_uuids]
+        hidden += len(c["photos"]) - len(keep)
+        if keep:
+            c = dict(c)
+            c["photos"] = keep
+            c["count"] = len(keep)
+            out.append(c)
+    return out, hidden
+
+
 def main():
     parser = argparse.ArgumentParser(description='Find product photo clusters in Photos Library')
     parser.add_argument('--days', type=int, default=3, help='Search last N days (0 for all; default 3 — the library-wide intake sweep window)')
@@ -181,6 +235,9 @@ def main():
     parser.add_argument('--keyword', '--tag', dest='keyword', type=str, help='Only photos with this keyword/tag')
     parser.add_argument('--exclude-keyword', type=str, help='Exclude photos with this keyword/tag')
     parser.add_argument('--hide-sorted', action='store_true', help='Convenience flag to exclude photos tagged rg-sorted')
+    parser.add_argument('--verify-live', action='store_true',
+                        help='Also check Photos\' LIVE model for rg-sorted (sqlite flushes lazily; '
+                             'use right after a filing run so fresh tags are not re-reported as unsorted)')
     parser.add_argument('--json', action='store_true', help='Output as JSON')
     parser.add_argument('--db', type=str, help='Path to Photos.sqlite')
 
@@ -232,6 +289,14 @@ def main():
     # Filter by type if specified
     if args.type != 'all':
         clusters = [c for c in clusters if c['type'] == args.type]
+
+    if args.verify_live and clusters:
+        all_uuids = [p['uuid'] for c in clusters for p in c['photos'] if p.get('uuid')]
+        sorted_live = live_sorted_uuids(all_uuids)
+        clusters, hidden = filter_live_sorted(clusters, sorted_live)
+        if hidden:
+            print(f"ℹ️  --verify-live: hid {hidden} photo(s) already rg-sorted in Photos' live "
+                  f"model (sqlite not yet flushed — do NOT re-file them)", file=os.sys.stderr)
 
     if args.json:
         print(json.dumps(clusters, indent=2))

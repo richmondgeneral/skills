@@ -97,3 +97,41 @@ def test_add_to_album_failure_is_nonfatal(monkeypatch):
     monkeypatch.setattr(fc.subprocess, "run", boom)
     out = fc.add_to_album("RG-0099", ["u1"])
     assert out["ok"] is False and "non-fatal" in out["warning"]
+
+
+# ---------------------------------------------------------------------------
+# Duplicate-mint guard (RG-0060 void postmortem, 2026-07-15).
+# ---------------------------------------------------------------------------
+
+def _mk_item(tmp_path, sku, manifest):
+    d = tmp_path / sku
+    d.mkdir()
+    (d / fc.MANIFEST_NAME).write_text(json.dumps(manifest))
+
+
+def test_find_existing_sku_matches(tmp_path):
+    _mk_item(tmp_path, "RG-0060", {"u1": "hero.jpeg", "u2": "detail-1.jpeg"})
+    _mk_item(tmp_path, "RG-0061", {"u9": "hero.jpeg"})
+    hits = fc.find_existing_sku(str(tmp_path), ["u2", "u3"])
+    assert hits == {"RG-0060": ["u2"]}
+
+
+def test_find_existing_sku_empty_when_no_match(tmp_path):
+    _mk_item(tmp_path, "RG-0060", {"u1": "hero.jpeg"})
+    assert fc.find_existing_sku(str(tmp_path), ["zz"]) == {}
+    assert fc.find_existing_sku(str(tmp_path / "nope"), ["u1"]) == {}
+
+
+def test_find_existing_sku_reports_conflict(tmp_path):
+    _mk_item(tmp_path, "RG-0060", {"u1": "hero.jpeg"})
+    _mk_item(tmp_path, "RG-0061", {"u2": "hero.jpeg"})
+    hits = fc.find_existing_sku(str(tmp_path), ["u1", "u2"])
+    assert set(hits) == {"RG-0060", "RG-0061"}
+
+
+def test_find_existing_sku_skips_void_records(tmp_path):
+    _mk_item(tmp_path, "RG-0060", {"u1": "hero.jpeg"})
+    (tmp_path / "RG-0060" / "label.json").write_text('{"sku":"RG-0060","state":"Void"}')
+    _mk_item(tmp_path, "RG-0061", {"u1": "hero.jpeg"})
+    hits = fc.find_existing_sku(str(tmp_path), ["u1"])
+    assert hits == {"RG-0061": ["u1"]}  # void record ignored, live successor adopted

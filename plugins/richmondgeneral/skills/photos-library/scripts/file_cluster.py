@@ -147,7 +147,7 @@ def find_existing_sku(items_dir, uuids):
         label_path = os.path.join(items_dir, name, "label.json")
         try:
             with open(label_path) as f:
-                if str(json.load(f).get("state", "")).lower() == "void":
+                if str(json.load(f).get("state", "")).lower().startswith("void"):
                     continue
         except (OSError, json.JSONDecodeError):
             pass

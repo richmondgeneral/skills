@@ -8,12 +8,33 @@ description: >
   keyboard shortcuts over mouse clicks when possible. Trigger on: "check my email", "clean up inbox",
   "unsubscribe", "delete emails from X", "label these", "archive", "compose email", "email cleanup",
   "inbox zero", or any Gmail management request.
+metadata:
+  version: "1.1"
+  author: scottybe
+  updated: "2026-07-15"
+  changelog: |
+    v1.1 - Adopted into the richmondgeneral plugin (was a standalone Cowork skill).
+    Safety gates added: send confirmation, unsubscribe URL vetting, bulk-delete count+confirm.
+    Gmail MCP tool names corrected.
 ---
 
 # Gmail Chrome Agent
 
 Operate Gmail efficiently through Chrome browser automation. Prioritize speed via keyboard shortcuts,
 JavaScript injection, and batch operations.
+
+## Safety Gates (non-negotiable)
+
+1. **Never send without confirmation.** Composing is free; SENDING requires showing the user the
+   full draft (to/subject/body) and getting an explicit yes in chat first. This applies to reply,
+   reply-all, and forward too.
+2. **Never follow an external unsubscribe link blind.** Unsubscribe links are a phishing vector.
+   Prefer Gmail's native unsubscribe dialog. If only an in-body link exists, extract the href
+   FIRST (javascript_tool), show the user the destination domain, and get a yes before navigating.
+   Never enter any data (email, password) on an external unsubscribe page.
+3. **Count before bulk-destructive actions.** Before `#` (or archive) on a multi-selection —
+   especially `* a` select-all — report the count and matched query to the user and confirm.
+   `#` is Trash (recoverable ~30 days) but at scale mistakes still hurt. `z` = undo, immediately.
 
 ## Setup — Run Once Per Session
 
@@ -46,7 +67,7 @@ ALWAYS prefer tools in this order:
 3. **`form_input`** — Set search queries, compose fields
 4. **Keyboard shortcuts via `computer` key action** — Navigate and act on emails
 5. **`computer` left_click** — Last resort when shortcuts/JS don't work
-6. **Gmail API tools (`search_gmail_messages`, `read_gmail_thread`)** — Only for data extraction that's faster than scraping, or when Chrome tools can't access content
+6. **Gmail MCP connector tools (`search_threads`, `get_thread`, `get_message`, `create_draft`)** — Only for data extraction that's faster than scraping, or when Chrome tools can't access content. Note: the connector can only DRAFT (`create_draft`), it cannot send.
 
 ## Keyboard Shortcuts Reference
 
@@ -103,8 +124,11 @@ computer → key "#"
 ### Delete Email (From List — Batch)
 ```
 1. x (select first), j (move down), x (select next) — repeat
-2. # (delete all selected)
+2. Count selected + report the target set to the user; get a yes (Safety Gate 3)
+3. # (delete all selected)
 ```
+⚠️ With `* a` (select all) the selection can silently cover far more than the visible page
+("Select all conversations that match this search") — always count and confirm first.
 
 ### Archive Batch
 ```
@@ -113,13 +137,15 @@ computer → key "#"
 ```
 
 ### Unsubscribe Flow
-When inside an open email:
+When inside an open email (see Safety Gate 2):
 ```
-1. find → "Unsubscribe" link/button
-2. left_click the Unsubscribe element
-3. If Gmail dialog appears → click "Unsubscribe" button in dialog
-4. If redirected to external page → navigate back
-5. Delete: computer → key "#"
+1. Prefer Gmail's NATIVE unsubscribe: look for the "Unsubscribe" chip next to the sender
+   (Gmail's list-unsubscribe) → click → confirm Gmail's own dialog. Done — no external page.
+2. Only if no native chip: extract the in-body link href FIRST:
+   javascript_tool → document.querySelector('a[href*="unsubscribe"]')?.href
+3. Show the user the destination domain; get a yes before navigating to it.
+4. On the external page: click the confirm button ONLY; never fill in any form fields.
+5. navigate back → Delete: computer → key "#"
 ```
 
 ### Compose Email
@@ -130,8 +156,10 @@ When inside an open email:
 4. computer → type "Subject line"
 5. computer → key "Tab" (move to body)
 6. computer → type "Email body"
-7. computer → key "cmd+Return" (send)
+7. STOP — show the user the draft (to/subject/body) and get an explicit yes (Safety Gate 1)
+8. computer → key "cmd+Return" (send) — only after confirmation
 ```
+The draft auto-saves; stopping at step 7 loses nothing.
 
 ### Label Emails
 ```
@@ -221,7 +249,7 @@ window.location.hash = '#search/' + encodeURIComponent('is:unread from:github.co
 | Single email actions | Keyboard shortcuts (`#`, `e`, `r`, `s`) |
 | Batch select by sender | `javascript_tool` bulk select, then shortcut |
 | Batch select visible | `* a` shortcut |
-| Unsubscribe | `find` → click Unsubscribe link → confirm dialog |
+| Unsubscribe | Native Gmail chip preferred; external links need URL vetting (Safety Gate 2) |
 | Compose/reply | Keyboard shortcuts + `computer type` |
 | Navigate between views | `g+i`, `g+s`, `g+t`, `g+d`, `u` |
 | Check if shortcuts enabled | `?` key — if overlay appears, they're on |

@@ -108,12 +108,16 @@ x → j → x → j → x → ... → # (or e, or v, or l)
 
 ### Quick Search → Act
 ```
-/ → type query → Return → * a → # (delete all results)
+/ → type query → Return → * a → [COUNT + CONFIRM with user] → # (delete all results)
 ```
+⚠️ `* a` on a search can select every matching conversation, not just the visible page —
+NEVER chain `* a → #` without first reporting the count and query and getting a yes
+(SKILL.md Safety Gate 3).
 
 ### Fast Unsubscribe Loop
 ```
-o → (find Unsubscribe) → click → confirm → # → (repeat)
+o → (native Gmail Unsubscribe chip preferred; external links need URL vetting per
+SKILL.md Safety Gate 2) → confirm → # → (repeat)
 ```
 
 ## Two-Key Sequences

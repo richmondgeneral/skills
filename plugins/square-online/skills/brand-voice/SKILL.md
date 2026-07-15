@@ -124,5 +124,5 @@ One observation, one detail, one invitation. No hashtag stuffing.
 ## Related skills
 
 - `brand-guidelines`  -  visual identity (colors, fonts, components)
-- `marketing:draft-content`  -  channel-specific copy formatting (email, social, blog)
-- `marketing:brand-review`  -  audit existing copy against this voice
+- `catalog-voice-rewrite`  -  channel-specific copy formatting (email, social, blog)
+- `catalog-voice-audit`  -  audit existing copy against this voice

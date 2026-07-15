@@ -184,3 +184,9 @@ After identification, return to rg-full-auto to complete Phase 1 research checkl
 ## References
 
 - `references/research-sources.md` — Databases, search strategies, reference books
+
+
+> **Pricing hand-off:** unsigned / judgment-call / higher-value pieces require a BPO-style
+> pricing report at `ops/pricing/RG-XXXX-pricing.md` (template `_TEMPLATE.md`) — comps with
+> sources, eBay absorption rate, tested-vs-untested tiers, condition adjustment. A confirmed
+> maker's mark can move price 30–100%+ — always check and document it before pricing.

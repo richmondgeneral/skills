@@ -72,7 +72,7 @@ Specialized appraisal workflow for books, with Library of Congress cross-referen
 | **A.L. Burt** | Reprint publisher - cheap cloth/reprint list check |
 | **Dover** | Reprint publisher - note original publication |
 
-For a more comprehensive list and specialized detection rules, see the [publisher-points.md](file:///Users/scottybe/workspace/richmondgeneral/skills/plugins/richmondgeneral/skills/book-appraiser/references/publisher-points.md) reference.
+For a more comprehensive list and specialized detection rules, see the [publisher-points.md](references/publisher-points.md) reference.
 
 **Number line guide:**
 - `10 9 8 7 6 5 4 3 2 1` → First printing
@@ -247,3 +247,9 @@ Example: `1930 Harold Gray Little Orphan Annie - 1979 Dover Reprint | VG Softcov
 
 - `references/condition-grading.md` - Detailed grading standards with examples
 - `references/publisher-points.md` - Publisher-specific first edition identification
+
+
+> **Pricing hand-off:** unsigned / judgment-call / higher-value pieces require a BPO-style
+> pricing report at `ops/pricing/RG-XXXX-pricing.md` (template `_TEMPLATE.md`) — comps with
+> sources, eBay absorption rate, tested-vs-untested tiers, condition adjustment. A confirmed
+> maker's mark can move price 30–100%+ — always check and document it before pricing.

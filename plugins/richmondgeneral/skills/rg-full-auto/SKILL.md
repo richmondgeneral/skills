@@ -7,8 +7,8 @@ description: >
   Use when processing a new acquisition from scratch, doing a complete item redo, or user says
   "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard",
   "process acquisition", "add to inventory", "process this photo", "list item", "sell this",
-  "add to whatnot". NOT for simple edits to existing items -- use rg-item-update for price
-  changes, description tweaks, or adding images.
+  "add to whatnot". NOT for simple edits to existing items -- use rg-item-update (edits), rg-reprice (price
+  cascade), or rg-square-list (just get an intaken item live on Square) instead.
 metadata:
   version: "6.5"
   author: scottybe

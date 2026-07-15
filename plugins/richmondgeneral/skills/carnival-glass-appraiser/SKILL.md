@@ -210,3 +210,9 @@ After appraisal completes, return to rg-full-auto workflow at Phase 2 (Photograp
 ## References
 
 - `references/carnival-glass-complete.md` - Pattern catalogs, color guides, maker identification
+
+
+> **Pricing hand-off:** unsigned / judgment-call / higher-value pieces require a BPO-style
+> pricing report at `ops/pricing/RG-XXXX-pricing.md` (template `_TEMPLATE.md`) — comps with
+> sources, eBay absorption rate, tested-vs-untested tiers, condition adjustment. A confirmed
+> maker's mark can move price 30–100%+ — always check and document it before pricing.

@@ -206,3 +206,11 @@ Verification:
 | `square-image-upload` | Dedicated image upload handling |
 | `square-webhook-monitor` | Webhook subscription and monitor operations |
 | `square-cache` | Sync and verify cached catalog state after updates |
+
+## Price changes — prefer rg-reprice
+
+For a SINGLE item's price change, prefer the **rg-reprice** skill — it cascades the change
+across Square variation + payment link recreate + qr-buy + label + page + gallery card in one
+pass. This skill's bundled `scripts/safe_batch_reprice.py` exists for BATCH price updates
+(dry-run first); after any batch run, propagate to pages/links per item (rg-reprice per SKU or
+the build tools) — Square-only price edits leave the public surfaces stale.

@@ -3,7 +3,38 @@
 A comprehensive collection of AI assistant skills for managing Richmond General's vintage and antique inventory system. These skills integrate with Square Catalog, Apple ecosystem (iMessage, Contacts, Notes), and external identification databases to streamline operations.
 
 **Repository:** `richmondgeneral/skills`
-**Current Version:** v2026.06.17
+
+## This repo IS the plugin marketplace
+
+Despite the name, this repo is a **Claude plugin marketplace** (named `skills` for historical
+reasons — the name is load-bearing in CLAUDE.md, `uv run --project` paths, and ops docs, so it
+stays). `.claude-plugin/marketplace.json` at the root defines the marketplace `richmondgeneral`
+with two plugins, both sourced locally from this repo:
+
+```
+skills/                                  <- marketplace repo (this repo)
+├── .claude-plugin/marketplace.json      <- marketplace manifest (local ./plugins/... sources only)
+└── plugins/
+    ├── richmondgeneral/                 <- core ops plugin (commands/ + skills/ + pyproject)
+    │   └── .claude-plugin/plugin.json
+    └── square-online/                   <- storefront plugin (moved in from the retired
+        └── .claude-plugin/plugin.json      richmondgeneral/plugins repo, 2026-07-14)
+```
+
+**Update loop (replaces the old hand-rsync "dual-copy" flow):** edit skills here → commit →
+bump the plugin `version` in its `plugin.json` → push → then on each machine:
+
+```
+claude plugin marketplace update richmondgeneral   # refresh the marketplace clone from GitHub
+claude plugin update richmondgeneral@richmondgeneral   # installs the new version to the cache
+claude plugin update square-online@richmondgeneral     # (if square-online changed)
+```
+
+The cache lands at `~/.claude/plugins/cache/richmondgeneral/<plugin>/<version>/` and matches the
+repo exactly (verified 2026-07-14). A version bump is what triggers the reinstall — don't skip it.
+Cowork installs are refreshed separately in the desktop plugin manager. Do not side-load plugin
+skills as standalone user skills (Settings → Capabilities) — duplicates resolve ambiguously.
+`rsync` to the cache is only a break-glass fallback when the CLI is unavailable.
 
 ## Overview
 

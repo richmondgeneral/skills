@@ -48,5 +48,5 @@ The script's stdout (pass `--json` where the script supports it) comes back as t
 
 ## Notes
 
-- This SKILL.md is the repo source of truth. For Cowork to load it, sync it via the Skills UI. The helper script runs from the repo clone on the Mac (not from Cowork's sandbox).
+- This SKILL.md is the repo source of truth, shipped inside the `richmondgeneral` plugin from the `richmondgeneral/skills` marketplace repo. To pick up changes, update/reinstall the plugin (code-mode: `claude plugin marketplace update richmondgeneral && claude plugin update richmondgeneral@richmondgeneral`; Cowork: refresh the plugin in the plugin manager). Do NOT side-load this skill as a standalone user skill — that creates duplicate resolution. The helper script runs from the repo clone on the Mac (not from Cowork's sandbox).
 - In Claude Code / code mode you don't need this — invoke the skills directly (you have the Bash tool).

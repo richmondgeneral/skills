@@ -21,13 +21,13 @@ def _mini_psi(path):
         CREATE TABLE assets(uuid_0 INT, uuid_1 INT, creationDate INT);
         """
     )
-    # NB: real psi content_string carries a trailing NUL -> match normalized_string.
+    # NB: real psi content_string AND normalized_string carry a trailing NUL.
     conn.execute("INSERT INTO groups(rowid, category, content_string, normalized_string) "
-                 "VALUES (685, 1500, 'Receipt' || char(0), 'receipt')")
+                 "VALUES (685, 1500, 'Receipt' || char(0), 'receipt' || char(0))")
     conn.execute("INSERT INTO groups(rowid, category, content_string, normalized_string) "
-                 "VALUES (684, 2800, 'Receipts' || char(0), 'receipts')")
+                 "VALUES (684, 2800, 'Receipts' || char(0), 'receipts' || char(0))")
     conn.execute("INSERT INTO groups(rowid, category, content_string, normalized_string) "
-                 "VALUES (1, 1500, 'Dog' || char(0), 'dog')")
+                 "VALUES (1, 1500, 'Dog' || char(0), 'dog' || char(0))")
     u0 = struct.unpack("<q", bytes.fromhex("EA161386C7074F77"))[0]
     u1 = struct.unpack("<q", bytes.fromhex("B85AB90BCD4864C9"))[0]
     conn.execute("INSERT INTO assets(rowid, uuid_0, uuid_1, creationDate) VALUES (55, ?, ?, 0)", (u0, u1))

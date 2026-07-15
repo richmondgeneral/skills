@@ -131,7 +131,8 @@ def test_find_existing_sku_reports_conflict(tmp_path):
 
 def test_find_existing_sku_skips_void_records(tmp_path):
     _mk_item(tmp_path, "RG-0060", {"u1": "hero.jpeg"})
-    (tmp_path / "RG-0060" / "label.json").write_text('{"sku":"RG-0060","state":"Voided"}'  # real-world spelling (RG-0060 uses "Voided"))
+    # real-world spelling: the actual RG-0060 record uses state "Voided"
+    (tmp_path / "RG-0060" / "label.json").write_text('{"sku":"RG-0060","state":"Voided"}')
     _mk_item(tmp_path, "RG-0061", {"u1": "hero.jpeg"})
     hits = fc.find_existing_sku(str(tmp_path), ["u1"])
     assert hits == {"RG-0061": ["u1"]}  # void record ignored, live successor adopted

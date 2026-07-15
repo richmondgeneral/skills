@@ -188,12 +188,13 @@ def add_to_album(sku, uuids):
     return out.stdout.strip()
 
 
-def tag_sorted(sku, uuids):
-    """Union rg-sorted + <sku> into each photo's keywords (preserves existing)."""
+def tag_keywords(keywords, uuids):
+    """Union the given keywords into each photo's keywords (preserves existing)."""
+    kw_list = "{" + ", ".join(f'"{k}"' for k in keywords) + "}"
     uuid_list = "{" + ", ".join(f'"{u}"' for u in uuids) + "}"
     script = f'''
 tell application "Photos"
-    set addKw to {{"rg-sorted", "{sku}"}}
+    set addKw to {kw_list}
     repeat with u in {uuid_list}
         try
             set mi to (first media item whose id starts with (contents of u))
@@ -208,6 +209,11 @@ tell application "Photos"
     return "tagged"
 end tell'''
     return _osascript(script)
+
+
+def tag_sorted(sku, uuids):
+    """Union rg-sorted + <sku> into each photo's keywords (preserves existing)."""
+    return tag_keywords(["rg-sorted", sku], uuids)
 
 
 def main():

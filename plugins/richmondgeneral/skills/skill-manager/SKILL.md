@@ -1,177 +1,127 @@
 ---
 name: skill-manager
-description: Maintain the local skills repository health and registry. Use for version bumps, metadata audits, registry refreshes, packaging checks, and cleanup across skills. For creating or rewriting skill content, delegate to the skill-creator standard first.
+description: Maintain the richmondgeneral plugin-marketplace repo — version bumps, metadata audits, frontmatter validation, plugin-update rollouts, and cleanup across skills. Use for "bump the plugin version", "audit skill metadata", "roll out a skill change", "why isn't my skill update loading", "validate the skills repo". For creating or rewriting skill CONTENT, use the plugin-dev/writing-skills guidance first; this skill is repo hygiene + release mechanics.
 metadata:
-  version: "1.7"
+  version: "2.0"
   author: scottybe
-  updated: "2026-02-17"
+  updated: "2026-07-15"
   changelog: |
-    v1.7 - Full registry refresh:
-    - Updated rg-lot-tracker to 2.0 (aging, health scoring, enhanced reporting)
-    - Added whatnot-create-product 1.0, catalog-classifier 2.1, whatnot-catalog/chrome 1.0
-    - Added Whatnot, Appraisal, Messaging, Trading, and Deprecated skill sections
-    - Reflects full 25-skill inventory
+    v2.0 - Rewritten for the plugin-marketplace era: update flow = plugin.json version bump +
+    `claude plugin marketplace update` / `claude plugin update` (rsync = break-glass only);
+    static registry snapshot dropped (drift magnet — generate live instead); packaging demoted
+    to legacy; dead .system/skill-creator + deleted square-catalog-ops references removed.
 
-    v1.6 - Square ops skill expansion:
-    - Added `square-catalog-ops` and `square-webhook-monitor` to active snapshot
-    - Updated snapshot date to reflect current skill inventory
-
-    v1.5 - Aligned with Anthropic skill-creator conventions:
-    - Replaced stale static registry workflow with metadata-driven audit workflow
-    - Added explicit delegation to canonical skill-creator guidance
-    - Added frontmatter/structure validation checklist for all active skills
+    v1.7 - Full registry refresh (25-skill static snapshot — REMOVED in v2.0).
+    v1.5 - Aligned with Anthropic skill-creator conventions.
 ---
 
 # Skill Manager
 
-Repository maintenance skill for this repo's `richmondgeneral` plugin (skills under `plugins/richmondgeneral/skills/`).
+Repo maintenance + release mechanics for the **plugin marketplace repo**
+`~/workspace/richmondgeneral/skills` (named "skills" for historical reasons — it IS a Claude
+plugin marketplace: `.claude-plugin/marketplace.json` at the root defines marketplace
+`richmondgeneral` with two locally-sourced plugins).
 
-## Scope
+## Layout (source of truth)
 
-Use this skill for:
-- Skills repo hygiene (`metadata`, version drift, stale docs, packaging checks)
-- Registry refreshes
-- Cross-skill consistency fixes (paths, env vars, shared conventions)
+```
+skills/                                  <- marketplace repo
+├── .claude-plugin/marketplace.json      <- marketplace manifest (local ./plugins/... sources only)
+├── docs/                                <- repo-level templates/helpers (NOT shipped in plugins)
+└── plugins/
+    ├── richmondgeneral/                 <- core ops plugin
+    │   ├── .claude-plugin/plugin.json   <- THE version that gates reinstalls
+    │   ├── commands/  skills/  pyproject.toml
+    └── square-online/                   <- storefront plugin
+        └── .claude-plugin/plugin.json
+```
 
-Do not use this skill as the canonical source for how to design a skill from scratch.
+## The Update Loop (how a skill change ships)
 
-## Canonical Skill-Creation Standard
+1. Edit the skill under `plugins/<plugin>/skills/<skill>/`.
+2. **Bump the plugin `version` in `plugins/<plugin>/.claude-plugin/plugin.json`** — no bump =
+   no reinstall, this is the #1 "why isn't my change loading" cause.
+3. Validate before pushing (js-yaml is stricter than pyyaml — unquoted
+   `argument-hint: [a] [b]` or a description containing `": "` silently loads as EMPTY metadata):
+   ```bash
+   claude plugin validate .            # from the repo root — validates marketplace + plugins
+   ```
+4. Commit (explicit paths, multi-writer git rules per CLAUDE.md) and push.
+5. Roll out per machine:
+   ```bash
+   claude plugin marketplace update richmondgeneral
+   claude plugin update richmondgeneral@richmondgeneral   # and/or square-online@richmondgeneral
+   ```
+   Cache lands at `~/.claude/plugins/cache/richmondgeneral/<plugin>/<version>/` and matches the
+   repo exactly. New cache dir needs its venv: `uv sync --project <cache>/<version>`. Restart
+   sessions to load it; delete superseded version dirs once nothing holds them (`lsof +D`).
+6. Cowork picks up changes separately: refresh the plugin in the desktop plugin manager.
 
-For creating or substantially rewriting skills, follow this first:
-- `${CLAUDE_PLUGIN_ROOT}/skills/.system/skill-creator/SKILL.md`
-
-Use this skill to enforce those standards across the repository after edits.
+**Bans / fallbacks:** standalone Cowork side-loads of plugin skills are banned (duplicate
+resolution). `rsync` into the cache is break-glass ONLY (CLI broken) — and if you must, sync
+only the files you changed (a broad `rsync -a` reverts parallel sessions' newer fixes).
 
 ## Required Skill Contract
 
 Each active skill directory must have:
 1. `SKILL.md` with YAML frontmatter
-2. `name` and `description` fields in frontmatter
+2. `name` and `description` fields in frontmatter (description = triggers + "do NOT use for")
 3. `metadata.version`, `metadata.author`, `metadata.updated`
-4. Optional `metadata.changelog` when changes are substantive
+4. `metadata.changelog` when changes are substantive
 
-Preferred structure:
-- `references/` for deep documentation (progressive disclosure)
-- `scripts/` for deterministic/repeated logic
-- `assets/` for reusable output assets
-- `agents/openai.yaml` when UI metadata is required
+Preferred structure: `references/` (progressive disclosure), `scripts/` (deterministic logic),
+`assets/` (reusable outputs).
 
-## Repository Paths
+⚠️ **Gotcha:** the repo `.gitignore` has a `*key*` credentials guard — any skill file matching
+`*key*` (e.g. `keyboard-shortcuts.md`) needs `git add -f` or it is silently dropped.
 
-- Skills root: `${CLAUDE_PLUGIN_ROOT}/skills/`
-- Archive: `${CLAUDE_PLUGIN_ROOT}/skills/archive/`
-- Packaging helper: `${CLAUDE_PLUGIN_ROOT}/skills/docs/build-skill.sh`
-- Template: `${CLAUDE_PLUGIN_ROOT}/skills/docs/reference/SKILL_TEMPLATE.md`
+## Metadata Audit (generate live — no static snapshot)
 
-## Metadata Audit Commands
-
-List active skills and metadata snapshot:
+The old static registry table drifted immediately; generate the snapshot when needed:
 
 ```bash
-for d in ${CLAUDE_PLUGIN_ROOT}/skills/*; do
-  [ -d "$d" ] || continue
-  b=$(basename "$d")
-  case "$b" in .git|.venv|archive|docs|testing|.pytest_cache|__pycache__) continue;; esac
-  f="$d/SKILL.md"
-  [ -f "$f" ] || continue
-  ver=$(awk '/^metadata:/{m=1} m && /version:/{gsub(/"/,"",$2); print $2; exit}' "$f")
-  upd=$(awk '/^metadata:/{m=1} m && /updated:/{gsub(/"/,"",$2); print $2; exit}' "$f")
-  echo "$b|${ver:-?}|${upd:-?}"
+REPO=~/workspace/richmondgeneral/skills
+for d in $REPO/plugins/*/skills/*; do
+  [ -f "$d/SKILL.md" ] || continue
+  ver=$(awk '/^metadata:/{m=1} m && /version:/{gsub(/"/,"",$2); print $2; exit}' "$d/SKILL.md")
+  upd=$(awk '/^metadata:/{m=1} m && /updated:/{gsub(/"/,"",$2); print $2; exit}' "$d/SKILL.md")
+  echo "$(basename $(dirname $(dirname $d)))/$(basename $d)|${ver:-?}|${upd:-?}"
 done | sort
 ```
 
 Find missing required frontmatter fields:
 
 ```bash
-rg -n "^name:|^description:|^metadata:|version:|author:|updated:" ${CLAUDE_PLUGIN_ROOT}/skills/*/SKILL.md
+rg -L "^name:|^description:|^metadata:" $REPO/plugins/*/skills/*/SKILL.md
 ```
 
-## Active Skills Snapshot (2026-02-17)
+Plugin versions (the ones that matter for rollout):
 
-### Richmond General Workflows
-
-| Skill | Version | Updated |
-|-------|---------|---------|
-| `rg-full-auto` | 3.6 | 2026-02-16 |
-| `rg-item-update` | 1.4 | 2026-02-16 |
-| `rg-lot-tracker` | 2.0 | 2026-02-16 |
-| `catalog-classifier` | 2.1 | 2026-02-16 |
-| `product-labeler` | 1.1 | 2025-12-21 |
-
-### Square Integration
-
-| Skill | Version | Updated |
-|-------|---------|---------|
-| `square-cache` | 1.4 | 2026-02-17 |
-| `square-catalog-ops` | 1.1 | 2026-02-17 |
-| `square-chrome-control` | 1.0 | 2026-02-17 |
-| `square-image-upload` | 1.5 | 2026-02-17 |
-| `square-webhook-monitor` | 1.1 | 2026-02-17 |
-| `square-crm` | 1.1 | 2025-12-21 |
-
-### Whatnot
-
-| Skill | Version | Updated |
-|-------|---------|---------|
-| `whatnot-create-product` | 1.0 | 2026-02-16 |
-| `whatnot-chrome` | 1.0 | 2026-02-16 |
-| `whatnot-catalog` | 1.0 | 2026-02-16 |
-
-### Image / Intake
-
-| Skill | Version | Updated |
-|-------|---------|---------|
-| `image-processor` | 1.3 | 2026-02-15 |
-| `photos-library` | 1.2 | 2026-01-18 |
-
-### Appraisal
-
-| Skill | Version | Updated |
-|-------|---------|---------|
-| `book-appraiser` | 1.1 | 2025-12-21 |
-| `carnival-glass-appraiser` | 1.1 | 2025-12-21 |
-| `maker-mark-identifier` | 1.1 | 2025-12-21 |
-
-### Messaging / CRM
-
-| Skill | Version | Updated |
-|-------|---------|---------|
-| `imessage-core` | 1.1 | 2025-12-21 |
-| `imessage-archiver` | 1.1 | 2025-12-21 |
-| `contacts-manager` | 1.1 | 2025-12-21 |
-| `daily-briefing` | 2.0 | 2025-12-22 |
-
-### Trading
-
-| Skill | Version | Updated |
-|-------|---------|---------|
-| `alpha-trader` | 2.0 | — |
-| `alpaca-market-data` | 1.0 | 2026-02-14 |
+```bash
+cat $REPO/plugins/*/.claude-plugin/plugin.json | python3 -c "import json,sys; [print(p['name'], p['version']) for p in [json.loads(x) for x in sys.stdin.read().split('}\n{')] ] if False else None" 2>/dev/null || grep -H '"version"' $REPO/plugins/*/.claude-plugin/plugin.json
+```
 
 ## Maintenance Workflow
 
-1. Run metadata snapshot command.
+1. Generate the live metadata snapshot; diff against expectations.
 2. Patch target skills (frontmatter, stale paths, outdated claims).
-3. Validate scripts when changed (`python3 -m py_compile` or skill tests).
-4. Update this registry snapshot if versions changed.
-5. Commit only intended files; avoid sweeping unrelated changes.
+3. Validate scripts when changed (`python3 -m py_compile`, or the skill's tests via
+   `uv run --project plugins/richmondgeneral --with pytest python -m pytest <skill>/tests/`).
+4. `claude plugin validate .` before every push.
+5. Bump the plugin version once per batch; commit explicit paths only.
+6. Roll out (update loop above) and verify the cache matches the repo.
 
-## Packaging
+## Templates / legacy packaging
 
-Build one skill:
-
-```bash
-${CLAUDE_PLUGIN_ROOT}/skills/docs/build-skill.sh <skill-name>
-```
-
-Build all:
-
-```bash
-${CLAUDE_PLUGIN_ROOT}/skills/docs/build-skill.sh --all
-```
+- Skill template: `<repo>/docs/reference/SKILL_TEMPLATE.md` (repo root — NOT inside the plugin,
+  so `${CLAUDE_PLUGIN_ROOT}` paths won't reach it from an installed cache).
+- `.skill` zip packaging (`<repo>/docs/build-skill.sh`) is LEGACY: side-loads are banned, so
+  packages are only for sharing a skill outside this marketplace. Don't package for deployment.
 
 ## Safety Rules
 
 - Do not delete archived skills unless explicitly asked.
 - Do not rewrite unrelated skills in bulk just for style.
 - Prefer targeted, reversible changes and keep diffs small.
+- Multiple parallel sessions share this checkout — fetch first, stage explicit paths,
+  never `git add -A`, use a throwaway worktree for co-edited files.

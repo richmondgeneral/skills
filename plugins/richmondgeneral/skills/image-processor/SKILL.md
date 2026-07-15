@@ -4,8 +4,12 @@ description: Unified image processing with background removal, generation, editi
 metadata:
   version: "1.13"
   author: scottybe
-  updated: "2026-06-21"
+  updated: "2026-07-15"
   changelog: |
+    v1.13 - combo.py 1:1 marketplace combo collage; SKILL.md refreshed 2026-07-15
+    (deskew/--straighten claim corrected, Hero QA gate + matte.py sections added,
+    clean.py generative warning inline, directory tree regenerated).
+
     v1.12 - Local faithful enhance stage (torch/Metal, two-agent handoff):
     - NEW scripts upres.py / sharpen.py / enhance.py — non-generative, faithful
       enhancement on Apple-Silicon MPS for the 896px legacy batch + any soft hero.
@@ -51,6 +55,7 @@ metadata:
     - router.py: --model now actually restricts to the requested model (removebg was
       silently ignored by the quality-score sort before).
     - --straighten remains a documented no-op (auto-deskew needs opencv, absent).
+      [SUPERSEDED 2026-06-20: deskew.py landed, opencv added — --straighten = alias of --deskew]
 
     v1.8 - Listing photo standardizer (RG public-photo SOP enforcement):
     - standardize.py turns a raw documentation photo into a catalog-quality PUBLIC
@@ -187,8 +192,10 @@ uv run python scripts/standardize.py raw.jpg -o out.png --allow-rect-mask     # 
 ```
 
 Apply only to the **curated public subset**; the raw archive (Photos library, tagged by SKU) and the
-`items/RG-XXXX/` originals stay untouched (input → `--output`). `--straighten` is a documented no-op
-(reliable auto-deskew needs opencv, which isn't installed — shoot straight; the square crop never rotates).
+`items/RG-XXXX/` originals stay untouched (input → `--output`). `--straighten` is a **deprecated alias
+for `--deskew`** — real deskew/perspective-correct/crop-to-face landed 2026-06-20 (`deskew.py`, opencv
+is now a plugin dep): the **flat-goods profile** for books/paper/boxed/framed items is
+`standardize.py --deskew --perspective-correct --crop-to-face` (no cutout — the item's edges are the frame).
 Clean single-object shots cut out best; multi-object layouts produce rough masks. The canonical logo
 lives at `brand/assets/richmond-general-logo.{png,jpg}` (transparent PNG + original).
 
@@ -226,6 +233,46 @@ uv pip install --python ~/.cache/rg-enhance torch torchvision pillow numpy spand
 upres/restore (SUPIR / genai) is a SEPARATE, **showcase-only** path that MUST keep the `clean.py
 --agentic` marks/text judge — never auto-run it on items with printed labels.
 
+## Pre-publish Hero QA Gate (BLOCKING)
+
+**No hero publishes without `label.json → hero_qa.status == "pass"`.** `hero_qa.py` runs 5
+checks — upright (tesseract OSD), level (≤1.5° tilt), full_face (cutout clip), bg_ok,
+defects_ok — and writes the verdict to `label.json → hero_qa`. rg-full-auto refuses phase 4
+(Square primary) and phase 7 (GitHub publish) without a pass; rg-square-list refuses CREATE.
+
+```bash
+uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/hero_qa.py items/RG-XXXX   # single item
+uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/hero_qa.py --batch items/  # audit (non-zero exit if a Listed item fails)
+```
+
+Known limits: `level` false-positives on radially symmetric items (brooches, medallions) —
+after a visual check set `label.json → photo_overrides.status:"approved"` with a reason;
+a 90°-rotated hero with text-sparse pixels can still pass (upright-v2 fix is a known open
+handoff) — ALWAYS visually Read the hero before publish. OSD tuning (don't regress): 90/270
+flagged at conf ≥ 0.10, 180 only at ≥ 1.0.
+
+## Local Matte (BiRefNet cutout = the MASTER asset)
+
+`matte.py` produces the **transparent cutout master** non-generatively (BiRefNet via rembg —
+computes an alpha matte only, cannot fabricate marks; safe on labeled goods) and derives
+`cutout.png` + `square.png` (1:1, Square primary) + `card.png` (5:7, uniform gallery grid).
+**Never bake a background into the pixels** — Square renders the cutout on its white grid and
+the site card gets its background from CSS.
+
+Dedicated venv `~/.cache/rg-matte` (py3.12 — rembg/onnxruntime have no 3.14 wheels); invoke by
+absolute interpreter path, never `uv run --project`:
+
+```bash
+~/.cache/rg-matte/bin/python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/matte.py --item-dir items/RG-XXXX
+# orientation fixes on the clean cutout (agent looks at the image, picks the angle):
+~/.cache/rg-matte/bin/python .../matte.py --item-dir items/RG-XXXX --rotate 90
+# OSD best-effort (high-confidence only — no-ops when unsure; unreliable on ornate covers):
+~/.cache/rg-matte/bin/python .../matte.py --item-dir items/RG-XXXX --auto-upright
+```
+
+Flat rectangular goods (books, paper, boxed, framed) skip the cutout entirely — use the
+flat-goods profile: `standardize.py --deskew --perspective-correct --crop-to-face`.
+
 ## Quick Start
 
 ### Background Removal
@@ -255,6 +302,13 @@ python scripts/edit.py --input subject.jpg --odd-placement "the dashboard of a s
 ```
 
 ### Catalog Cleanup (v1.4 — single universal prompt)
+
+⚠️ **clean.py is GENERATIVE (Gemini image-out) — it can hallucinate provenance.** It once
+fabricated a "HALL CHINA" backstamp and re-staged a scene. NEVER auto-run it on items with
+printed labels, maker's marks, or model numbers without `--agentic` (Best-of-3 + judge, v1.11),
+and ALWAYS eyeball the output against the original before it touches a listing. For safe,
+non-generative work use `matte.py` (cutout), `deskew.py` (flat goods), `upres.py`/`sharpen.py`
+(enhance) — those cannot invent content.
 
 ```bash
 # Preserve damage (honest condition photo — default):
@@ -557,20 +611,24 @@ library.copy_photo(photos[0].uuid, '/tmp/photo.jpg')
 image-processor/
 ├── SKILL.md
 ├── lib/
-│   ├── __init__.py
-│   ├── router.py           # Smart model routing
-│   ├── photos.py           # Photos.app SQLite access
-│   └── models/
-│       ├── __init__.py
-│       ├── base.py         # BaseModel, TaskConfig, TaskType
-│       ├── nano_banana.py  # Gemini 3 Pro
-│       ├── gemini25.py     # Gemini 2.5 Flash
-│       ├── removebg.py     # remove.bg API
-│       └── gemini_image.py # Generation/editing
+│   ├── router.py           # Smart model routing (bootstraps keys itself — v1.7)
+│   ├── photos.py           # Photos.app SQLite access (ro/immutable)
+│   └── models/             # nano_banana / gemini25 / removebg / gemini_image
 └── scripts/
-    ├── process.py          # Background removal CLI
+    ├── process.py          # Background removal CLI (AI cutout routing)
+    ├── process_group.py    # Batch/group processing + mask-quality gate
+    ├── standardize.py      # Listing-photo standardizer (color/square/deskew; EXIF bake)
+    ├── deskew.py           # Flat-goods deskew / perspective-correct / crop-to-face (cv2)
+    ├── matte.py            # LOCAL BiRefNet cutout MASTER → cutout/square/card.png (~/.cache/rg-matte venv)
+    ├── hero_qa.py          # Pre-publish Hero QA gate (5 checks → label.json hero_qa)
+    ├── upres.py            # Real-ESRGAN x2/x4 upscale (~/.cache/rg-enhance venv)
+    ├── sharpen.py          # Unsharp / NAFNet deblur (~/.cache/rg-enhance venv)
+    ├── enhance.py          # One-pass upres→sharpen → hero.enhanced.png
+    ├── clean.py            # GENERATIVE catalog cleanup (Gemini; --agentic judge)
+    ├── combo.py            # 1:1 marketplace combo collage
+    ├── golden_card.py      # Card composition helper
     ├── generate.py         # Generation CLI
-    ├── edit.py             # Editing CLI
+    ├── edit.py             # Editing CLI (surgical instructions)
     ├── photos.py           # Photos.app CLI
     └── status.py           # Model status
 ```

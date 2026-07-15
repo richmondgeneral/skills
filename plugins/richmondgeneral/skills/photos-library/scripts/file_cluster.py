@@ -106,6 +106,12 @@ def _allocate():
     out = subprocess.run([sys.executable, SKU_AUTHORITY, "allocate"],
                          check=True, capture_output=True, text=True)
     sku = out.stdout.strip().splitlines()[-1].strip()
+    # sku_authority may emit either a bare RG-XXXX or {"sku": "RG-XXXX"}
+    if sku.startswith("{"):
+        try:
+            sku = json.loads(sku).get("sku", sku)
+        except json.JSONDecodeError:
+            pass
     if not RG_RE.match(sku):
         raise RuntimeError(f"sku_authority returned unexpected output: {sku!r}")
     return sku

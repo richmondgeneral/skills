@@ -1,11 +1,12 @@
 ---
 name: ebay-chrome
-description: Chrome automation patterns for managing eBay (richmondgeneral) listings via the Claude-in-Chrome extension — Seller Hub navigation, the "Revise your listing" form, title/SKU/price fields, the description RTE iframe, item specifics, and the publish ("Revise it") flow. Use for ANY eBay listing create/revise/manage action driven through Claude in Chrome. Triggers on "revise ebay", "edit ebay listing", "update ebay title/description", "ebay seller hub", "fix the ebay listing", "ebay chrome". This is the sanctioned path for eBay browser writes — do NOT use the local seller-agent's Vision Agent for eBay (Gemini-billable, no deterministic fallback; it was hard-down on a 429 on 2026-06-20). For programmatic CREATE of an API-managed item use `ebay-lister` (Sell Inventory API); for allowed field/category values see the field-map reference below.
+description: Chrome automation patterns for creating and managing Richmond General eBay listings through Seller Hub, including navigation, title/SKU/price, description RTE, photos, item specifics, shipping, and publish/revise flows. Use for live eBay create/revise/manage work while `ebay-lister` remains dry-run-only, and for browser-created listings after the API path activates. Triggers on "list on eBay", "revise eBay", "edit eBay listing", "eBay Seller Hub", "fix the eBay listing", and "eBay Chrome". Never use Seller Hub to revise an Inventory API-managed listing; route that back to `ebay-lister`.
 metadata:
   version: "1.1"
   author: scottybe
   updated: "2026-07-15"
   changelog: |
+    v1.1 - Clarified browser/API ownership, current dry-run routing, and canonical update workflow.
     v1.0 - Initial extraction from the RG-0023 reconcile (2026-06-20):
     - Seller Hub active-listings entry + search-by-item-number → Edit
     - "Revise your listing" form: title (80 char), Custom label (SKU), price
@@ -30,8 +31,11 @@ as we learn more of the form (the goal: eventually know every box, dropdown, and
 - For **eBay** it's the opposite: the Chrome extension drives the deterministic Revise form **with no
   Gemini and no per-action approval prompts** (verified 2026-06-20). The seller-agent's Vision Agent is
   Gemini-billable and was **hard-down on a 429** that day — so **eBay writes go through this skill**.
-- `ebay-lister` (Sell **Inventory API**) remains the path for *programmatic create* of an API-managed item.
-  Use this skill to **revise/manage listings that live in the browser UI** (most of our hand-created ones).
+- `ebay-lister` (Sell **Inventory API**) is currently dry-run-only. When it activates, use it for
+  programmatic creation and every later revision of those API-managed listings. eBay does not allow
+  Inventory API-created listings to be revised in Seller Hub.
+- Use this skill for all live eBay work while the API path is on hold, and later for listings originally
+  created in Seller Hub.
 
 ## Prerequisites
 
@@ -86,7 +90,6 @@ Keep required tokens consistent per the title/keyword template (form phrase + ma
 
 ## Update protocol for this skill (important)
 
-When you learn a new field, selector, dropdown value, or gotcha, **append it to `reference/field-map.md`**
-and bump this SKILL.md changelog. Treat the field-map like the seller-agent's fast-path cache: it
-accumulates so future sessions drive the form deterministically. Sync both copies (source +
-`~/.claude/plugins/cache/.../ebay-chrome/`) and re-sync via the Skills UI to activate in Cowork.
+When you verify a reusable field, selector, dropdown value, or gotcha, update
+`reference/field-map.md` and bump this changelog. Edit the canonical repository copy only, then rebuild
+or reinstall the plugin so generated caches stay derived from source.

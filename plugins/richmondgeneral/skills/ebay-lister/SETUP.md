@@ -54,8 +54,12 @@ If `locations` is empty, create one once via the Inventory API `createInventoryL
 ```bash
 # Safe: builds the payloads, lists any still-missing config, no API call.
 ... ebay_lister.py list --sku RG-0032 --dry-run
-# Live: creates the inventory item + offer, publishes, writes item_id/url into label.json.
+# After a successful sandbox smoke test, explicitly unlock live API writes.
+security add-generic-password -U -a "$USER" -s EBAY_API_LIVE_ENABLED -w '1'
+# Live: creates or updates the inventory item + offer, publishes if needed, and writes back.
 ... ebay_lister.py list --sku RG-0032 --publish
 ```
 
 Once this is in place, listing any item is one command — RG-0031 and RG-0032 included.
+Listings created through the Inventory API must also be revised through the Inventory API; Seller Hub
+cannot edit them. Keep `ebay-chrome` for listings originally created in the browser.

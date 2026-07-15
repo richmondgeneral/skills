@@ -14,7 +14,7 @@ Names resolved:
 Commands:
     consent-url            Print the authorize URL the owner opens to grant consent.
     exchange --code CODE   One-time: swap an authorization code for a refresh token.
-    check                  Mint an access token from the refresh token and report expiry.
+    check                  Verify that the refresh token can mint an access token.
 
 The owner performs the browser sign-in/consent. This script never handles a password —
 only the post-consent `code` and the resulting tokens.
@@ -27,12 +27,16 @@ import json
 import os
 import subprocess
 import sys
-import time
 import urllib.parse
 from pathlib import Path
 from typing import Optional
 
 import requests
+
+
+class EbayAuthError(RuntimeError):
+    """Raised when eBay credentials or environment configuration are invalid."""
+
 
 # --- Scopes the skill needs (list/publish + read policies/locations) ---
 SCOPES = [
@@ -42,7 +46,12 @@ SCOPES = [
 
 # --- Host selection (production by default; sandbox for testing) ---
 def _env_mode() -> str:
-    return (resolve("EBAY_ENV") or "production").strip().lower()
+    mode = (resolve("EBAY_ENV") or "production").strip().lower()
+    if mode not in {"production", "sandbox"}:
+        raise EbayAuthError(
+            f"Invalid EBAY_ENV {mode!r}; expected 'production' or 'sandbox'."
+        )
+    return mode
 
 
 def hosts() -> dict:
@@ -71,7 +80,7 @@ def resolve(name: str) -> Optional[str]:
         r = subprocess.run(
             ["security", "find-generic-password", "-a", os.environ.get("USER", ""),
              "-s", name, "-w"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         if r.returncode == 0 and r.stdout.strip():
             return r.stdout.strip()
@@ -97,15 +106,11 @@ def keychain_store(name: str, value: str) -> bool:
         subprocess.run(
             ["security", "add-generic-password", "-U", "-a", os.environ.get("USER", ""),
              "-s", name, "-w", value],
-            capture_output=True, text=True, check=True,
+            capture_output=True, text=True, check=True, timeout=10,
         )
         return True
     except Exception:  # noqa: BLE001
         return False
-
-
-class EbayAuthError(RuntimeError):
-    pass
 
 
 def _basic_auth_header() -> str:
@@ -174,7 +179,10 @@ def get_access_token() -> str:
     )
     if r.status_code != 200:
         raise EbayAuthError(f"token refresh failed ({r.status_code}): {r.text}")
-    return r.json()["access_token"]
+    token = r.json().get("access_token")
+    if not token:
+        raise EbayAuthError("token refresh succeeded but returned no access_token")
+    return token
 
 
 def _main(argv=None) -> int:
@@ -207,11 +215,10 @@ def _main(argv=None) -> int:
                     "note": "EBAY_REFRESH_TOKEN saved." if ok else
                             "Could not store in Keychain — set EBAY_REFRESH_TOKEN manually.",
                 }, indent=2))
-            return 0
+            return 0 if args.no_store or ok else 1
         if args.cmd == "check":
-            t = get_access_token()
-            print(json.dumps({"ok": True, "access_token_prefix": t[:12] + "…",
-                              "env": _env_mode()}, indent=2))
+            get_access_token()
+            print(json.dumps({"ok": True, "env": _env_mode()}, indent=2))
             return 0
     except EbayAuthError as e:
         print(f"ERROR: {e}", file=sys.stderr)

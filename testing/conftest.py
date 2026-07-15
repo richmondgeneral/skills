@@ -21,6 +21,7 @@ SKILL_DIRS = [
     "photos-library/scripts",
     "item-model-core/lib",
     "rg-reconcile/scripts",
+    "ebay-lister/scripts",
 ]
 
 for skill_dir in SKILL_DIRS:

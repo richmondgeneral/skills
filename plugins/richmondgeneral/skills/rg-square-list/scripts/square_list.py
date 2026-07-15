@@ -219,6 +219,15 @@ def _find_image(item_dir: Path) -> Optional[Path]:
     return None
 
 
+def _image_is_processed(img: Optional[Path]) -> bool:
+    """True only for the pipeline product (square.png from matte/flat-goods).
+
+    Raw fallbacks (square.jpg, hero.*) are how RG-0062/0064/0068 shipped in-situ
+    display-case shots with inverted rotations to the storefront (2026-07-15).
+    """
+    return img is not None and img.name == "square.png"
+
+
 def _extract_catalog_ids(result: dict, sku: str) -> tuple[str, str]:
     """Resolve (item_id, variation_id) from a batch-upsert response.
 
@@ -403,7 +412,7 @@ def _write_label(label_path: Path, label: dict) -> None:
 # -----------------------------------------------------------------------------
 
 def list_item(item_dir: str, dry_run: bool = False, force: bool = False,
-              skip_hero_qa: bool = False) -> dict:
+              skip_hero_qa: bool = False, allow_raw_image: bool = False) -> dict:
     """Create or update the item's Square listing; return a summary dict.
 
     See the module docstring for the full idempotency contract. In ``dry_run``
@@ -430,6 +439,8 @@ def list_item(item_dir: str, dry_run: bool = False, force: bool = False,
             "price": price_str,
             "object_id": existing_object_id,
             "would_upload_image": (not existing_object_id) or force,
+            "image": (lambda i: i.name if i else None)(_find_image(item_path)),
+            "image_processed": _image_is_processed(_find_image(item_path)),
             "local_pickup_only": _local_pickup_only(label),
             "hero_qa_ok": qa_ok,
         }
@@ -491,6 +502,14 @@ def list_item(item_dir: str, dry_run: bool = False, force: bool = False,
     image_uploaded = False
     if created or force:
         img = _find_image(item_path)
+        if img is not None and not _image_is_processed(img) and not allow_raw_image:
+            raise SystemExit(
+                f"REFUSED: {sku}'s only image is RAW ({img.name}) — the pipeline product "
+                f"square.png is missing. Run the image pipeline first "
+                f"(matte.py --item-dir items/{sku}, or the flat-goods deskew profile), "
+                f"re-run hero_qa, then retry — or pass --allow-raw-image to override "
+                f"consciously."
+            )
         if img is not None:
             _create_catalog_image(
                 token, str(img), object_id=item_id,
@@ -619,10 +638,16 @@ def main(argv=None) -> int:
         "--skip-hero-qa", action="store_true",
         help="Override the pre-publish Hero QA gate (conscious override only).",
     )
+    parser.add_argument(
+        "--allow-raw-image", action="store_true",
+        help="Allow uploading a raw (non-pipeline) image — square.jpg/hero.* "
+             "(conscious override; the default requires the matte/flat-goods square.png).",
+    )
     args = parser.parse_args(argv)
 
     summary = list_item(args.item_dir, dry_run=args.dry_run, force=args.force,
-                        skip_hero_qa=args.skip_hero_qa)
+                        skip_hero_qa=args.skip_hero_qa,
+                        allow_raw_image=args.allow_raw_image)
 
     if summary.get("dry_run"):
         print(f"[dry-run] {summary['sku']}: would {summary['action']} "

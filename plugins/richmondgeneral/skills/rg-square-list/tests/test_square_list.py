@@ -830,3 +830,37 @@ def test_create_writes_info_qr_and_categories(item_dir, monkeypatch):
     assert cats.get("type") == "CLZCJ62H4TTHDQ3ZBYMZQASQ"
     assert cats.get("reporting_category") == "CLZCJ62H4TTHDQ3ZBYMZQASQ"
     assert cats.get("tier") == sc.CAT_NEW_ARRIVALS
+
+
+# ---------------------------------------------------------------------------
+# Raw-image gate (RG-0062/0064/0068 in-situ shots shipped raw, 2026-07-15).
+# ---------------------------------------------------------------------------
+
+def test_create_refuses_raw_image(item_dir, monkeypatch):
+    (item_dir / "square.png").unlink()          # fixture ships square.png; remove it
+    (item_dir / "hero.jpg").write_bytes(b"")    # only a raw hero remains
+    _write_label(item_dir)
+    _patch_token(monkeypatch)
+    _patch_request(monkeypatch, _create_handler)
+    _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
+    with pytest.raises(SystemExit, match="RAW"):
+        sl.list_item(str(item_dir))
+
+
+def test_create_allows_raw_image_with_flag(item_dir, monkeypatch):
+    (item_dir / "square.png").unlink()
+    (item_dir / "hero.jpg").write_bytes(b"")
+    _write_label(item_dir)
+    _patch_token(monkeypatch)
+    _patch_request(monkeypatch, _create_handler)
+    uploads = _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
+    sl.list_item(str(item_dir), allow_raw_image=True)
+    assert len(uploads) == 1
+
+
+def test_dry_run_reports_image_processed_state(item_dir):
+    _write_label(item_dir)
+    s = sl.list_item(str(item_dir), dry_run=True)
+    assert s["image"] == "square.png" and s["image_processed"] is True

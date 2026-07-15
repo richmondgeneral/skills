@@ -2,9 +2,9 @@
 name: ebay-chrome
 description: Chrome automation patterns for managing eBay (richmondgeneral) listings via the Claude-in-Chrome extension — Seller Hub navigation, the "Revise your listing" form, title/SKU/price fields, the description RTE iframe, item specifics, and the publish ("Revise it") flow. Use for ANY eBay listing create/revise/manage action driven through Claude in Chrome. Triggers on "revise ebay", "edit ebay listing", "update ebay title/description", "ebay seller hub", "fix the ebay listing", "ebay chrome". This is the sanctioned path for eBay browser writes — do NOT use the local seller-agent's Vision Agent for eBay (Gemini-billable, no deterministic fallback; it was hard-down on a 429 on 2026-06-20). For programmatic CREATE of an API-managed item use `ebay-lister` (Sell Inventory API); for allowed field/category values see the field-map reference below.
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: scottybe
-  updated: "2026-06-20"
+  updated: "2026-07-15"
   changelog: |
     v1.0 - Initial extraction from the RG-0023 reconcile (2026-06-20):
     - Seller Hub active-listings entry + search-by-item-number → Edit

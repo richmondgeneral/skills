@@ -115,3 +115,41 @@ The full browser CREATE flow. No Gemini, no permission churn — `browser_batch`
 - Best Offer **auto-accept / auto-decline** thresholds (Minimum offer / Auto accept fields).
 - Oversize package handling on CREATE (only relevant when shipping, not pickup-only).
 - Full dropdown option lists for the jewelry Item specifics.
+
+## Session learnings 2026-07-15 (5 revisions + 2 creates: wrestling DVDs 298507094521, Knoll fabric 298507111449)
+
+### Navigation / Seller Hub
+- **❌ `/sh/lst/active?keyword=…` deep-link hangs the tab** (same failure class as the ReviseItem
+  deep-link — renderer freezes, every CDP call times out). Navigate the PLAIN `/sh/lst/active`,
+  then type into the search box. If a tab is frozen, don't fight it: create a fresh tab.
+- **Post-"Done" search box swallow:** after the revise-confirmation "Done" click, Seller Hub
+  re-renders async — the FIRST click+type into "Search by title, SKU, or item number" is often
+  swallowed. Re-click and retype; screenshot-verify the box shows your number before clicking Edit.
+- **Stale row prices:** the Active-listings row can show the OLD price right after a successful
+  revise (dialog confirmed, row still stale). Trust the "Your listing has been revised" dialog or
+  re-read the live item; never re-revise off the row price.
+
+### Revise form
+- **"Revise it" ref-clicks don't fire.** `find` → click-by-ref scrolls but doesn't submit;
+  `scroll_to` the ref, then **coordinate-click the visible blue button** (≈(643,572) @ ~1290px
+  viewport). Success signal = the dialog; absence after 7s = click again once.
+
+### Create form
+- Prelist may **skip "Find a match"** and jump straight to the condition modal (e.g. Crafts >
+  Fabric: only New/Used offered).
+- **Shipping policy is a React combobox, NOT a native `<select>`** — safe to click open. Observed
+  options: Local Pickup Only / Local Pickup + Calculated Ship + International (elS) / Standard
+  Small Item / Default Shipping. Create default = last-used (verify every time).
+- Suggested item specifics: check individually rather than "Apply all" when one is wrong
+  (eBay.ai offered "Actor: John Cena" for a DVD lot stack photo).
+- **"List it" can freeze the renderer AFTER the submit succeeds.** Don't retry-click a frozen tab
+  (duplicate risk) — open a FRESH tab → `/sh/lst/active` → confirm the new listing exists.
+
+### Cross-channel: FB photos → eBay
+- FB-only listings (no items/RG-XXXX dir): `ops/seller-agent/save_item_photos.py <fb_item_url>
+  <out_dir>` downloads the listing photos via the logged-in Playwright profile (headless +
+  `--disable-blink-features=AutomationControlled`; a HEADED launch over the osascript bridge dies
+  with TargetClosedError; clear stale `playwright_profile/Singleton*` locks first).
+- Filter the grab: real product photos are **720×960 portraits**; 526/540/565 squares are
+  recommendation-thumbnail junk. FB CDN URLs are signed → blocked from Chrome-tool output; the
+  Playwright context fetch keeps them browser-side (clipboard hand-off also freezes the tab — don't).

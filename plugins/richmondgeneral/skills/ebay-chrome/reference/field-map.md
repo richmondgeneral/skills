@@ -160,3 +160,14 @@ The full browser CREATE flow. No Gemini, no permission churn — `browser_batch`
 - Package weight/dims inputs (calculated-ship policies): plain inputs to the right of the policy
   dropdown — lbs / oz / L×W×H in. Type after selecting the policy; live-verified 7 lb 15×8×6 →
   calculated $9.04 ground quote on the item page.
+
+## ⚠️ CRITICAL — the revise confirmation dialog does NOT prove your edits saved (2026-07-15)
+"Your listing has been revised" appears even when every keystroke was swallowed — Revise submits
+whatever the form actually holds. A batch of 5 price revisions all showed the dialog; ZERO price
+changes had landed (verified on the live item pages). The swallow hits any field for ~the first
+seconds after the form (or the Seller Hub search box) renders, and can recur; ref-clicks from
+`find` often don't focus the field either. **Mandatory protocol for EVERY field edit:**
+1. `screenshot` first (forces a settle + gives real coordinates), then coordinate-click the field.
+2. Type, then `zoom` the field region and READ the value. If stale, click+retype (2nd try lands).
+3. Only then submit — and verify the live `/itm/<id>` page after (`innerText` match on `US $…`),
+   never the Seller Hub row (stale) and never the dialog (lies).

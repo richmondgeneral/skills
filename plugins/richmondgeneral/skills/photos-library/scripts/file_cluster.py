@@ -346,6 +346,7 @@ def main():
                    help="uuid=role (hero|detail-<slug>); repeatable")
     p.add_argument("--items-dir", default=DEFAULT_ITEMS_DIR)
     p.add_argument("--plan", action="store_true", help="dry-run: print intent, mutate nothing")
+    p.add_argument("--json", action="store_true", help="with --plan: emit the plan as JSON")
     p.add_argument("--tag-only", action="store_true",
                    help="just tag rg-sorted + SKU (no export/album) — for photos of an already-handled item")
     p.add_argument("--no-album", action="store_true",
@@ -388,6 +389,11 @@ def main():
     if args.plan:
         plan = plan_filenames(existing_files(args.sku), photos)
         sku_label = args.sku or ("RG-NEXT (would mint)" if args.mint else "(no SKU!)")
+        if args.json:
+            print(json.dumps({"plan": True, "sku": sku_label,
+                              "exports": [{"uuid": e["uuid"], "out": e["out"]} for e in plan],
+                              "album_add": len(on_disk), "offloaded": offloaded}, indent=2))
+            return
         print(f"PLAN — sku: {sku_label}")
         for entry in plan:
             print(f"  {entry['uuid'][:8]}  ->  items/{args.sku or 'RG-XXXX'}/{entry['out']}")

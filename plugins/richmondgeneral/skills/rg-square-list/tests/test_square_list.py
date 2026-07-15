@@ -687,10 +687,13 @@ def test_create_generates_qr_buy(monkeypatch, item_dir):
 
     sl.list_item(str(item_dir), dry_run=False)
 
-    # gen_qr_png invoked once with the NEW buy link, targeting qr-buy.png.
-    assert len(qr_calls) == 1
+    # gen_qr_png invoked for BOTH QRs: buy link first, then the info QR
+    # (price tag -> GitHub item page) — the full two-QR contract.
+    assert len(qr_calls) == 2
     assert qr_calls[0]["url"] == "https://square.link/u/abc"
     assert qr_calls[0]["out_path"].endswith("qr-buy.png")
+    assert qr_calls[1]["url"] == "https://richmondgeneral.github.io/items/RG-0099/"
+    assert qr_calls[1]["out_path"].endswith("qr-info.png")
 
     # Recorded in label.json -> qr_codes.buy.
     written = json.loads(label_path.read_text(encoding="utf-8"))
@@ -796,3 +799,34 @@ def test_type_category_defaults_to_collectibles_without_note(item_dir):
     cats = [c["id"] for c in obj["item_data"]["categories"]]
     assert cats[0] == sl.CAT_COLLECTIBLES
     assert cats[2] == sl.CAT_VINTAGE_MARKET
+
+
+def test_create_writes_info_qr_and_categories(item_dir, monkeypatch):
+    _write_label(item_dir, reporting_category_note="Books & Paper")
+    _patch_token(monkeypatch)
+
+    def handler(method, path, body):
+        if path == "/v2/catalog/batch-upsert":
+            return 200, {"id_mappings": [
+                {"client_object_id": "#RG-0099", "object_id": "ITEM_REAL"},
+                {"client_object_id": "#RG-0099-var", "object_id": "VAR_REAL"}]}
+        if path == "/v2/inventory/batch-change":
+            return 200, {"counts": [{"quantity": "1"}]}
+        if path == "/v2/online-checkout/payment-links":
+            return 200, {"payment_link": {"id": "PL", "url": "https://square.link/u/abc",
+                                          "order_id": "ORD"}}
+        raise AssertionError(f"unexpected request: {method} {path}")
+
+    _patch_request(monkeypatch, handler)
+    _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
+    sl.list_item(str(item_dir))
+    label = json.loads((item_dir / "label.json").read_text())
+    qr = label.get("qr_codes", {})
+    assert qr.get("info", {}).get("file") == "qr-info.png"
+    assert "richmondgeneral.github.io/items/RG-0099/" in qr["info"]["url"]
+    assert qr.get("buy", {}).get("file") == "qr-buy.png"
+    cats = label["channels"]["square"].get("categories", {})
+    assert cats.get("type") == "CLZCJ62H4TTHDQ3ZBYMZQASQ"
+    assert cats.get("reporting_category") == "CLZCJ62H4TTHDQ3ZBYMZQASQ"
+    assert cats.get("tier") == sc.CAT_NEW_ARRIVALS

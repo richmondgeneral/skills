@@ -1,6 +1,6 @@
 {
   "name": "richmondgeneral",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "description": "Richmond General's full skill set — Square catalog & storefront ops, item lifecycle (intake, lotting, mark-sold), iMessage/CRM, photo library, image processing, appraisal, and Whatnot tooling. Single source of truth for the Claude desktop app and Cowork.",
   "author": {
     "name": "Scott Beilfuss"

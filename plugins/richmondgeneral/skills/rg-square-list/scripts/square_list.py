@@ -529,6 +529,37 @@ def list_item(item_dir: str, dry_run: bool = False, force: bool = False,
                 "installed (re-run under uv with --with \"qrcode[pil]\")."
             )
 
+    # --- Info QR (price tag -> GitHub item page): the OTHER half of the two-QR
+    # contract. rg-square-list used to emit only qr-buy (2026-07-15 RG-0071 run).
+    qr_info_recorded = False
+    info_url = f"https://richmondgeneral.github.io/items/{sku}/"
+    info_path = item_path / "qr-info.png"
+    try:
+        if not info_path.exists():
+            gen_qr_png(info_url, str(info_path))
+        qr_codes = label.get("qr_codes") or {}
+        info = qr_codes.get("info") or {}
+        info.update({"url": info_url, "file": "qr-info.png",
+                     "use": "price tag — scan for item card"})
+        info.pop("status", None)  # clear any intake "stub" marker
+        qr_codes["info"] = info
+        label["qr_codes"] = qr_codes
+        qr_info_recorded = True
+    except ImportError:
+        print("  [warn] qr-info.png NOT generated: the `qrcode` package is not "
+              "installed (re-run under uv with --with \"qrcode[pil]\").")
+
+    # --- Persist the resolved categories back into the record (Square had them,
+    # label.json didn't — 2026-07-15 RG-0071 run) --------------------------------
+    if created:
+        type_id = resolve_type_category(label)
+        square["categories"] = {
+            "type": type_id,
+            "tier": CAT_NEW_ARRIVALS,
+            "room": ROOM_BY_TYPE.get(type_id, CAT_VINTAGE_MARKET),
+            "reporting_category": type_id,
+        }
+
     # --- Write back into channels.square -------------------------------------
     square.update({
         "object_id": item_id,
@@ -559,6 +590,7 @@ def list_item(item_dir: str, dry_run: bool = False, force: bool = False,
         "price": price_str,
         "image_uploaded": image_uploaded,
         "qr_buy": qr_buy_recorded,
+        "qr_info": qr_info_recorded,
     }
 
 

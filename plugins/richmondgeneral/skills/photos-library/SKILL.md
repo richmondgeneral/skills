@@ -2,10 +2,15 @@
 name: photos-library
 description: Query and extract photos from macOS Photos Library, sort intake photos into per-SKU libraries, and sort receipt photos into ops/receipts + the receipts ledger. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, pull images from Photos app, sort the intake album into items, file photos into a SKU, clear the intake queue, route downloaded photos into the right album, or sort/file receipts out of the photo library. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll", "sort intake", "sort my intake photos", "file these into their SKU", "out of intake", "photos from downloads into the right album", "sort receipts", "file receipts", "receipt photos", "receipts out of the library".
 metadata:
-  version: "1.10"
+  version: "1.11"
   author: scottybe
   updated: "2026-07-15"
   changelog: |
+    v1.11 - Cowork operating pattern baked in: mac-bridge-first entry point (deferred-tool
+    connection check), subagent fan-out for per-item research with writes kept serial in the
+    main agent (2026-06-21 experiment, now default), computer-use fallback for iCloud-offloaded
+    originals (open in Photos to force download, then re-run = manifest resume).
+
     v1.10 - Duplicate-mint guard + live-model verification (RG-0060 void postmortem):
     - file_cluster scans items/*/.filed.json before minting — a --mint retry ADOPTS the
       already-filed SKU instead of minting a duplicate; conflicts exit 4; Void records
@@ -387,6 +392,29 @@ as: sweep → look → propose → confirm → file.
    ```bash
    python3 scripts/file_cluster.py --tag-only --sku RG-00NN --uuids <uuids>
    ```
+
+**Cowork entry point: load `mac-bridge` FIRST.** Every command in this skill runs on the Mac.
+From Cowork, load the `mac-bridge` skill before anything else — it has the connection-check
+protocol (the osascript tool is usually DEFERRED, not disconnected; ToolSearch it before telling
+the user to toggle the extension).
+
+**Intake at scale = subagent fan-out (reads) + serial writes (proven 2026-06-21).** After the
+sweep, the MAIN agent segments each cluster into items and assigns explicit UUIDs. Then:
+- **Fan out one READ-ONLY subagent per item** for the slow cognitive work: identify → hero pick →
+  condition → estimates block → web comps (subagents must load WebSearch via ToolSearch) →
+  photo-gap flags → blockers. Subagents mint/write/tag/commit NOTHING.
+- **All writes stay serial in the main agent**: SKU mint (CAS authority), `file_cluster` runs,
+  tagging, git commits, Square. Two writers on the bridge/Photos/git is how duplicate-SKU and
+  half-tagged states happen — the bridge is a single-lane road.
+- Main agent reviews each subagent draft against the definition-of-done, then executes.
+
+**iCloud-offloaded originals — computer-use fallback.** `file_cluster` reports offloaded uuids
+(original not on disk) and skips them. Scripting cannot force the download; the fix is UI:
+with **computer-use** (Photos is a native app = full tier), open Photos, search the UUID or
+locate the photo (the intake album/date view), open it full-screen so Photos fetches the
+original, wait for the download badge to clear, then re-run the SAME `file_cluster` command —
+the manifest resume picks up just the newly available photos. If computer-use isn't granted,
+hand the user the photo list and ask them to open each once.
 
 **Duplicate-mint guard + Void-SKU recovery.** `file_cluster` scans every item's `.filed.json`
 before minting: if any of the cluster's uuids were already filed, it **adopts that SKU** (no new

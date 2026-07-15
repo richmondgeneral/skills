@@ -1,6 +1,6 @@
 ---
 name: mac-bridge
-description: Run Richmond General's Mac-only skills from Cowork by executing them on the Mac over the osascript bridge. Use when working in Cowork and a task needs the local Mac — the Photos library, local files, or any RG skill that isn't Cowork-native (photos-library, image-processor, rg-full-auto steps, etc.). Triggers on "from Cowork run …", "pull from the photo library", "use the Mac image-processor", "run an RG skill script on my Mac", or any intake/photo task in Cowork that needs the Mac. NOT needed in Claude Code / code mode — there, run the skills directly.
+description: Run Richmond General's Mac-only skills from Cowork by executing them on the Mac over the osascript bridge. LOAD THIS FIRST for any Cowork task that needs the local Mac — the Photos library, local files, intake sweeps, or any RG skill that isn't Cowork-native (photos-library, image-processor, rg-full-auto steps, etc.). Triggers on "from Cowork run …", "pull from the photo library", "check photo lib", "intake sweep", "use the Mac image-processor", "run an RG skill script on my Mac", "control your mac", or when the bridge seems disconnected/unavailable — the osascript tool is usually just DEFERRED (ToolSearch it) rather than off; this skill has the connection-check protocol. NOT needed in Claude Code / code mode — there, run the skills directly.
 metadata:
   version: "1.1"
   author: scottybe
@@ -10,6 +10,19 @@ metadata:
 ---
 
 # Mac Bridge — run RG skills on the Mac from Cowork
+
+## Connection check — do this BEFORE claiming the bridge is off
+
+The `Control your Mac` osascript tool is usually a **DEFERRED tool**: it does NOT appear in
+your active tool list until you fetch it. An empty tool list is NOT evidence the extension is
+disconnected (2026-07-15 intake session: the agent told the user to "toggle it on" when it was
+already on — the tool was just deferred).
+
+1. `ToolSearch` for `osascript` / "Control your Mac" (e.g. query `+osascript` or
+   `select:mcp__Control_your_Mac__osascript`). Deferred tools load on fetch.
+2. Probe: `osascript → do shell script "echo bridge-ok"`. If it returns `bridge-ok`, you're live.
+3. ONLY if ToolSearch finds nothing AND the probe fails: ask the user to enable
+   Cowork → Settings → Extensions → "Control your Mac", then re-run step 1.
 
 Cowork is sandboxed and can't touch the Mac filesystem, Photos, or Python directly. But it **can** run AppleScript via the "Control your Mac" osascript extension, and AppleScript's `do shell script` runs bash on the Mac (verified 2026-06-18). This skill uses that bridge plus a wrapper (`rg-skill.sh`) to run any Richmond General skill script on the Mac in the plugin's `uv` environment and return its output.
 

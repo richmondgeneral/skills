@@ -44,3 +44,56 @@ def test_stub_label_written_only_when_absent(tmp_path):
     (d / "label.json").write_text('{"sku":"RG-0031","price":"42"}')
     fc.ensure_label(str(d), "RG-0031")  # must not clobber
     assert json.loads((d / "label.json").read_text())["price"] == "42"
+
+
+# ---------------------------------------------------------------------------
+# Intake hardening (2026-07-15): resume manifest, verified tags, tag ordering.
+# ---------------------------------------------------------------------------
+
+def test_manifest_roundtrip_and_split(tmp_path):
+    d = str(tmp_path)
+    assert fc.load_manifest(d) == {}
+    fc.save_manifest(d, {"u1": "hero.jpeg"})
+    assert fc.load_manifest(d) == {"u1": "hero.jpeg"}
+    photos = [{"uuid": "u1", "role": None}, {"uuid": "u2", "role": None}]
+    already, todo = fc.split_filed({"u1": "hero.jpeg"}, photos)
+    assert [p["uuid"] for p in already] == ["u1"]
+    assert [p["uuid"] for p in todo] == ["u2"]
+
+
+def test_load_manifest_tolerates_garbage(tmp_path):
+    (tmp_path / fc.MANIFEST_NAME).write_text("not json")
+    assert fc.load_manifest(str(tmp_path)) == {}
+
+
+def test_parse_tag_result_mixed():
+    ok, failed = fc.parse_tag_result("u1:ok\nu2:fail no media item\nu3:ok\n\n")
+    assert ok == ["u1", "u3"]
+    assert failed == {"u2": "no media item"}
+
+
+def test_tag_sorted_retries_failures(monkeypatch):
+    calls = []
+
+    def fake_tag(keywords, uuids):
+        calls.append(list(uuids))
+        if len(calls) == 1:
+            return ["u1"], {"u2": "flake"}
+        return ["u2"], {}
+
+    monkeypatch.setattr(fc, "tag_keywords", fake_tag)
+    result = fc.tag_sorted("RG-0099", ["u1", "u2"])
+    assert sorted(result["ok"]) == ["u1", "u2"]
+    assert result["failed"] == {}
+    assert calls == [["u1", "u2"], ["u2"]]  # retry hit only the failure
+
+
+def test_add_to_album_failure_is_nonfatal(monkeypatch):
+    import subprocess as sp
+
+    def boom(*a, **k):
+        raise sp.CalledProcessError(1, "osascript", stderr="AppleEvent timed out")
+
+    monkeypatch.setattr(fc.subprocess, "run", boom)
+    out = fc.add_to_album("RG-0099", ["u1"])
+    assert out["ok"] is False and "non-fatal" in out["warning"]

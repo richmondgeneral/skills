@@ -2,10 +2,20 @@
 name: photos-library
 description: Query and extract photos from macOS Photos Library, sort intake photos into per-SKU libraries, and sort receipt photos into ops/receipts + the receipts ledger. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, pull images from Photos app, sort the intake album into items, file photos into a SKU, clear the intake queue, route downloaded photos into the right album, or sort/file receipts out of the photo library. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll", "sort intake", "sort my intake photos", "file these into their SKU", "out of intake", "photos from downloads into the right album", "sort receipts", "file receipts", "receipt photos", "receipts out of the library".
 metadata:
-  version: "1.8"
+  version: "1.9"
   author: scottybe
   updated: "2026-07-15"
   changelog: |
+    v1.9 - Intake filing hardened (2026-07-15 Cowork-struggle postmortem):
+    - file_cluster.py tags BEFORE the album step; album add is best-effort/non-fatal
+      (the flaky AppleScript used to abort pre-tag, stranding exported items in the queue)
+    - per-photo tag verification + one retry (bare `try` used to swallow failures silently);
+      exit 3 + tag_failed listing when photos still fail
+    - .filed.json resume manifest: re-running after a bridge timeout skips exported photos
+      instead of duplicating them under fresh detail-N names; [export i/n] progress on stderr
+    - subprocess failures now emit stage + captured stderr as JSON (no more "errored
+      without detail" over the bridge); --no-album flag
+
     v1.8 - Receipt sorter (agent loop):
     - find_receipts.py: queue of receipt photos via Apple's OWN ML labels in
       the Photos search index (database/search/psi.sqlite "Receipt" scene
@@ -348,8 +358,21 @@ as: sweep → look → propose → confirm → file.
    python3 scripts/file_cluster.py --uuids <uuids> [--sku RG-00NN | --mint] \
        [--role <uuid>=hero] [--role <uuid>=detail-back]
    ```
-   Exports to `items/RG-XXXX/` (hero + detail-N, no clobber), adds to the per-SKU album, and tags
-   `rg-sorted` + `RG-XXXX`. Minting is atomic (Square-CAS) and hard-fails offline.
+   Exports to `items/RG-XXXX/` (hero + detail-N, no clobber), tags `rg-sorted` + `RG-XXXX`
+   (verified per-photo, one automatic retry), then adds to the per-SKU album **best-effort**
+   (the album AppleScript is known-flaky; a failure is a warning, never an abort — tagging
+   happens FIRST so the queue always clears). Minting is atomic (Square-CAS) and hard-fails
+   offline.
+
+   **Timeout / interruption? Just re-run the SAME command.** A `.filed.json` manifest in the
+   item dir records uuid→file; a re-run skips already-exported photos (no duplicate detail-N),
+   re-tags idempotently, and finishes what's left. Per-photo `[export i/n]` progress goes to
+   stderr — over the bridge, always capture it (`2>&1`) and for big clusters (>8 photos) expect
+   to re-run once or twice rather than raising the bridge timeout.
+
+   Exit codes: `0` = filed (album warning possible — check `album.warning` in the JSON);
+   `3` = some photos failed tagging even after retry (`tag_failed` lists them — re-run, or
+   `--tag-only` those uuids). `--no-album` skips the album step entirely.
 
    For a cluster that belongs to an **already-photographed** item (just clear it from the queue and
    label it by SKU — no new `items/` photos), tag without exporting:

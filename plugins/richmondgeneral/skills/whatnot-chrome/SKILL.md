@@ -16,7 +16,13 @@ metadata:
     - Added page element discovery patterns
 ---
 
-# Whatnot Chrome Automation
+# Whatnot Chrome
+
+> **Which Whatnot skill?** This one = CSV batch import + edit-page automation. Single-item create
+> form → `whatnot-create-product`; field/category reference → `whatnot-catalog`.
+> **Idempotency first:** before importing a CSV row / creating a draft, check that SKU's
+> `label.json → channels.whatnot` — skip SKUs already registered (blind imports = duplicate
+> listings). Deterministic alternative: `ops/seller-agent/publish_item.py --platform whatnot`. Automation
 
 Reusable Chrome automation primitives for Whatnot's dashboard. This skill owns the *how* — how to interact with Whatnot's React UI. For field values and category data, see `whatnot-catalog`.
 

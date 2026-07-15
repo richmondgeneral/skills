@@ -1,3 +1,11 @@
+> ⚠️ **Version note (2026-07-15):** the JS scaffolding below is the **v0.2.x single-route**
+> implementation (regex `on()` match for `/s/shop` only). The live snippet is **v0.3.0
+> multi-route** — a `route()` function returning `{tiles, title, sub, key}` per matched route,
+> with a `data-rg-route` idempotency attribute and a `body.rg-hero-active` toggle (see the
+> v0.3.0 section of SKILL.md). When building or editing the hero, START from the LIVE snippet
+> (`snippets.list` on the site, or `brand/storefront/richmondgeneral-shop-snippet.html`) — use
+> this file for the per-variant tile CSS/markup only, not the route scaffolding.
+
 # Hero Tile Variant Templates
 
 These are the exact CSS + JS templates for each of the four design variants. The skill builds the final snippet content by selecting the appropriate template and substituting:

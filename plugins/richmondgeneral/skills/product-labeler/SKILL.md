@@ -2,10 +2,13 @@
 name: product-labeler
 description: Generate product labels for Richmond General Square inventory. Use when creating thermal printer labels (CSV for Print Master batch import), Square catalog descriptions, or price tags. Handles imported Asian snacks, vintage items, and wellness products. Supports batch label generation, style guide compliance, and measurement conversions.
 metadata:
-  version: "1.1"
+  version: "1.2"
   author: scottybe
-  updated: "2025-12-21"
+  updated: "2026-07-15"
   changelog: |
+    v1.2 - RG-era alignment: two-QR price tags (qr-info.png), RG-XXXX SKUs first-class,
+    Mac-native output path (the /mnt/user-data path was Cowork-container-only).
+
     v1.1 - Anthropic skills update:
     - Added author and updated fields
 ---
@@ -13,6 +16,13 @@ metadata:
 # Product Labeler for Richmond General Square
 
 Generate professional product labels for thermal printing and Square catalog listings.
+
+> **RG-era updates (2026-07):** unique RG items use **RG-XXXX** SKUs (minted by the Square
+> CAS authority — never invent one here); the legacy SNACK-/COOKIE-/VINT- prefixes below apply
+> to consumable/snack restock only. **Price tags for RG items carry the `qr-info.png` QR**
+> (→ the GitHub item page; already generated in the item dir by intake/rg-full-auto Phase 7 —
+> reference it, don't regenerate). The buy QR (`qr-buy.png`) belongs on the item card, not the
+> price tag.
 
 ## Workflow Overview
 
@@ -111,7 +121,7 @@ To generate CSV for batch printing:
 2. Generate CSV with headers in row 1
 3. Keep to 100 rows max per file (Print Master limit)
 4. Save as UTF-8 encoded CSV
-5. Output to `/mnt/user-data/outputs/` for user download
+5. Output next to the item (`items/RG-XXXX/`) or a workspace `labels/` dir on the Mac (`/mnt/user-data/outputs/` is Cowork-container-only — invalid on the Mac)
 
 **Example batch output:**
 ```csv

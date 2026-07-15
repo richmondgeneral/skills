@@ -224,13 +224,33 @@ do shell script "ls -lt ~/Desktop/*.jpg ~/Desktop/*.jpeg ~/Desktop/*.png ~/Deskt
 
 Check size (`stat -f%z`). If > 20MB, compress first: `sips -Z 3000 source --out hero_temp.png`. Convert HEIC to PNG if needed: `sips -s format png source --out hero_temp.png`.
 
-### Step 0.7: Remove background
+### Step 0.7: Cutout master via matte.py (local, non-generative — the DEFAULT path)
+
+`matte.py` (BiRefNet, dedicated `~/.cache/rg-matte` venv — absolute interpreter path, never
+`uv run --project`) produces the transparent cutout MASTER and derives `square.png` (1:1,
+Square primary) + `card.png` (5:7 gallery card). Free, local, safe on labeled goods.
 
 ```applescript
-do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/process.py '/ABSOLUTE/REMOVE_BG_INPUT' --output '/Users/scottybe/workspace/richmondgeneral/items/RG-XXXX/hero.png' --quality premium --model removebg 2>&1"
+do shell script "$HOME/.cache/rg-matte/bin/python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/matte.py --item-dir /Users/scottybe/workspace/richmondgeneral/items/RG-XXXX 2>&1"
 ```
 
-Prerequisites: `~/.env` must have `REMOVEBG_API_KEY`. Monitor credits -- alert user if <= 5. If bg removal fails, fall back to original image.
+**Flat rectangular goods** (books, paper, boxed, framed) skip the cutout — use the flat-goods
+profile instead: `standardize.py --deskew --perspective-correct --crop-to-face`.
+
+Legacy fallback (API, only if the matte venv is unavailable): `process.py --model removebg`
+(needs `REMOVEBG_API_KEY`; monitor credits). Never improvise an untracked cutout (Vision/
+Preview) — see the RG-0031 postmortem.
+
+### Step 0.8: Hero QA gate (BLOCKING)
+
+```applescript
+do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/hero_qa.py /Users/scottybe/workspace/richmondgeneral/items/RG-XXXX 2>&1"
+```
+
+`label.json → hero_qa.status` must be `"pass"` (or `photo_overrides.status:"approved"` after a
+visual check) before Phase 4 (Square primary) or Phase 7 (GitHub publish) — process_batch
+enforces this; don't route around it. ALWAYS visually Read the hero too (the gate has a known
+sideways-pixels gap on text-sparse covers).
 
 ---
 
@@ -319,10 +339,11 @@ Do NOT include `catalog_object_type`. `quantity` is a STRING. `occurred_at` must
 
 ## Phase 4: Image Upload
 
-Use `square-image-upload` skill script on user's Mac:
+**Precondition: Hero QA pass (Step 0.8).** Upload `square.png` (the 1:1 derived from the matte
+master; falls back to hero.png for legacy items) via the `square-image-upload` skill:
 
 ```applescript
-do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/square-image-upload/scripts/upload_image.py --image '/Users/scottybe/workspace/richmondgeneral/items/RG-XXXX/hero.png' --item-id 'CATALOG_ITEM_ID' --name 'RG-XXXX Hero' --caption 'Front view' --primary 2>&1"
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/square-image-upload/scripts/upload_image.py --image '/Users/scottybe/workspace/richmondgeneral/items/RG-XXXX/square.png' --item-id 'CATALOG_ITEM_ID' --name 'RG-XXXX Hero' --caption 'Front view' --primary 2>&1"
 ```
 
 WebP not supported -- convert if needed: `sips -s format png image.webp --out hero.png`
@@ -386,11 +407,16 @@ Write populated template to `/Users/scottybe/workspace/richmondgeneral/items/RG-
 ### Steps 7.2-7.6: QR code, gallery, count, cleanup, git push
 
 See `references/info-card-publishing.md` for exact commands:
-- **7.2:** Generate QR code (Python qrcode library via osascript)
-- **7.3:** Add item card to gallery `index.html` (sed via osascript)
-- **7.4:** Update item count in gallery
+- **7.2:** Generate BOTH QR codes — `qr-info.png` (GitHub item page, printed on the price tag)
+  and `qr-buy.png` (Square checkout link) — and record them in `label.json → qr_codes`.
+  (`rg-square-list` already emits qr-buy.png when it creates the payment link.)
+- **7.3:** Add the item card to the gallery via `python items/scripts/build_gallery.py --apply`
+  (idempotent reconciler — NEVER hand-`sed`; that path silently dropped 6 cards, see the
+  2026-06-21 postmortem). Gate: `build_gallery.py --check` must exit 0 — a live item page
+  absent from the grid is NOT done.
+- **7.4:** Item count is recomputed by build_gallery.py automatically.
 - **7.5:** Cleanup temp files
-- **7.6:** `git add`, `git commit`, `git push origin main`
+- **7.6:** `git add <explicit paths>`, `git commit`, `git push origin main`
 
 **Customer flow:** QR on label -> Info card -> Read story -> Buy Now -> Square checkout
 
@@ -501,7 +527,7 @@ See `references/troubleshooting.md` for common issues (image size, upload failur
 - `references/api-payloads.md` - JSON templates for Phase 2/3/5
 - `references/description-formatting.md` - HTML formatting rules for `description_html`
 - `references/info-card-template.html` - Flip card HTML template for Phase 7
-- `references/info-card-publishing.md` - QR code, gallery insertion, git commands for Phase 7
+- `references/info-card-publishing.md` - two-QR generation, build_gallery.py, git commands for Phase 7
 - `references/label-format.md` - Print Master CSV settings
 - `references/marketplace-templates.md` - Title/description templates across platforms
 - `references/mcp-connectors.md` - MCP connector quick reference

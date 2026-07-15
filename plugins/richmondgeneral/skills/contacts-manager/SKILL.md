@@ -47,6 +47,14 @@ metadata:
 | HOA Drywall | 1343 | Dawn, Amy, neighbors |
 | Shagbark | 1053 | Dawn, Amy, multiple |
 
+## CRM Segments (Square)
+
+| Segment | Square group ID | Notes |
+|---------|-----------------|-------|
+| Atari / Vintage Computing | `6B1ZES5TGR5VA1XBG4EYMS4JAS` | Live 2026-07; quick-lookup roster in `references/contacts.md` |
+
+(The quick-ref tables above are point-in-time — `references/contacts.md` is the current roster.)
+
 ## Agent-Friendly Contacts
 
 These contacts know Scott uses AI agents. Can message AS the agent directly:

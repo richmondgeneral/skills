@@ -240,6 +240,11 @@ If the user opted out of a specific sold date (Step 3), drop the ` • Sold …`
 
 Prices are JSON numbers (not strings, no `$`). If `listed_price === sold_price`, write both anyway — downstream reporting expects both keys present. See `RG-0003/status.json` (sold below ask) and `RG-0005/status.json` (sold at ask) for canonical examples.
 
+**Also set `label.json → state: "Sold"`** (and `channels.square.status: "sold"` if present).
+label.json is the source of truth the canonical builders key on — if it still says `Listed`,
+a later `build_gallery.py --apply` / `build_item_page.py` run (rg-reconcile heal, rg-reprice)
+can regenerate an "available" card/page and CLOBBER the manual sold treatment from Steps 2–5.
+
 ### Step 7 — Delete the Square payment link
 
 This is the irreversible step. **Confirm with the user before running** unless they've already explicitly said "deactivate it" in this session.

@@ -13,7 +13,13 @@ metadata:
     - Added Type field disambiguation (CSV listing type vs edit page content type)
 ---
 
-# Whatnot Catalog Reference
+# Whatnot Catalog
+
+> **Which Whatnot skill?** `whatnot-catalog` = field/category REFERENCE data; `whatnot-chrome` =
+> CSV batch import + edit-page automation; `whatnot-create-product` = single-item create form.
+> **Idempotency first (all three):** check `label.json → channels.whatnot` before ANY create —
+> if the item is already registered there, update, never blind-create. The deterministic publish
+> route `ops/seller-agent/publish_item.py --platform whatnot` also exists (review-by-default). Reference
 
 Reference data for Whatnot listings — categories, metadata fields, allowed values, and shipping heuristics. This is a **data-only** skill with no Chrome automation. For browser interaction, see `whatnot-chrome`.
 
@@ -67,7 +73,7 @@ Square prices use cents (e.g., `650` = $6.50). Whatnot requires **positive whole
 | Blu-ray | `Movies` | `Blu-ray` | |
 | Movie memorabilia | `Movies` | `Movie Memorabilia` | |
 | Rare/vintage books | `Rare & Vintage Books` | _(empty)_ | Top-level, no sub required |
-| Vintage toys | `Vintage Toys` | _(varies)_ | Check Values tab |
+| Vintage toys | `Vintage Toys` | _(varies)_ | Check Values tab (see also `whatnot-create-product/references/dropdown-values.md` — the DOM-extracted canonical dropdown list) |
 | Vinyl records | `Vinyl Records` | _(varies)_ | |
 | Art | `Art` | _(varies)_ | |
 

@@ -1,6 +1,6 @@
 ---
 name: square-image-upload
-description: Upload and manage images in Square Catalog via API. Use when the user needs to upload product photos, replace existing catalog images, or attach images to Square items/variations. Triggers on "upload image to Square", "add photo to item", "replace product image", "Square catalog image", or any request to programmatically manage Square product images. This skill is the deterministic default for image uploads, even when some Square MCP connectors expose multipart methods.
+description: Upload and manage images in Square Catalog via API. Use when the user needs to upload product photos, replace existing catalog images, or attach images to Square items/variations. Triggers on "upload image to Square", "add photo to item", "replace product image", "Square catalog image", or any request to programmatically manage Square product images. This skill is the deterministic default for image uploads, even when some Square MCP connectors expose multipart methods. From a Cowork session, prefer the square-image-upload-cowork variant (bridge-native flow).
 metadata:
   version: "1.6"
   author: scottybe
@@ -140,7 +140,7 @@ uv run --with requests,Pillow scripts/rotate_item_images.py --item-id <ID> --dry
 ### Upload New Image to Item
 
 ```bash
-uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/scripts/upload_image.py \
+uv run --with requests ~/workspace/richmondgeneral/skills/plugins/richmondgeneral/skills/square-image-upload/scripts/upload_image.py \
   --image /path/to/photo.jpg \
   --item-id CATALOG_ITEM_ID \
   --name "Product Photo" \
@@ -150,7 +150,7 @@ uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/sc
 ### Replace Existing Image
 
 ```bash
-uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/scripts/upload_image.py \
+uv run --with requests ~/workspace/richmondgeneral/skills/plugins/richmondgeneral/skills/square-image-upload/scripts/upload_image.py \
   --image /path/to/new_photo.jpg \
   --image-id EXISTING_IMAGE_ID
 ```
@@ -158,7 +158,7 @@ uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/sc
 ### Upload to Item Variation
 
 ```bash
-uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/scripts/upload_image.py \
+uv run --with requests ~/workspace/richmondgeneral/skills/plugins/richmondgeneral/skills/square-image-upload/scripts/upload_image.py \
   --image /path/to/photo.jpg \
   --variation-id VARIATION_ID
 ```
@@ -241,7 +241,7 @@ In Phase 2, after background removal:
 
 ```bash
 # Via osascript (runs on Mac with env vars)
-do shell script "source ~/.env && uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/scripts/upload_image.py \
+do shell script "source $HOME/.local/bin/env && source ~/.env && uv run --with requests ~/workspace/richmondgeneral/skills/plugins/richmondgeneral/skills/square-image-upload/scripts/upload_image.py \
   --image /Users/scottybe/workspace/square/items/RG-XXXX/hero.png \
   --item-id CATALOG_ITEM_ID \
   --name 'RG-XXXX Hero' \

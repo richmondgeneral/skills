@@ -97,7 +97,20 @@ def stub_label(sku):
             "whatnot": {"status": "not_listed"},
             "marketplace": {"status": "not_listed", "url": None},
         },
-        "qr_code_url": f"{PAGES_BASE}/{sku}/",
+        "qr_codes": {
+            "info": {
+                "url": f"{PAGES_BASE}/{sku}/",
+                "file": "qr-info.png",
+                "status": "stub",
+                "use": "price tag — scan for item card",
+            },
+            "buy": {
+                "url": None,  # filled by rg-square-list when the payment link is created
+                "file": "qr-buy.png",
+                "status": "stub",
+                "use": "Square checkout — scan to buy",
+            },
+        },
     }
 
 

@@ -50,3 +50,8 @@ The script's stdout (pass `--json` where the script supports it) comes back as t
 
 - This SKILL.md is the repo source of truth, shipped inside the `richmondgeneral` plugin from the `richmondgeneral/skills` marketplace repo. To pick up changes, update/reinstall the plugin (code-mode: `claude plugin marketplace update richmondgeneral && claude plugin update richmondgeneral@richmondgeneral`; Cowork: refresh the plugin in the plugin manager). Do NOT side-load this skill as a standalone user skill — that creates duplicate resolution. The helper script runs from the repo clone on the Mac (not from Cowork's sandbox).
 - In Claude Code / code mode you don't need this — invoke the skills directly (you have the Bash tool).
+- ⚠️ `rg-skill.sh` runs everything through the PLUGIN uv env (py3.14) — the image-processor
+  enhance/matte scripts (`matte.py`, `upres.py`, `sharpen.py`, `enhance.py`) need their DEDICATED
+  venvs instead (torch/rembg have no 3.14 wheels): invoke by absolute interpreter path —
+  `~/.cache/rg-matte/bin/python .../matte.py` / `~/.cache/rg-enhance/bin/python .../upres.py` —
+  never via rg-skill.sh or `uv run --project`.

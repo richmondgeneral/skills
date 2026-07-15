@@ -185,6 +185,32 @@ def update_catalog_image(
     return response.json()
 
 
+def _resolve_token():
+    """SQUARE_ACCESS_TOKEN via env -> macOS Keychain -> workspace .env (bridge-portable)."""
+    import subprocess
+    for key in ("SQUARE_ACCESS_TOKEN", "SQUARE_TOKEN"):
+        v = os.environ.get(key)
+        if v:
+            return v
+    for key in ("SQUARE_ACCESS_TOKEN", "SQUARE_TOKEN"):
+        try:
+            r = subprocess.run(
+                ["security", "find-generic-password", "-s", key, "-w"],
+                capture_output=True, text=True, timeout=5)
+            if r.returncode == 0 and r.stdout.strip():
+                return r.stdout.strip()
+        except Exception:
+            pass
+    env_path = os.path.expanduser("~/workspace/richmondgeneral/.env")
+    if os.path.exists(env_path):
+        for line in open(env_path):
+            line = line.strip()
+            for key in ("SQUARE_ACCESS_TOKEN", "SQUARE_TOKEN"):
+                if line.startswith(f"{key}=") and not line.startswith("#"):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Upload images to Square Catalog API',
@@ -243,11 +269,13 @@ def main():
     
     args = parser.parse_args()
     
-    # Get access token
-    access_token = args.token or os.environ.get('SQUARE_ACCESS_TOKEN')
+    # Get access token: --token → env → macOS Keychain → workspace .env
+    # (bridge-portable — the bare osascript shell has no ~/.zshrc env; see mac-bridge)
+    access_token = args.token or _resolve_token()
     if not access_token:
         print("Error: Square access token required.", file=sys.stderr)
-        print("Set SQUARE_ACCESS_TOKEN environment variable or use --token", file=sys.stderr)
+        print("Checked --token, SQUARE_ACCESS_TOKEN/SQUARE_TOKEN env, Keychain, and .env",
+              file=sys.stderr)
         sys.exit(1)
     
     # Validate image file

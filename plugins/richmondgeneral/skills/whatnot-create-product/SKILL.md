@@ -18,6 +18,12 @@ compatibility:
 
 # Whatnot Product Listing Skill
 
+> **Which Whatnot skill?** This one = the single-item create form. NOT for CSV batch import /
+> edit-page automation (→ `whatnot-chrome`) or field/category reference (→ `whatnot-catalog`).
+> **Idempotency first:** check `label.json → channels.whatnot` before creating — if already
+> registered, update the existing product instead. Record the new product id/url back into
+> `channels.whatnot` after a create.
+
 ## Overview
 
 This skill automates the creation of product listings on Whatnot's Seller Hub. Whatnot

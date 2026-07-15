@@ -64,6 +64,10 @@ DEFAULT_API_VERSION = "2026-04-21"
 
 # ---------------------------------------------------------------- auth ----
 
+# NOTE (2026-07-15 audit): this writer uses a full-object upsert (GET first, so
+# variations/price are preserved — safe). The skill doc recommends the sparse form
+# (batchUpdateObjects sparse_update:true with only {type,id,version,item_data:{image_ids}});
+# prefer that if this writer is ever reworked.
 def load_token(env_file: Optional[str] = None) -> str:
     """Resolve SQUARE_ACCESS_TOKEN: env → --env-file → workspace .env."""
     tok = os.environ.get("SQUARE_ACCESS_TOKEN") or os.environ.get("SQUARE_TOKEN")

@@ -233,7 +233,7 @@ mongosh square_cache --eval "db.sync_log.find({error: {\$exists: true}}).sort({t
 ### Using cache_wrapper.py
 
 ```python
-from skills.square_cache.scripts.cache_wrapper import SquareCacheWrapper
+from cache_wrapper import  # (illustrative — run from the skill's scripts/ dir) SquareCacheWrapper
 
 cache = SquareCacheWrapper()
 

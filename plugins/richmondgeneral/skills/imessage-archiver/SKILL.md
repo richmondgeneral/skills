@@ -43,7 +43,7 @@ Archive conversations from Messages app to Apple Notes with proper inline media 
 
 ```bash
 # Get conversation with phone number
-python3 ~/scripts/get_imessage_convo.py +1XXXXXXXXXX 30
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/imessage-core/scripts/get_imessage_convo.py +1XXXXXXXXXX 30
 
 # Get attachments for date range.
 # Open chat.db read-only + immutable so the query can't lock/checkpoint the live WAL.

@@ -60,7 +60,7 @@ Suggested (via "Apply all" or individually) — observed values offered:
 - **Confirmation dialog** buttons: View listing / Create new listing / Create similar listing / Share
   listing / **Feedback** / **Done**.
 
-## CREATE a new listing — end-to-end (mapped 2026-06-21, RG-0055 Kreamer tin → live item 298439755483)
+## CREATE a new listing — end-to-end (first verified 2026-06-21: RG-0054 → live item 298439625952; field-map refined same day on RG-0055 Kreamer tin → 298439755483)
 
 The full browser CREATE flow. No Gemini, no permission churn — `browser_batch` the whole thing.
 

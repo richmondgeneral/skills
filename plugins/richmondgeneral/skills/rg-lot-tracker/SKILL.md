@@ -9,10 +9,12 @@ description: >
   "reconcile sales", "stale inventory", "aging report", "lot health", "lot score",
   "velocity report", "what needs repricing".
 metadata:
-  version: "2.0"
+  version: "2.1"
   author: scottybe
-  updated: "2026-02-16"
+  updated: "2026-07-15"
   changelog: |
+    v2.1 - ops path corrected to ~/workspace/richmondgeneral/ops (square/ops = dead pre-consolidation repo)
+
     v2.0 - Aging, health scoring, and enhanced reporting:
     - Added Phase 5: Square Sales Auto-Reconciliation (MCP query patterns for order matching)
     - Added Phase 6: Inventory Aging & Health Monitor (days-on-market, stale alerts, repricing)

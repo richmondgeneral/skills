@@ -233,7 +233,7 @@ mongosh square_cache --eval "db.sync_log.find({error: {\$exists: true}}).sort({t
 ### Using cache_wrapper.py
 
 ```python
-from cache_wrapper import  # (illustrative — run from the skill's scripts/ dir) SquareCacheWrapper
+from cache_wrapper import SquareCacheWrapper  # illustrative — run from the skill's scripts/ dir
 
 cache = SquareCacheWrapper()
 
@@ -258,7 +258,7 @@ changes = cache.get_recent_changes(since="2025-12-01")
 ### Using query_helper.py
 
 ```python
-from skills.square_cache.scripts.query_helper import QueryHelper
+from query_helper import QueryHelper  # illustrative — run from the skill's scripts/ dir
 
 helper = QueryHelper()
 

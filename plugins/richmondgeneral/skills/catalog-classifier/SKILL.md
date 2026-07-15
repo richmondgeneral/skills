@@ -116,7 +116,7 @@ Item Input
 
 ## Tier Assignment (Secondary Category)
 
-**New Arrivals** — the DEFAULT intake tier. Every new item gets it as secondary on intake,
+**New Arrivals** — the DEFAULT intake tier. Every new RG-typed item gets it as secondary on intake (TVM/Food follow their own routing),
 no judgment required. Items age out of it via re-tiering.
 
 **The Real Rarities** — a RE-TIER destination (may be applied at intake for obvious showcase

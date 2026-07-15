@@ -71,6 +71,7 @@ metadata:
       (cluttered shots), --margin, --size. bg-removal errors are surfaced (rect-mask /
       credits), not swallowed. --straighten is a documented no-op (reliable auto-deskew
       needs opencv, absent — shoot straight; the square crop never rotates).
+      [SUPERSEDED 2026-06-20: deskew.py landed — --straighten = alias of --deskew]
 
     v1.7 - Key bootstrap actually reached + billing-aware 429 (RG-0030 fix):
     - create_default_router() now calls bootstrap_keys() itself. The CLI
@@ -160,13 +161,16 @@ Unified image processing skill combining background removal, image generation, i
 
 ## Listing Photo Standardizer (public-photo SOP)
 
+> Standardizer output is NOT publish-ready by itself — the **Hero QA gate** (below) must pass
+> (`label.json → hero_qa.status == "pass"`) before any hero reaches Square or GitHub.
+
 `standardize.py` turns a raw documentation photo into a **catalog-quality public image** per
 [`ops/docs/RG-listing-SOP.md`](../../../../../ops/docs/RG-listing-SOP.md) — the "thematic thread"
 that makes every public photo look cohesive:
 
 - **Color-corrected** toward real-life color (backdrop-referenced white balance preserves
   patina on brass/Bakelite, falls back to gray-world)
-- **Background removed**, **hero always transparent** (reuses `process.py` routing/fallbacks)
+- **Background removed**, hero = transparent cutout (reuses `process.py` routing/fallbacks) — **EXCEPT flat rectangular goods** (books/paper/boxed/framed): those skip the cutout and use the framed flat-goods deskew profile instead (see below)
 - **Standardized scale** — `--fill 0.85` makes the object's longest side fill the same fraction of the
   canvas on every item, so the storefront grid looks uniform
 - **Grounding** — `--shadow` bakes a subtle, size-proportional soft drop shadow so the cutout isn't a

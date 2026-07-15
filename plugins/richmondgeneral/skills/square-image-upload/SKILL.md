@@ -166,7 +166,7 @@ uv run --with requests ~/workspace/richmondgeneral/skills/plugins/richmondgenera
 ### Bulk Upload All Item Photos (Hero + Details)
 
 ```bash
-uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/scripts/upload_batch.py \
+uv run --with requests ~/workspace/richmondgeneral/skills/plugins/richmondgeneral/skills/square-image-upload/scripts/upload_batch.py \
   --directory /Users/scottybe/workspace/square/items/RG-XXXX \
   --item-id CATALOG_ITEM_ID \
   --include \"*.png\" --include \"*.jpg\" --include \"*.jpeg\" \
@@ -176,7 +176,7 @@ uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/sc
 ### Bulk Upload via Manifest CSV
 
 ```bash
-uv run --with requests ~/workspace/richmondgeneral/skills/square-image-upload/scripts/upload_batch.py \
+uv run --with requests ~/workspace/richmondgeneral/skills/plugins/richmondgeneral/skills/square-image-upload/scripts/upload_batch.py \
   --manifest /path/to/upload-manifest.csv \
   --json
 ```

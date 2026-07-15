@@ -2,9 +2,11 @@
 name: mac-bridge
 description: Run Richmond General's Mac-only skills from Cowork by executing them on the Mac over the osascript bridge. Use when working in Cowork and a task needs the local Mac — the Photos library, local files, or any RG skill that isn't Cowork-native (photos-library, image-processor, rg-full-auto steps, etc.). Triggers on "from Cowork run …", "pull from the photo library", "use the Mac image-processor", "run an RG skill script on my Mac", or any intake/photo task in Cowork that needs the Mac. NOT needed in Claude Code / code mode — there, run the skills directly.
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: scottybe
-  updated: "2026-06-18"
+  updated: "2026-07-15"
+  changelog: |
+    v1.1 - note: matte/enhance scripts need their dedicated venvs by absolute path — NOT runnable via rg-skill.sh; plugin-update sync flow
 ---
 
 # Mac Bridge — run RG skills on the Mac from Cowork

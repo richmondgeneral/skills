@@ -13,13 +13,13 @@ metadata:
     - Added Type field disambiguation (CSV listing type vs edit page content type)
 ---
 
-# Whatnot Catalog
+# Whatnot Catalog Reference
 
 > **Which Whatnot skill?** `whatnot-catalog` = field/category REFERENCE data; `whatnot-chrome` =
 > CSV batch import + edit-page automation; `whatnot-create-product` = single-item create form.
 > **Idempotency first (all three):** check `label.json → channels.whatnot` before ANY create —
 > if the item is already registered there, update, never blind-create. The deterministic publish
-> route `ops/seller-agent/publish_item.py --platform whatnot` also exists (review-by-default). Reference
+> route `ops/seller-agent/publish_item.py --platform whatnot` also exists (review-by-default).
 
 Reference data for Whatnot listings — categories, metadata fields, allowed values, and shipping heuristics. This is a **data-only** skill with no Chrome automation. For browser interaction, see `whatnot-chrome`.
 

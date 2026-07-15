@@ -1,6 +1,6 @@
 {
   "name": "square-online",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Manage Square Online storefront operations beyond Square's REST APIs. Snippets API automation for category-tile heros (4 design variants), API-only category publishing to the storefront nav (sparse channel add), a dashboard walkthrough for sort defaults, brand-guidelines and brand-voice skills, catalog-voice-audit and catalog-voice-rewrite, plus storefront-image-cache-bust for stale Weebly CDN image fixes.",
   "author": {
     "name": "Scott Beilfuss"

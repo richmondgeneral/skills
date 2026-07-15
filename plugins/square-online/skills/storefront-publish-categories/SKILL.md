@@ -58,7 +58,7 @@ Read with `batchGetobjects` (note the lowercase `o`):
 { "object_ids": ["TX6SBQLJDMZOCVXBUD3KT3CL"], "include_deleted_objects": true }
 ```
 
-Diagnose the target: `batchGetObjects` it and check `is_deleted` and the length of `category_data.channels` (1 = base only; 6 = published).
+Diagnose the target: `batchGetobjects` it and check `is_deleted` and the length of `category_data.channels` (1 = base only; 6 = published).
 
 **If `is_deleted: true`, STOP — this is NOT a publish problem.** The storefront 404 is a stale
 hero tile pointing at a removed category (cause A of the two-cause 404 model): repoint the tile

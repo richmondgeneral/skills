@@ -86,7 +86,7 @@ Use `square-image-upload` as the default production path for image uploads:
 
 ```applescript
 do shell script "source ~/.env && python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-image-upload/scripts/upload_image.py \
-  --image /path/to/hero.png \
+  --image /path/to/square.png \
   --item-id CATALOG_ITEM_ID \
   --name 'Product Hero' \
   --primary"

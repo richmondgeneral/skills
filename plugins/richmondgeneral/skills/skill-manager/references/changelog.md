@@ -1,6 +1,6 @@
 # Skills Changelog
 
-Tracking changes to all skills in `~/.claude/skills/`.
+HISTORICAL record (pre-marketplace era; the `~/.claude/skills/` location no longer exists — skills live in `plugins/richmondgeneral/skills/`). Kept for history only; per-skill changelogs + git are current..
 
 ---
 

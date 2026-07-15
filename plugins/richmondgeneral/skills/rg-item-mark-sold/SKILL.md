@@ -2,10 +2,12 @@
 name: rg-item-mark-sold
 description: Mark a Richmond General item as sold across all surfaces — migrate the GitHub Pages item card (and the matching gallery grid card on the landing page) to the sold-archive pattern (brown SOLD badge, "Sold · $X" front price, sold-status-panel back footer replacing the QR + buy button), write status.json with sold metadata, delete the Square payment link via API so the printed QR / bookmarked checkout URL can no longer charge a phantom sale, validate, and commit/push. Use this skill whenever the user says any of "mark RG-XXXX as sold", "mark as sold", "this sold", "[item] sold for $X", "RG-XXXX sold on Square", "buyer paid", "this item sold", "update RG-XXXX to sold", "set RG-XXXX status to sold", "deactivate the buy link", "kill the payment link for X", "retire this listing", or otherwise indicates that a unique inventory item has been purchased and needs the listing taken down without being deleted. Do NOT use for inventory loss/giveaways/damage (use square-inventory-loss instead), description or price edits on still-available items (use rg-item-update), or new item onboarding (use rg-full-auto).
 metadata:
-  version: "1.3"
+  version: "1.4"
   author: scottybe
-  updated: "2026-06-20"
+  updated: "2026-07-15"
   changelog: |
+    v1.4 - Step 6 also sets label.json state=Sold (prevents build_gallery --apply resurrecting the card)
+
     v1.3 - Audit order-based attribution (RG-0003 phantom slipped to WARN):
     - --audit now resolves a link it can't attribute by record/metadata via the
       link's ORDER line items: catalog_object_id -> the item's recorded

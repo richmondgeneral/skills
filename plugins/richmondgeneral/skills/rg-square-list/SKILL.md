@@ -2,10 +2,12 @@
 name: rg-square-list
 description: List a Richmond General item on Square in one command — create (or idempotently update) the catalog ITEM from its label.json, set inventory, upload square.png as the primary image, mint a payment link, generate qr-buy.png, and write all IDs back into label.json. Use when an item is already intake-complete (priced + photographed, has items/RG-XXXX/label.json) and needs to go live on Square. Triggers on "list this on Square", "create the Square item", "push RG-XXXX to Square", "rg-square-list". NOT for full onboarding from a raw photo (use rg-full-auto), NOT for price changes on an already-listed item (use rg-reprice), NOT for sold items (use rg-item-mark-sold). Always preview with --dry-run before a live run; live runs mutate the production Square catalog.
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: scottybe
-  updated: "2026-06-21"
+  updated: "2026-07-15"
   changelog: |
+    v1.1 - TYPE from label.json reporting_category_note (TYPE_CATEGORIES/ROOM_BY_TYPE); blocking Hero QA gate on CREATE (--skip-hero-qa override)
+
     v1.0 - Initial: one-command Square listing from label.json.
     - square_client.py: token (env->Keychain->.env), stdlib-urllib transport,
       constants, payment-link create/delete, set_inventory_count, gen_qr_png.

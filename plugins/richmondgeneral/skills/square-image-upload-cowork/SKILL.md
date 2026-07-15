@@ -2,10 +2,12 @@
 name: square-image-upload-cowork
 description: Cowork-native workflow to upload product images to Square Catalog, optionally cleaning the background and/or removing visible price tags first. Cleanup runs on the Mac image-processor (Gemini) via the osascript bridge — no Cloudinary. Use this skill whenever the user wants to push a product photo to Square from a Cowork session — including from a workspace file, an image URL (e.g., GitHub Pages or a vendor site), or to replace an existing Square catalog image. Trigger on phrasings like "upload this photo to Square", "swap out the product image", "fix the image on item X", "replace the price tag in this picture", "remove the background and put it on this Square item", "the photo has a sticker on it", "clean up this listing photo". Do NOT use for inventory adjustments (use square-inventory-loss) or for description text fixes.
 metadata:
-  version: "2.0"
+  version: "2.1"
   author: scottybe
-  updated: "2026-06-18"
+  updated: "2026-07-15"
   changelog: |
+    v2.1 - batchGetobjects casing REVERTED to lowercase-o — that IS the real MCP method name (verified via get_service_info 2026-07-15); the 1.3.3 'typo fix' was wrong
+
     v2.0 - Cloudinary removed. Image cleanup now runs on the Mac image-processor
       (Gemini) over the osascript bridge (verified callable from Cowork
       2026-06-18: `do shell script` runs bash on the Mac). One cleanup engine
@@ -44,7 +46,7 @@ The skill resolves any of these to a file the Mac can read **before** cleanup/up
 |---|---|---|
 | Workspace file | path under `~/workspace/richmondgeneral/...` | already on the shared mount — use directly |
 | Public URL | HTTP/HTTPS (GitHub Pages, vendor page) | download into `~/workspace/richmondgeneral/rg-pending/` first |
-| Existing Square image | 24-char `image_id` | `catalog.batchGetObjects` → `image_data.url` → download into the workspace |
+| Existing Square image | 24-char `image_id` | `catalog.batchGetobjects` (lowercase `o` — real MCP method name) → `image_data.url` → download into the workspace |
 
 For the Mac Photos library: the bridge can now reach it too — but the cleanest path is still to have the Mac `photos-library` skill export into the workspace, then proceed here.
 
@@ -89,7 +91,7 @@ Re-fetch the item: confirm the new `image_id` is in `image_ids` (position 0 if `
 ## Worked example
 User: *"There's a price sticker on the photo for RG-0023. Replace the image without the sticker and remove the background."*
 1. Look up RG-0023 → `item_id` + current `image_ids[0]`.
-2. `catalog.batchGetObjects` on `image_ids[0]` → S3 URL → download to `~/workspace/richmondgeneral/rg-pending/RG-0023-src.png`.
+2. `catalog.batchGetobjects` on `image_ids[0]` → S3 URL → download to `~/workspace/richmondgeneral/rg-pending/RG-0023-src.png`.
 3. Bridge-clean: `… clean.py --input '~/workspace/richmondgeneral/rg-pending/RG-0023-src.png' --output '~/workspace/richmondgeneral/rg-pending/RG-0023-clean.png' --remove 'price tag'` (bg removal is clean.py's default storefront treatment).
 4. Show the cleaned file; get sign-off.
 5. `python3 scripts/upload_to_square.py --source ~/workspace/richmondgeneral/rg-pending/RG-0023-clean.png --image-id <existing image_ids[0]> --name "RG-0023 hero (cleaned)" --json`

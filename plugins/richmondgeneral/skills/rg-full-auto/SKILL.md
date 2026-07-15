@@ -10,10 +10,12 @@ description: >
   "add to whatnot". NOT for simple edits to existing items -- use rg-item-update (edits), rg-reprice (price
   cascade), or rg-square-list (just get an intaken item live on Square) instead.
 metadata:
-  version: "6.5"
+  version: "6.6"
   author: scottybe
-  updated: "2026-06-19"
+  updated: "2026-07-15"
   changelog: |
+    v6.6 - Phase 0.7/0.8/4/7 modernized: matte.py cutout master, BLOCKING hero_qa gate, square.png primary, two-QR, build_gallery.py (audit 2026-07-15)
+
     v6.5 - Path migration + library-intake front door:
     - Repointed the dead ~/workspace/square/{items,ops} paths to
       ~/workspace/richmondgeneral/{items,ops} across SKILL.md, references, and the

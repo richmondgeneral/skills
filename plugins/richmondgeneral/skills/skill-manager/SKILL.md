@@ -98,7 +98,7 @@ rg -L "^name:|^description:|^metadata:" $REPO/plugins/*/skills/*/SKILL.md
 Plugin versions (the ones that matter for rollout):
 
 ```bash
-cat $REPO/plugins/*/.claude-plugin/plugin.json | python3 -c "import json,sys; [print(p['name'], p['version']) for p in [json.loads(x) for x in sys.stdin.read().split('}\n{')] ] if False else None" 2>/dev/null || grep -H '"version"' $REPO/plugins/*/.claude-plugin/plugin.json
+grep -H '"version"' $REPO/plugins/*/.claude-plugin/plugin.json
 ```
 
 ## Maintenance Workflow

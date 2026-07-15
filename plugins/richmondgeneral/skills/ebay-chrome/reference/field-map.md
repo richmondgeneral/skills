@@ -153,3 +153,10 @@ The full browser CREATE flow. No Gemini, no permission churn — `browser_batch`
 - Filter the grab: real product photos are **720×960 portraits**; 526/540/565 squares are
   recommendation-thumbnail junk. FB CDN URLs are signed → blocked from Chrome-tool output; the
   Playwright context fetch keeps them browser-side (clipboard hand-off also freezes the tab — don't).
+- **Revise-form field typing can also be swallowed** (like the Seller Hub search box) right after
+  the form loads — a title retype visually "succeeded" per the action log but the field kept the
+  old value and the revise saved the OLD title. Verify with `zoom` on the field or the tab-title
+  echo BEFORE clicking Revise it; if stale, click the field again and retype.
+- Package weight/dims inputs (calculated-ship policies): plain inputs to the right of the policy
+  dropdown — lbs / oz / L×W×H in. Type after selecting the policy; live-verified 7 lb 15×8×6 →
+  calculated $9.04 ground quote on the item page.

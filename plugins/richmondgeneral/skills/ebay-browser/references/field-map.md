@@ -1,8 +1,8 @@
-# eBay form field-map (grow this every session)
+# eBay browser form field map
 
-The accumulating knowledge base of eBay's Seller Hub / "Revise your listing" form: where each field is,
-how to set it, and (for dropdowns) the allowed values. **Append as you learn.** Mirrors the role
-`whatnot-catalog` plays for Whatnot. Each entry: what it is → how to reach/set it → values/notes.
+Driver-neutral knowledge for eBay Seller Hub and its create/revise forms: where each field is, how to set
+it, and the allowed values observed. Translate these operations into the current host's native browser
+tools; see `native-surfaces.md`. Add only behavior verified on the live form.
 
 Last updated: 2026-06-20 (seeded from the RG-0023 Weiss brooch revise).
 
@@ -55,14 +55,14 @@ Suggested (via "Apply all" or individually) — observed values offered:
   visually, not via that textarea.
 - **JS value reads are unreliable** for title/SKU here — broad selectors returned `"on"` (matched a
   checkbox). Read by the exact `ref` from `read_page`/`find`, or just screenshot.
-- **No permission churn on eBay** (unlike facebook.com) — `browser_batch` sequences ran without per-action
-  approval prompts. Batch aggressively.
+- **No permission churn was observed on eBay** (unlike facebook.com) — native Chrome action batches ran
+  without per-action approval prompts. Batch when the active host supports it.
 - **Confirmation dialog** buttons: View listing / Create new listing / Create similar listing / Share
   listing / **Feedback** / **Done**.
 
 ## CREATE a new listing — end-to-end (first verified 2026-06-21: RG-0054 → live item 298439625952; field-map refined same day on RG-0055 Kreamer tin → 298439755483)
 
-The full browser CREATE flow. No Gemini, no permission churn — `browser_batch` the whole thing.
+The full browser CREATE flow. Batch native browser actions where the active host supports it.
 
 1. **Idempotency first.** Seller Hub → Active (`/sh/lst/active`): search the maker/title in "Search by
    title, SKU, or item number" → expect **0 results**. Then left-rail **Drafts** → scan titles (the
@@ -74,10 +74,9 @@ The full browser CREATE flow. No Gemini, no permission churn — `browser_batch`
    For a one-off, click **"Continue without match"** (bottom center) to take the suggested category.
 4. **Confirm details** modal: **Select the condition** (New / New other / Seller refurbished / **Used** /
    For parts) → **Continue to listing**. Lands on **"Complete your listing"** (`/lstng?draftId=…&mode=AddItem`).
-5. **Photos** — do NOT click "Upload from computer" (opens a native picker you can't see). `find`
-   "photo file upload input element" → returns the **`<input type=file>`** ref → `file_upload` with
+5. **Photos** — target the **`<input type=file>`** with the host's direct upload action and pass
    **workspace absolute paths** (`/Users/.../items/RG-XXXX/hero.jpeg`, …). **First file = Main.** Keep each
-   `file_upload` call **< 10 MB** (≈4–5 jpegs); split into batches, re-`find` the input ref between batches.
+   upload batch **< 10 MB** (≈4–5 jpegs); split batches and reacquire the input between them.
 6. **Title** — plain `<input>`, click → `cmd+a` → `Backspace` → type (80-char max; tab title echoes it).
 7. **Custom label (SKU)** — plain `<input>`; type `RG-XXXX`.
 8. **Item specifics** — a **"Suggested item specifics"** card (eBay.ai, from photos+title) with checkboxes
@@ -151,7 +150,7 @@ The full browser CREATE flow. No Gemini, no permission churn — `browser_batch`
   `--disable-blink-features=AutomationControlled`; a HEADED launch over the osascript bridge dies
   with TargetClosedError; clear stale `playwright_profile/Singleton*` locks first).
 - Filter the grab: real product photos are **720×960 portraits**; 526/540/565 squares are
-  recommendation-thumbnail junk. FB CDN URLs are signed → blocked from Chrome-tool output; the
+  recommendation-thumbnail junk. FB CDN URLs are signed → blocked from native-browser output; the
   Playwright context fetch keeps them browser-side (clipboard hand-off also freezes the tab — don't).
 - **Revise-form field typing can also be swallowed** (like the Seller Hub search box) right after
   the form loads — a title retype visually "succeeded" per the action log but the field kept the

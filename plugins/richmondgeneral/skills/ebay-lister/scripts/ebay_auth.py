@@ -120,7 +120,7 @@ def _basic_auth_header() -> str:
         raise EbayAuthError(
             "Missing EBAY_CLIENT_ID / EBAY_CLIENT_SECRET (env, Keychain, or .env). "
             "NOTE: the eBay developer keys aren't issued yet, so this API path is on hold "
-            "(eBay is NOT blocked). Use the `ebay-chrome` browser skill for eBay writes until "
+            "(eBay is NOT blocked). Use the `ebay-browser` skill for eBay writes until "
             "the keys arrive, then follow SETUP.md. (--dry-run works without keys.)")
     raw = f"{cid}:{secret}".encode("utf-8")
     return "Basic " + base64.b64encode(raw).decode("ascii")

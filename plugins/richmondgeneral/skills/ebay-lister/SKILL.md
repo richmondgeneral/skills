@@ -4,7 +4,7 @@ description: >
   Build, create, publish, and update Richmond General eBay listings through eBay's Sell Inventory API.
   Use for `--dry-run` payload validation now, and for programmatic eBay create/update work only after
   developer keys are issued and `EBAY_API_LIVE_ENABLED=1` is deliberately configured. Until then, route
-  all live eBay create/revise/manage work through `ebay-chrome`. Reads
+  all live eBay create/revise/manage work through `ebay-browser`. Reads
   items/RG-XXXX/label.json (price, condition, attributes, photos from the live GitHub
   Pages URLs), upserts the inventory item and offer, publishes unpublished offers, then
   writes the eBay item_id + URL back into label.json. Use whenever the task is to list an
@@ -15,15 +15,16 @@ metadata:
   version: "0.3"
   author: scottybe
   updated: "2026-07-15"
-  status: "ON HOLD — API path awaiting eBay developer keys; live writes are code-gated by EBAY_API_LIVE_ENABLED. Use ebay-chrome for live work; use this skill with --dry-run only."
+  status: "ON HOLD — API path awaiting eBay developer keys; live writes are code-gated by EBAY_API_LIVE_ENABLED. Use ebay-browser for live work; use this skill with --dry-run only."
   changelog: "0.3 (2026-07-15): added an explicit live-write gate, required-field validation, safe SKU parsing, correct condition mapping, and idempotent offer updates."
 ---
 
 # ebay-lister — list on eBay via the Sell API
 
 > ⏸️ **ON HOLD — API path not active yet (eBay is NOT blocked).** eBay writes — create AND revise —
-> currently go through the **browser** via the **`ebay-chrome`** skill (Claude-in-Chrome), the
-> sanctioned path until further notice. This API path is waiting on eBay developer keys (App ID /
+> currently go through the **browser** via the **`ebay-browser`** skill, which prefers the native
+> authenticated Chrome surface in Claude, Codex, or Gemini Spark and uses Playwright only as fallback.
+> This API path is waiting on eBay developer keys (App ID /
 > Cert ID / OAuth — not yet issued), so only `ebay_lister.py list --sku … --dry-run` is safe here (it
 > builds payloads locally, makes no API call). Live mutations are also blocked in code unless
 > `EBAY_API_LIVE_ENABLED=1`. When the keys arrive, follow SETUP.md and activate that gate only after
@@ -68,7 +69,7 @@ script. Commit + push the `items` repo (stage explicit paths). Optionally regene
 ## Notes / limits (v0.1)
 - Fixed-price + Best Offer only; no auctions or variations yet.
 - Inventory API listings cannot be revised in Seller Hub. Keep API-created listings on this API path;
-  use `ebay-chrome` only for browser-created listings.
+  use `ebay-browser` only for browser-created listings.
 - Images are referenced from the public GitHub Pages URLs — push the item page first.
 - Aspects are best-effort from `attributes`; pass `--aspect "Author=…"` to add required ones.
   If publish returns missing-required-aspect errors, add them and re-run (PUT/offer are idempotent).

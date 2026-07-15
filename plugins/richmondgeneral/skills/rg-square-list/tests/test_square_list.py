@@ -864,3 +864,33 @@ def test_dry_run_reports_image_processed_state(item_dir):
     _write_label(item_dir)
     s = sl.list_item(str(item_dir), dry_run=True)
     assert s["image"] == "square.png" and s["image_processed"] is True
+
+
+def test_update_description_preserves_variations(item_dir, monkeypatch):
+    """The 2026-07-15 latent 400: /v2/catalog/object replaces item_data wholesale,
+    so the update must re-send the fetched variations, not just name/description."""
+    _write_label(item_dir, page={"story": "A fine story."},
+                 channels={"square": {"object_id": "ITEM_EXISTING", "price": "65.00",
+                                      "payment_link_id": "PL", "buy_link": "https://square.link/u/x",
+                                      "order_id": "ORD"}})
+    posted = {}
+
+    def handler(method, path, body):
+        if method == "GET" and path == "/v2/catalog/object/ITEM_EXISTING":
+            return 200, {"object": {"type": "ITEM", "id": "ITEM_EXISTING", "version": 6,
+                                    "item_data": {"name": "Old", "description_plaintext": "x",
+                                                  "variations": [{"type": "ITEM_VARIATION",
+                                                                  "id": "VAR_1"}]}}}
+        if method == "POST" and path == "/v2/catalog/object":
+            posted.update(body["object"])
+            return 200, {"catalog_object": {"id": "ITEM_EXISTING", "version": 7}}
+        raise AssertionError(f"unexpected request: {method} {path}")
+
+    _patch_token(monkeypatch)
+    _patch_request(monkeypatch, handler)
+    _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
+    sl.list_item(str(item_dir))
+    assert posted["item_data"]["variations"][0]["id"] == "VAR_1"      # not dropped
+    assert "A fine story." in posted["item_data"]["description_html"]  # story-first
+    assert "description_plaintext" not in posted["item_data"]          # derived field stripped

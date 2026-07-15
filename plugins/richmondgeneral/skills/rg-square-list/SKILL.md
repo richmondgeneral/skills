@@ -2,10 +2,16 @@
 name: rg-square-list
 description: List a Richmond General item on Square in one command — create (or idempotently update) the catalog ITEM from its label.json, set inventory, upload square.png as the primary image, mint a payment link, generate qr-buy.png + qr-info.png (BOTH QR codes, recorded in label.json → qr_codes), and write all IDs back into label.json. Use when an item is already intake-complete (priced + photographed, has items/RG-XXXX/label.json) and needs to go live on Square. Triggers on "list this on Square", "create the Square item", "push RG-XXXX to Square", "rg-square-list". NOT for full onboarding from a raw photo (use rg-full-auto), NOT for price changes on an already-listed item (use rg-reprice), NOT for sold items (use rg-item-mark-sold). Always preview with --dry-run before a live run; live runs mutate the production Square catalog.
 metadata:
-  version: "1.3"
+  version: "1.4"
   author: scottybe
   updated: "2026-07-15"
   changelog: |
+    v1.4 - Store description = brand voice: composed from label.json page.story (+ Condition
+    line); CREATE warns when page.story is empty (store copy was shipping as bare condition
+    notes — RG-0061 etc., 2026-07-15). _sparse_update_item latent 400 FIXED: /v2/catalog/object
+    replaces item_data wholesale, so the update now GETs the full object and re-sends it with
+    the patched fields (variations preserved — regression-tested).
+
     v1.3 - Processed-image gate: only the pipeline square.png uploads by default; raw
     square.jpg/hero.* refused (--allow-raw-image override). Dry-run reports image +
     image_processed.
@@ -51,7 +57,13 @@ Over the Cowork osascript bridge, invoke by absolute interpreter path (the modul
 1. Reads `items/RG-XXXX/label.json` (price, product_name, condition_notes, fulfillment, photos).
 2. **Create vs update (idempotent):**
    - If `channels.square.object_id` is already set → **sparse-update** the item (name + description_html) — never creates a duplicate.
-   - Else → `catalog/batch-upsert` create. **A CREATE first passes TWO image gates** — the pre-publish Hero QA gate — refused unless `label.json → hero_qa.status == "pass"` (or `photo_overrides.status == "approved"`); `--skip-hero-qa` = conscious override — AND the processed-image gate: the upload must be the
+   - Else → `catalog/batch-upsert` create. **Write the brand-voice story FIRST.** The Square store description is composed from
+`label.json → page.story` (the "curated mercantile" voice — see square-online:brand-voice)
+plus a plain Condition line; with no story it degrades to spec-style notes and warns. eBay/
+Marketplace copy is a DIFFERENT register (attributes/condition via seller-agent) — don't reuse
+store prose there or vice versa.
+
+**A CREATE first passes TWO image gates** — the pre-publish Hero QA gate — refused unless `label.json → hero_qa.status == "pass"` (or `photo_overrides.status == "approved"`); `--skip-hero-qa` = conscious override — AND the processed-image gate: the upload must be the
 pipeline product `square.png` (matte.py or the flat-goods profile); a raw `square.jpg`/`hero.*`
 is REFUSED (`--allow-raw-image` = conscious override). Raw in-situ shots reaching the storefront
 (RG-0062/0064/0068, 2026-07-15) is the failure class this blocks. Item carries 3 categories `[TYPE, New Arrivals (tier), room]` — **TYPE resolves from `label.json → reporting_category_note`** (name match, e.g. "Books & Paper"; defaults to Collectibles WITH a warning when absent) and the room is the type's parent per ROOM_BY_TYPE — `reporting_category = TYPE`, one FIXED_PRICING variation at the label price, the tax id, `ecom_visibility: VISIBLE`. **IDs are persisted to label.json immediately after create** (before image/paylink) so a mid-flow failure never double-creates on re-run.

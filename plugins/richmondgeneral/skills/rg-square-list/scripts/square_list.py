@@ -103,6 +103,19 @@ def _create_catalog_image(access_token, image_path, object_id=None, name=None,
 # Catalog object — mirrors rg-full-auto/process_new_item._build_catalog_object.
 # -----------------------------------------------------------------------------
 
+def _compose_description(story: str, notes: str) -> str:
+    """Store description: brand-voice story first, condition stated plainly after.
+    Falls back to notes-only when no story exists (with the CREATE-time warning)."""
+    import html as _html
+    parts = []
+    if story:
+        parts.append(f"<p>{_html.escape(story)}</p>")
+    if notes:
+        label_txt = "<strong>Condition:</strong> " if story else ""
+        parts.append(f"<p>{label_txt}{_html.escape(notes)}</p>")
+    return "".join(parts) or "<p></p>"
+
+
 def resolve_type_category(label: dict) -> str:
     """Resolve the TYPE category id from ``label["reporting_category_note"]``.
 
@@ -152,6 +165,12 @@ def build_catalog_object(sku: str, label: dict) -> dict:
     price_cents = dollars_to_cents(label["price"])
     name = label["product_name"]
     notes = label.get("condition_notes") or ""
+    story = ((label.get("page") or {}).get("story") or "").strip()
+    if not story:
+        print("  [warn] page.story is EMPTY — the store description will be spec-style "
+              "condition notes. Write the brand-voice story (square-online:brand-voice) "
+              "in label.json -> page.story first for a store-quality listing.",
+              file=sys.stderr)
     type_id = resolve_type_category(label)
     room_id = ROOM_BY_TYPE.get(type_id, CAT_VINTAGE_MARKET)
 
@@ -187,7 +206,7 @@ def build_catalog_object(sku: str, label: dict) -> dict:
         # ONLY description_html (per process_new_item v3.2): the storefront
         # renders this; the deprecated plain `description` field would show raw
         # HTML tags on richmondgeneral.com, so it is intentionally NOT set.
-        item_data["description_html"] = f"<p>{notes}</p>"
+        item_data["description_html"] = _compose_description(story, notes)
 
     return {
         "type": "ITEM",
@@ -303,31 +322,31 @@ def _variation_id_from_object(obj: dict) -> Optional[str]:
 
 def _sparse_update_item(token: str, object_id: str, label: dict,
                         version: Optional[int] = None) -> None:
-    """Issue a sparse ITEM update — ONLY name/description, preserving everything
-    else (variation, price, categories, images).
+    """Update ONLY name/description, preserving variation/price/categories/images.
 
-    ``version`` may be supplied by a caller that already fetched the object (the
-    UPDATE path reuses its single GET); otherwise it is fetched here.
+    ⚠️ `/v2/catalog/object` upserts item_data WHOLESALE at this API version — sending
+    only {name, description} 400s with "must have at least one variation" (latent bug
+    found live 2026-07-15). So: GET the full object, patch the fields inside its OWN
+    item_data, and re-send the complete object (the safe GET-first full upsert).
     """
-    if version is None:
-        version = _get_object_version(token, object_id)
-    name = label["product_name"]
+    status, parsed = square_request("GET", f"/v2/catalog/object/{object_id}", token)
+    if status != 200:
+        raise RuntimeError(
+            f"fetch of {object_id} failed: {status}: {json.dumps(parsed)}"
+        )
+    obj = parsed["object"]
+    obj.setdefault("type", "ITEM")
+    obj.setdefault("item_data", {})
+    story = ((label.get("page") or {}).get("story") or "").strip()
     notes = label.get("condition_notes") or ""
-    item_data = {"name": name}
-    if notes:
-        # description_html only — plain `description` is deprecated (renders raw
-        # HTML tags on the storefront). Matches build_catalog_object.
-        item_data["description_html"] = f"<p>{notes}</p>"
+    obj["item_data"]["name"] = label["product_name"]
+    # description_html only — plain `description` is deprecated (renders raw
+    # HTML tags on the storefront). Matches build_catalog_object.
+    obj["item_data"]["description_html"] = _compose_description(story, notes)
+    obj["item_data"].pop("description", None)            # deprecated plain field
+    obj["item_data"].pop("description_plaintext", None)  # server-derived, read-only
 
-    body = {
-        "idempotency_key": str(uuid.uuid4()),
-        "object": {
-            "type": "ITEM",
-            "id": object_id,
-            "version": version,
-            "item_data": item_data,
-        },
-    }
+    body = {"idempotency_key": str(uuid.uuid4()), "object": obj}
     status, parsed = square_request("POST", "/v2/catalog/object", token, body=body)
     if not (200 <= status < 300):
         raise RuntimeError(

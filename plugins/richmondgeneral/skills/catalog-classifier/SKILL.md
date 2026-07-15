@@ -157,6 +157,5 @@ This skill is called by:
 - `rg-item-update` - Category changes
 - `product-labeler` - Batch categorization
 
-After bulk category changes, run:
-
-`python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues`
+After bulk category changes, verify against live Square (source of truth) and re-sync
+`catalog_state.json` via the reconcile tool.

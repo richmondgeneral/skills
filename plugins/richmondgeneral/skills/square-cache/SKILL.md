@@ -2,19 +2,20 @@
 name: square-cache
 description: Access MongoDB-cached Square catalog with change tracking and audit trails. Use when checking catalog status, searching items (faster than API), viewing change history, monitoring updates, or querying cached data. Triggers on "Square cache", "catalog changes", "what changed", "search cached items", "sync catalog", "item history", "cache status". Required for offline catalog access and automated change detection.
 metadata:
-  version: "1.4"
+  version: "1.5"
   author: scottybe
-  updated: "2026-02-17"
+  updated: "2026-07-15"
   runtime_tier: "WEB_SAFE"
   required_capabilities:
     - mcp_local_tools
   changelog: |
+    v1.5 - square-catalog-ops delegation removed (skill deleted 2026-06-20); cache framed as speed layer (live Square = source of truth)
+
     v1.4 - runtime contract alignment:
     - Added runtime tier and capability metadata
     - Added runtime policy guidance references for WEB_SAFE vs LOCAL_STANDARD sync operations
 
-    v1.3 - catalog ops + webhook monitor integration:
-    - Added cleanup-audit workflow via `square-catalog-ops`
+    v1.3 - webhook monitor integration:
     - Added webhook-monitor triage workflow for near-real-time change detection
 
     v1.2 - path and token compatibility update:
@@ -31,6 +32,10 @@ metadata:
 Local MongoDB cache of Square catalog items with comprehensive change tracking, before/after snapshots, and field-level diff reports.
 
 ## Why This Skill Exists
+
+⚠️ **Live Square is the source of truth — this cache is a SPEED LAYER.** Never base a write
+decision (price/state/category change, listing, mark-sold) on cache data alone; reconcile
+against the live API first. Cache staleness is normal between syncs.
 
 **Performance:** Cache searches are instant vs. API calls taking seconds.
 
@@ -293,14 +298,12 @@ When generating labels:
 3. Generate label batch
 4. Update cache with label_generated flag
 
-### With square-catalog-ops
+### After catalog mutations
 
 After any category/visibility mutation:
-1. Run cleanup audit:
-   - `python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues`
-2. Run cache sync:
+1. Run cache sync:
    - `~/workspace/square/square-tools/bin/square_cache.sh sync`
-3. Verify recent diffs:
+2. Verify recent diffs:
    - `~/workspace/square/square-tools/bin/square_cache.sh changes --since YYYY-MM-DD`
 
 ### With square-webhook-monitor

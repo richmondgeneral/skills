@@ -6,9 +6,9 @@ metadata:
   author: scottybe
   updated: "2026-02-16"
   changelog: |
-    v1.4 - catalog governance delegation:
-    - Added delegation to `square-catalog-ops` for category merge/audit/compliance checks
-    - Added post-write cleanup audit gate before cache reconciliation
+    v1.5 - square-catalog-ops delegation/gates removed (skill deleted 2026-06-20); default tier corrected to New Arrivals
+
+    v1.4 - catalog governance delegation (REMOVED in v1.5):
     - Added `Food & Pantry` guidance for consolidated food routing
 
     v1.3 - description_html + connector naming:
@@ -169,30 +169,9 @@ To **replace** primary image: delete old image first via `catalog.batchDeleteobj
 }
 ```
 
-## Catalog Governance Ops (Delegate)
-
-Use `square-catalog-ops` for taxonomy-level operations (not ad-hoc inline updates):
-
-```bash
-# Prove version + SDK compliance
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py compliance
-
-# Merge legacy food categories -> Food & Pantry
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py merge-food --apply
-
-# Verify cleanup/channel assignment integrity
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
-```
-
 ## Cache Reconciliation (Required)
 
 After any write to Square (price, description, category, image, inventory), sync cache and verify the update is visible.
-
-Before cache reconciliation on category/visibility updates, run cleanup audit:
-
-```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
-```
 
 **Primary (MCP):**
 ```
@@ -225,6 +204,5 @@ Verification:
 | `rg-full-auto` | New item onboarding (10-phase workflow) |
 | `rg-item-mark-sold` | Terminal state — item sold, kill the Square payment link, migrate the GitHub Pages card to the sold-archive pattern |
 | `square-image-upload` | Dedicated image upload handling |
-| `square-catalog-ops` | Category merge, cleanup audit, compliance proof |
 | `square-webhook-monitor` | Webhook subscription and monitor operations |
 | `square-cache` | Sync and verify cached catalog state after updates |

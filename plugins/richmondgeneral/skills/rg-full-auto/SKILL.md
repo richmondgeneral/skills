@@ -334,11 +334,6 @@ After Phase 2/3/4 writes, reconcile cache:
 **Primary:** `square_cache_mcp:square_cache_sync`
 **Fallback:** Run cache wrapper script via osascript.
 
-**Category governance gate:**
-```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/square-catalog-ops/scripts/catalog_ops.py audit-cleanup --fail-on-issues
-```
-
 Verify: 1. Exact SKU exists in cache (`square_cache_search`). 2. Cached item includes uploaded image ID (`square_cache_get_item`). If missing, sync once more.
 
 ---
@@ -489,7 +484,6 @@ See `references/troubleshooting.md` for common issues (image size, upload failur
 |-------|---------|
 | `rg-item-update` | Quick edits to existing items |
 | `square-image-upload` | Image upload via API |
-| `square-catalog-ops` | Compliance proof, category merges, cleanup audits |
 | `square-webhook-monitor` | Webhook subscription operations and local monitoring |
 | `book-appraiser` | Antiquarian books, LOC cross-reference |
 | `carnival-glass-appraiser` | Pressed iridescent glass 1908-1930s |

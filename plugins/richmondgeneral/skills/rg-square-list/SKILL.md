@@ -41,7 +41,7 @@ Over the Cowork osascript bridge, invoke by absolute interpreter path (the modul
 1. Reads `items/RG-XXXX/label.json` (price, product_name, condition_notes, fulfillment, photos).
 2. **Create vs update (idempotent):**
    - If `channels.square.object_id` is already set → **sparse-update** the item (name + description_html) — never creates a duplicate.
-   - Else → `catalog/batch-upsert` create. Item carries 3 categories `[Collectibles (type), New Arrivals (tier), The Vintage Market (room)]`, `reporting_category = Collectibles`, one FIXED_PRICING variation at the label price, the tax id, `ecom_visibility: VISIBLE`. **IDs are persisted to label.json immediately after create** (before image/paylink) so a mid-flow failure never double-creates on re-run.
+   - Else → `catalog/batch-upsert` create. **A CREATE first passes the pre-publish Hero QA gate** — refused unless `label.json → hero_qa.status == "pass"` (or `photo_overrides.status == "approved"`); `--skip-hero-qa` = conscious override. Item carries 3 categories `[TYPE, New Arrivals (tier), room]` — **TYPE resolves from `label.json → reporting_category_note`** (name match, e.g. "Books & Paper"; defaults to Collectibles WITH a warning when absent) and the room is the type's parent per ROOM_BY_TYPE — `reporting_category = TYPE`, one FIXED_PRICING variation at the label price, the tax id, `ecom_visibility: VISIBLE`. **IDs are persisted to label.json immediately after create** (before image/paylink) so a mid-flow failure never double-creates on re-run.
 3. **Inventory:** sets the new variation to `IN_STOCK` quantity 1 (create path only) — without this the item lists "Sold out" and the payment link can't complete.
 4. **Image:** uploads `square.png` as the **primary** catalog image (create path, or update + `--force`).
 5. **Payment link (idempotent):** keeps the existing link if its recorded price matches; deletes + recreates on a price change (or an orphaned link with no recorded price); creates one if none. `ask_for_shipping_address` is set unless the item is `local_pickup_only`.
@@ -50,7 +50,7 @@ Over the Cowork osascript bridge, invoke by absolute interpreter path (the modul
 
 ## Constants (canonical source: `scripts/square_client.py`)
 
-Location `B87BAEZ0NWV34`, API version `2026-04-21`, Collectibles `YQWBSOJDENMXDGUUQ3TGI3HF`, New Arrivals `TGWDFETSQPR6BF67YJCTOLW6`, The Vintage Market room `TX6SBQLJDMZOCVXBUD3KT3CL`, tax `LPKEJF7H27NOPK7EE6A5CA7V`. Token resolves env → macOS Keychain → workspace `.env` (bridge-portable).
+Location `B87BAEZ0NWV34`, API version `2026-04-21`, tier New Arrivals `TGWDFETSQPR6BF67YJCTOLW6`, tax `LPKEJF7H27NOPK7EE6A5CA7V`; the full TYPE→id and TYPE→room maps live in `square_client.py` (`TYPE_CATEGORIES` / `ROOM_BY_TYPE`, mirroring rg-full-auto's square-catalog reference). Token resolves env → macOS Keychain → workspace `.env` (bridge-portable).
 
 ## Idempotency contract
 

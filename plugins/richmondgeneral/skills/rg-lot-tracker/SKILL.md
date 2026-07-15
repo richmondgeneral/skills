@@ -49,7 +49,8 @@ owner always knows whether they're making or losing money, and what needs attent
 ## Where the data lives
 
 All financial data lives in the **private ops repo** (richmondgeneral/ops).
-The canonical local path is `~/workspace/square/ops`.
+The canonical local path is `~/workspace/richmondgeneral/ops`.
+(⚠️ `~/workspace/square/ops` is the DEAD pre-consolidation location — it may still exist on disk; never write there.)
 
 ```
 ops/
@@ -66,7 +67,7 @@ ops/
 
 Before any read or write, locate the ops repo root. Check in order:
 
-1. `~/workspace/square/ops` (standard location)
+1. `~/workspace/richmondgeneral/ops` (standard location)
 2. A sibling `ops/` directory next to the current repo root
 3. Ask the user: "Where is the ops repo cloned?"
 
@@ -75,7 +76,7 @@ directory, a temp folder, or anywhere else. Financial data written outside the
 private ops repo risks leaking acquisition costs and margins into a public repo.
 
 Tell the user: "I need the ops repo path to save lot data. Is it at
-`~/workspace/square/ops`, or somewhere else?"
+`~/workspace/richmondgeneral/ops`, or somewhere else?"
 
 Once resolved, store the path and use it as the base for all `lot-tracking/`
 and `inventory/` paths throughout the session.

@@ -39,6 +39,7 @@ def _write_label(item_dir, **overrides):
         "price": "65.00",
         "condition_notes": "Gently used; minor shelf wear.",
         "channels": {},
+        "hero_qa": {"status": "pass"},
     }
     label.update(overrides)
     path = item_dir / "label.json"
@@ -167,6 +168,7 @@ def _write_label_dummy():
         "price": "65.00",
         "condition_notes": "Gently used; minor shelf wear.",
         "channels": {},
+        "hero_qa": {"status": "pass"},
     }
 
 
@@ -755,3 +757,42 @@ def test_state_not_downgraded_from_sold(monkeypatch, item_dir):
     assert written["state"] == "Sold"
     # But the channel status still reflects the sparse update ran.
     assert written["channels"]["square"]["status"] == "listed"
+
+
+# ---------------------------------------------------------------------------
+# Hero QA gate + TYPE category resolution (audit 2026-07-15).
+# ---------------------------------------------------------------------------
+
+def test_create_refused_without_hero_qa_pass(item_dir):
+    _write_label(item_dir, hero_qa={"status": "fail"})
+    with pytest.raises(SystemExit, match="REFUSED"):
+        sl.list_item(str(item_dir))
+
+
+def test_create_allowed_via_photo_overrides_approval(item_dir):
+    _write_label(item_dir, hero_qa={"status": "fail"},
+                 photo_overrides={"status": "approved", "reason": "radial symmetry"})
+    assert sl.hero_qa_ok(json.loads((item_dir / "label.json").read_text()))
+
+
+def test_skip_hero_qa_flag_overrides_gate(item_dir):
+    _write_label(item_dir, hero_qa={"status": "fail"})
+    summary = sl.list_item(str(item_dir), dry_run=True)
+    assert summary["hero_qa_ok"] is False  # dry-run reports, never blocks
+
+
+def test_type_category_resolved_from_reporting_note(item_dir):
+    _, label = _write_label(item_dir, reporting_category_note="Books & Paper")
+    obj = sl.build_catalog_object("RG-0099", label)
+    cats = [c["id"] for c in obj["item_data"]["categories"]]
+    assert cats[0] == "CLZCJ62H4TTHDQ3ZBYMZQASQ"          # Books & Paper TYPE
+    assert obj["item_data"]["reporting_category"]["id"] == "CLZCJ62H4TTHDQ3ZBYMZQASQ"
+    assert cats[2] == "QLM2GZ643LOCYHB653YIDJWT"          # General Store room
+
+
+def test_type_category_defaults_to_collectibles_without_note(item_dir):
+    _, label = _write_label(item_dir)
+    obj = sl.build_catalog_object("RG-0099", label)
+    cats = [c["id"] for c in obj["item_data"]["categories"]]
+    assert cats[0] == sl.CAT_COLLECTIBLES
+    assert cats[2] == sl.CAT_VINTAGE_MARKET

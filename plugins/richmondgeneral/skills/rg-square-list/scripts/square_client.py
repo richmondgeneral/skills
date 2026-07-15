@@ -51,6 +51,39 @@ TAX_ID = "LPKEJF7H27NOPK7EE6A5CA7V"
 CAT_COLLECTIBLES = "YQWBSOJDENMXDGUUQ3TGI3HF"
 CAT_NEW_ARRIVALS = "TGWDFETSQPR6BF67YJCTOLW6"
 CAT_VINTAGE_MARKET = "TX6SBQLJDMZOCVXBUD3KT3CL"  # The Vintage Market — room/parent of Collectibles (ROOM_BY_TYPE)
+CAT_GENERAL_STORE = "QLM2GZ643LOCYHB653YIDJWT"   # The General Store — room/parent of most General Store types
+
+# TYPE categories (reporting category = type; canon: rg-full-auto/references/square-catalog.md,
+# verified live 2026-05-11). label.json → reporting_category_note resolves here by name.
+TYPE_CATEGORIES = {
+    "books & paper": "CLZCJ62H4TTHDQ3ZBYMZQASQ",
+    "furniture": "W3EYAJJPTNC46WSLNYI4WH7V",
+    "pottery & ceramics": "APSTFSN4UXQI44HBFSDTSEX7",
+    "collectibles": CAT_COLLECTIBLES,
+    "art & craft kits": "F4JQYK4Z5MEBV5VFCDYHIAWT",
+    "wellness & apothecary": "I5PMPWGTVR7IDBL4RUJWN3A4",
+    "gifts": "AR3ZTA45KU4BH23AJ7LOLLRA",
+    "home": "43IPDJV36K4AX55M4QFPYHHO",
+    "food & pantry": "CYTCL6ES7TSG2XCUVHIDG5B2",
+    "analog & vintage media": "N35REXL33FZWJNJV24IUQGPN",
+    "trésor vintage market": "XQY33UQNPA7IPZ4CBIYJX3VM",
+}
+
+# Room (parent) per TYPE — mirrors rg-full-auto process_new_item.ROOM_BY_TYPE.
+ROOM_BY_TYPE = {
+    "I5PMPWGTVR7IDBL4RUJWN3A4": CAT_GENERAL_STORE,   # Wellness & Apothecary
+    "AR3ZTA45KU4BH23AJ7LOLLRA": CAT_GENERAL_STORE,   # Gifts
+    "CLZCJ62H4TTHDQ3ZBYMZQASQ": CAT_GENERAL_STORE,   # Books & Paper
+    "APSTFSN4UXQI44HBFSDTSEX7": CAT_GENERAL_STORE,   # Pottery & Ceramics
+    "CYTCL6ES7TSG2XCUVHIDG5B2": CAT_GENERAL_STORE,   # Food & Pantry
+    "43IPDJV36K4AX55M4QFPYHHO": CAT_GENERAL_STORE,   # Home
+    "F4JQYK4Z5MEBV5VFCDYHIAWT": CAT_GENERAL_STORE,   # Art & Craft Kits
+    "W3EYAJJPTNC46WSLNYI4WH7V": CAT_VINTAGE_MARKET,  # Furniture
+    "YQWBSOJDENMXDGUUQ3TGI3HF": CAT_VINTAGE_MARKET,  # Collectibles
+    "N35REXL33FZWJNJV24IUQGPN": CAT_VINTAGE_MARKET,  # Analog & Vintage Media
+    "XQY33UQNPA7IPZ4CBIYJX3VM": CAT_VINTAGE_MARKET,  # Trésor Vintage Market
+}
+
 BASE = "https://connect.squareup.com"
 
 # Token env var names: primary, then legacy fallback.

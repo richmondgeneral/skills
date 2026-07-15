@@ -46,6 +46,8 @@ from square_client import (  # noqa: E402
     CAT_COLLECTIBLES,
     CAT_NEW_ARRIVALS,
     CAT_VINTAGE_MARKET,
+    ROOM_BY_TYPE,
+    TYPE_CATEGORIES,
     LOCATION_ID,
     TAX_ID,
     build_payment_link_body,
@@ -101,30 +103,66 @@ def _create_catalog_image(access_token, image_path, object_id=None, name=None,
 # Catalog object — mirrors rg-full-auto/process_new_item._build_catalog_object.
 # -----------------------------------------------------------------------------
 
+def resolve_type_category(label: dict) -> str:
+    """Resolve the TYPE category id from ``label["reporting_category_note"]``.
+
+    Name-matches (case-insensitive) against TYPE_CATEGORIES. When the note is
+    absent or unrecognized, defaults to Collectibles and prints a warning —
+    the wrong reporting category silently skews Square sales reports, so set
+    the note in label.json (e.g. "Books & Paper") for non-Collectibles items.
+    """
+    note = (label.get("reporting_category_note") or "").strip().lower()
+    if note in TYPE_CATEGORIES:
+        return TYPE_CATEGORIES[note]
+    if note:
+        print(f"[warn] reporting_category_note {label.get('reporting_category_note')!r} "
+              f"doesn't match a known TYPE category — defaulting to Collectibles",
+              file=sys.stderr)
+    else:
+        print("[warn] label.json has no reporting_category_note — TYPE defaulting to "
+              "Collectibles (set it if this item isn't a Collectible)", file=sys.stderr)
+    return CAT_COLLECTIBLES
+
+
+def hero_qa_ok(label: dict) -> bool:
+    """Pre-publish Hero QA gate (canon: no hero publishes without a pass).
+
+    Passes when ``hero_qa.status == "pass"`` OR ``photo_overrides.status ==
+    "approved"`` (the documented visual-check override for e.g. the
+    radially-symmetric level false-positive).
+    """
+    if ((label.get("hero_qa") or {}).get("status")) == "pass":
+        return True
+    return ((label.get("photo_overrides") or {}).get("status")) == "approved"
+
+
 def build_catalog_object(sku: str, label: dict) -> dict:
     """Build the ITEM upsert object for ``catalog/batch-upsert`` (CREATE path).
 
-    Mirrors rg-full-auto's ``_build_catalog_object`` exactly for the rg-square-list
-    case: TYPE = Collectibles, TIER = New Arrivals (the intake default), plus the
-    ROOM = The Vintage Market (Collectibles' parent room per ROOM_BY_TYPE), so
-    ``categories = [type, tier, room]`` and ``reporting_category = type``. The
-    room category is required or the item is missing from the room-level Shop All
-    grid. One FIXED_PRICING ITEM_VARIATION priced from ``label["price"]``.
+    Mirrors rg-full-auto's ``_build_catalog_object``: TYPE resolved from
+    ``label.json → reporting_category_note`` (name match against TYPE_CATEGORIES;
+    defaults to Collectibles WITH A WARNING when absent/unknown), TIER = New
+    Arrivals (the intake default), plus the ROOM = the type's parent room per
+    ROOM_BY_TYPE, so ``categories = [type, tier, room]`` and
+    ``reporting_category = type``. The room category is required or the item is
+    missing from the room-level Shop All grid. One FIXED_PRICING ITEM_VARIATION priced from ``label["price"]``.
     ``#``-prefixed temp ids (``#RG-XXXX`` / ``#RG-XXXX-var``) are resolved to real
     ids from the response ``id_mappings``.
     """
     price_cents = dollars_to_cents(label["price"])
     name = label["product_name"]
     notes = label.get("condition_notes") or ""
+    type_id = resolve_type_category(label)
+    room_id = ROOM_BY_TYPE.get(type_id, CAT_VINTAGE_MARKET)
 
     item_data = {
         "name": name,
         "categories": [
-            {"id": CAT_COLLECTIBLES},     # TYPE
+            {"id": type_id},              # TYPE (from reporting_category_note)
             {"id": CAT_NEW_ARRIVALS},     # TIER (intake default)
-            {"id": CAT_VINTAGE_MARKET},   # ROOM (Collectibles' parent, ROOM_BY_TYPE)
+            {"id": room_id},              # ROOM (type's parent, ROOM_BY_TYPE)
         ],
-        "reporting_category": {"id": CAT_COLLECTIBLES},
+        "reporting_category": {"id": type_id},
         "tax_ids": [TAX_ID],
         "is_taxable": True,
         "ecom_visibility": "VISIBLE",
@@ -364,7 +402,8 @@ def _write_label(label_path: Path, label: dict) -> None:
 # Orchestrator.
 # -----------------------------------------------------------------------------
 
-def list_item(item_dir: str, dry_run: bool = False, force: bool = False) -> dict:
+def list_item(item_dir: str, dry_run: bool = False, force: bool = False,
+              skip_hero_qa: bool = False) -> dict:
     """Create or update the item's Square listing; return a summary dict.
 
     See the module docstring for the full idempotency contract. In ``dry_run``
@@ -381,6 +420,7 @@ def list_item(item_dir: str, dry_run: bool = False, force: bool = False) -> dict
     channels = label.get("channels") or {}
     square = channels.get("square") or {}
     existing_object_id = square.get("object_id")
+    qa_ok = hero_qa_ok(label)
 
     if dry_run:
         return {
@@ -391,7 +431,17 @@ def list_item(item_dir: str, dry_run: bool = False, force: bool = False) -> dict
             "object_id": existing_object_id,
             "would_upload_image": (not existing_object_id) or force,
             "local_pickup_only": _local_pickup_only(label),
+            "hero_qa_ok": qa_ok,
         }
+
+    # Pre-publish Hero QA gate: a CREATE puts the hero live on Square — refuse
+    # without a hero_qa pass (or the documented photo_overrides approval).
+    if not existing_object_id and not qa_ok and not skip_hero_qa:
+        raise SystemExit(
+            f"REFUSED: {sku} has no hero_qa pass (label.json hero_qa.status != 'pass' "
+            f"and no photo_overrides approval). Run hero_qa.py, fix or approve the "
+            f"hero, then retry — or pass --skip-hero-qa to override consciously."
+        )
 
     token = resolve_token()
 
@@ -533,9 +583,14 @@ def main(argv=None) -> int:
         "--force", action="store_true",
         help="On an update, also re-upload the primary image.",
     )
+    parser.add_argument(
+        "--skip-hero-qa", action="store_true",
+        help="Override the pre-publish Hero QA gate (conscious override only).",
+    )
     args = parser.parse_args(argv)
 
-    summary = list_item(args.item_dir, dry_run=args.dry_run, force=args.force)
+    summary = list_item(args.item_dir, dry_run=args.dry_run, force=args.force,
+                        skip_hero_qa=args.skip_hero_qa)
 
     if summary.get("dry_run"):
         print(f"[dry-run] {summary['sku']}: would {summary['action']} "

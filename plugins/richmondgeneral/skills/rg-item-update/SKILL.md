@@ -2,9 +2,9 @@
 name: rg-item-update
 description: Quick edits to existing Richmond General catalog items. Use for price changes, description updates, SEO tweaks, adding/replacing images, category changes, or fixing typos. Triggers on "update item", "change price", "edit description", "fix", "modify existing". Also handles BATCH operations like "move all food items" or "update category for multiple items". NOT for new items—use rg-full-auto for complete onboarding workflow. NOT for items that have sold—use rg-item-mark-sold to migrate the listing to the sold-archive pattern and delete the Square payment link.
 metadata:
-  version: "1.4"
+  version: "1.5"
   author: scottybe
-  updated: "2026-02-16"
+  updated: "2026-07-15"
   changelog: |
     v1.5 - square-catalog-ops delegation/gates removed (skill deleted 2026-06-20); default tier corrected to New Arrivals
 
@@ -101,7 +101,7 @@ Returns `item_id` and `variation_id` needed for updates.
 
 **Type categories (primary + reporting):** Books & Paper `CLZCJ62H4TTHDQ3ZBYMZQASQ`, Furniture `W3EYAJJPTNC46WSLNYI4WH7V`, Pottery & Ceramics `APSTFSN4UXQI44HBFSDTSEX7`, Collectibles `YQWBSOJDENMXDGUUQ3TGI3HF`, Art & Craft Kits `F4JQYK4Z5MEBV5VFCDYHIAWT`, Wellness & Apothecary `I5PMPWGTVR7IDBL4RUJWN3A4`, The Apothecary Cabinet `6E7UZYZFNZBGFRJFH272RVBE`, Home & Gifts `AR3ZTA45KU4BH23AJ7LOLLRA`, Analog `N35REXL33FZWJNJV24IUQGPN`
 
-**Tier categories (secondary):** The New Finds `P34KX3L7XRZJJ5RP6W35K4YO` (default), The Real Rarities `FL4L42RRUE5UXMWFDLXOCNB5` (rare only)
+**Tier categories (secondary):** New Arrivals `TGWDFETSQPR6BF67YJCTOLW6` (**default intake tier**), The Real Rarities `FL4L42RRUE5UXMWFDLXOCNB5` (rare only), The New Finds `P34KX3L7XRZJJ5RP6W35K4YO` (re-tier destination — no longer the default)
 
 For food items, route to consolidated `Food & Pantry` (`CYTCL6ES7TSG2XCUVHIDG5B2`) instead of legacy food categories.
 See `rg-full-auto/references/square-catalog.md` for full list including TVM categories.

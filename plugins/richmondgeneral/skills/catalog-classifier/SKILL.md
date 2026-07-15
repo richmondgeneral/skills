@@ -1,11 +1,15 @@
 ---
 name: catalog-classifier
-description: Determines Square category assignment based on item attributes. Use when onboarding items, bulk categorization, or when unsure which category an item belongs to. Routes items to correct brand (TVM/RG/Snacks), type category (Books, Furniture, Collectibles, etc.), and tier (Real Rarities vs New Finds). Triggers on "what category", "classify", "which category", "categorize item".
+description: Determines Square category assignment based on item attributes. Use when onboarding items, bulk categorization, or when unsure which category an item belongs to. Routes items to the correct type category (Books & Paper, Furniture, Collectibles, Pottery & Ceramics, etc. — reporting category = type) plus the market tier (New Arrivals default on intake; The Vintage Market / The Real Rarities / The General Store as re-tiers); TVM/Food brands handled as explicit exceptions. Triggers on "what category", "classify", "which category", "categorize item".
 metadata:
-  version: "2.1"
+  version: "2.2"
   author: scottybe
   updated: "2026-02-16"
   changelog: |
+    v2.2 - Tier model corrected: New Arrivals = default intake tier (New Finds/Real Rarities = re-tier
+    destinations); type category is ALWAYS primary + reporting; square-catalog-ops delegation removed
+    (skill deleted 2026-06-20).
+
     v2.1 - food taxonomy consolidation:
     - Replaced legacy snack split categories with `Food & Pantry`
     - Marked old snack categories as legacy-hidden (do not assign)
@@ -61,8 +65,10 @@ Assigns Square categories based on item attributes. Returns category ID(s) with 
 
 | Category | ID | Criteria |
 |----------|-----|----------|
-| **The New Finds** | `P34KX3L7XRZJJ5RP6W35K4YO` | Default intake — most new items get this as secondary |
-| **The Real Rarities** | `FL4L42RRUE5UXMWFDLXOCNB5` | Truly rare/showcase-worthy — replaces New Finds as secondary |
+| **New Arrivals** | `TGWDFETSQPR6BF67YJCTOLW6` | **Default intake tier** — every new item lands here; re-tier later as it ages |
+| **The Real Rarities** | `FL4L42RRUE5UXMWFDLXOCNB5` | Truly rare/showcase-worthy — re-tier destination |
+| **The New Finds** | `P34KX3L7XRZJJ5RP6W35K4YO` | Re-tier destination (NO LONGER the intake default) |
+| **The Vintage Market** | `TX6SBQLJDMZOCVXBUD3KT3CL` | Room category — auto-attached when the type lives under it (Furniture, Collectibles, Analog & Vintage Media) |
 
 ### Food Category
 
@@ -104,13 +110,17 @@ Item Input
                                     └─► Vinyl/pinball/analog? → Analog & Vintage Media
 
                                     THEN add tier as secondary:
-                                    ├─► Genuinely rare/special? → + The Real Rarities
-                                    └─► Standard new stock? → + The New Finds (default)
+                                    └─► + New Arrivals (default intake tier — ALWAYS on intake;
+                                        re-tier later to The Real Rarities / The New Finds as it ages)
 ```
 
 ## Tier Assignment (Secondary Category)
 
-**The Real Rarities** — add as secondary when ANY of:
+**New Arrivals** — the DEFAULT intake tier. Every new item gets it as secondary on intake,
+no judgment required. Items age out of it via re-tiering.
+
+**The Real Rarities** — a RE-TIER destination (may be applied at intake for obvious showcase
+pieces) when ANY of:
 - Pre-1950 with identified maker/manufacturer
 - Documented provenance (estate, auction record)
 - Significant collectible value ($75+)
@@ -119,10 +129,8 @@ Item Input
 - Carnival glass with identified pattern/maker
 - Antiquarian books (pre-1900)
 
-**The New Finds** — default secondary for everything else:
-- Standard new inventory arrivals
-- Items that will eventually get sorted into a more specific grouping
-- The "intake" category — items land here and get moved out over time
+**The New Finds** — a re-tier destination only (NO LONGER the intake default; the old
+"every item gets New Finds" rule matched zero live items and is retired).
 
 ## Multi-Category Assignment
 
@@ -132,7 +140,7 @@ Some items may warrant multiple categories:
 |----------|------------|
 | Japanese candy | Food & Pantry |
 | French crystal | 🇫🇷 Timeless Treasures (primary) |
-| Vintage radio | Analog & Vintage Media + The New Finds (or Real Rarities if rare) |
+| Vintage radio | Analog & Vintage Media + New Arrivals (re-tier to Real Rarities if rare) |
 
 **Rule:** When multi-assigning, the more specific category is primary.
 
@@ -143,8 +151,8 @@ When classifying, return:
 ```
 Square Primary Category: Books & Paper
 Square Primary ID: CLZCJ62H4TTHDQ3ZBYMZQASQ
-Square Secondary Category: The New Finds
-Square Secondary ID: P34KX3L7XRZJJ5RP6W35K4YO
+Square Secondary Category: New Arrivals (default intake tier)
+Square Secondary ID: TGWDFETSQPR6BF67YJCTOLW6
 Square Reporting Category ID: CLZCJ62H4TTHDQ3ZBYMZQASQ
 Confidence: High
 Reasoning: Item is a catalog/book-format publication; standard intake tier applies.

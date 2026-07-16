@@ -2,10 +2,17 @@
 name: photos-library
 description: Query and extract photos from macOS Photos Library, sort intake photos into per-SKU libraries, and sort receipt photos into ops/receipts + the receipts ledger. Use when user asks to find recent photos, extract product photos, search by date/album/type, convert HEIC to JPEG, pull images from Photos app, sort the intake album into items, file photos into a SKU, clear the intake queue, route downloaded photos into the right album, or sort/file receipts out of the photo library. Triggers on "recent photos", "photos from last week", "extract from Photos", "product photos", "find pictures of", "pull from camera roll", "sort intake", "sort my intake photos", "file these into their SKU", "out of intake", "photos from downloads into the right album", "sort receipts", "file receipts", "receipt photos", "receipts out of the library".
 metadata:
-  version: "1.11"
+  version: "1.12"
   author: scottybe
-  updated: "2026-07-15"
+  updated: "2026-07-16"
   changelog: |
+    v1.12 - GPS EXIF wipe at export (privacy): sips_convert now zeroes the GPS IFD
+    of every exported JPEG in place (stdlib-only - runs over the bare bridge shell;
+    entry count, entries, and pointed-to value blocks zeroed, so pixels/orientation/
+    other EXIF and file length are untouched; never fatal). Root fix for the
+    2026-07-15 leak - originals exported metadata-and-all put iPhone GPS coordinates
+    on the public items Pages site. Backstop: items CI scripts/check_gps_exif.py.
+
     v1.11 - Cowork operating pattern baked in: mac-bridge-first entry point (deferred-tool
     connection check), subagent fan-out for per-item research with writes kept serial in the
     main agent (2026-06-21 experiment, now default), computer-use fallback for iCloud-offloaded

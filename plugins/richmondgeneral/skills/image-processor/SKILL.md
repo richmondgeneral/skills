@@ -2,10 +2,21 @@
 name: image-processor
 description: Unified image processing with background removal, generation, editing, listing-photo standardization, and Photos.app integration. Auto-routes to optimal model (Nano Banana Pro, Gemini 2.5, remove.bg) based on task. Triggers on "remove background", "generate image", "edit image", "process photo", "standardize listing photos", "make photos professional/catalog-quality", "square crop / center / color-correct photo", "transparent hero", "photos library", "get from photos", or when rg-full-auto needs image processing.
 metadata:
-  version: "1.13"
+  version: "1.14"
   author: scottybe
-  updated: "2026-07-15"
+  updated: "2026-07-16"
   changelog: |
+    v1.14 - GPS EXIF scrub (privacy; the 2026-07-15 leak - 130+42 published images
+    carried iPhone GPS coordinates on the public Pages site):
+    - standardize.py strip_gps(): lossless in-place GPS removal (JPEG APP1-only
+      rewrite via piexif, PNG chunk-level eXIf swap) - pixels, orientation, and
+      all non-GPS EXIF preserved; malformed Apple MakerNote tags piexif cannot
+      re-serialize are dropped via a bounded retry, never the whole file.
+    - CLI: standardize.py --strip-gps FILE... for detail shots / raw heroes that
+      ship without a standardize() pass. New dep: piexif.
+    - Backstops: photos-library file_cluster wipes GPS at sips export; the items
+      repo CI (scripts/check_gps_exif.py, stdlib) fails the build on any GPS IFD.
+
     v1.13 - combo.py 1:1 marketplace combo collage; SKILL.md refreshed 2026-07-15
     (deskew/--straighten claim corrected, Hero QA gate + matte.py sections added,
     clean.py generative warning inline, directory tree regenerated).

@@ -419,6 +419,101 @@ def bake_orientation(img: Image.Image) -> Image.Image:
     return out
 
 
+# ---------------------------------------------------------------------------
+# GPS EXIF scrub (privacy)
+#
+# 2026-07-15: 130 published images across ~30 items carried iPhone GPS
+# coordinates on the public Pages site — raw shots committed without ever
+# passing standardize() (whose PNG output is already EXIF-free). This strip
+# is for photos that ship AS-IS (detail-N shots, raw heroes): lossless,
+# in place, GPS only — pixels, orientation, and the rest of the EXIF stay.
+# The items repo CI (check_gps_exif.py) is the backstop.
+# ---------------------------------------------------------------------------
+
+GPS_IFD_TAG = 0x8825
+_EXIF_PREFIX = b"Exif\x00\x00"
+
+
+def _dump_sans_gps(exif_dict: Dict[str, Any]) -> bytes:
+    """piexif.dump with the GPS IFD emptied. Apple files routinely hold tags
+    piexif loads but refuses to re-serialize (tuple MakerNote 37500, int
+    SceneType 41729, ...); drop each offender the dump error names and retry
+    rather than failing the whole file."""
+    import re
+    import piexif
+    exif_dict = {k: (dict(v) if isinstance(v, dict) else v) for k, v in exif_dict.items()}
+    exif_dict["GPS"] = {}
+    ifd_names = {"0th": "0th", "Exif": "Exif", "1st": "1st", "Interop": "Interop"}
+    for _ in range(64):
+        try:
+            return piexif.dump(exif_dict)
+        except ValueError as exc:
+            m = re.search(r"(\d+) in (\w+)", str(exc))
+            ifd = ifd_names.get(m.group(2)) if m else None
+            if not ifd or int(m.group(1)) not in exif_dict.get(ifd, {}):
+                raise
+            del exif_dict[ifd][int(m.group(1))]
+    raise ValueError("EXIF would not sanitize within 64 tag drops")
+
+
+def _png_replace_exif(path: str, exif_bytes: bytes) -> None:
+    """Swap the payload of a PNG's eXIf chunk in place (chunk-level rewrite —
+    every other chunk, i.e. the pixel data, is copied byte-for-byte)."""
+    import struct
+    import zlib
+    with open(path, "rb") as f:
+        data = f.read()
+    out = bytearray(data[:8])
+    i = 8
+    while i < len(data):
+        (length,) = struct.unpack(">I", data[i:i + 4])
+        ctype = data[i + 4:i + 8]
+        if ctype == b"eXIf":
+            payload = exif_bytes[len(_EXIF_PREFIX):] if exif_bytes.startswith(_EXIF_PREFIX) else exif_bytes
+            out += struct.pack(">I", len(payload)) + b"eXIf" + payload
+            out += struct.pack(">I", zlib.crc32(b"eXIf" + payload) & 0xFFFFFFFF)
+        else:
+            out += data[i:i + 12 + length]
+        i += 12 + length
+    with open(path, "wb") as f:
+        f.write(bytes(out))
+
+
+def strip_gps(path) -> bool:
+    """Remove GPS EXIF from a photo IN PLACE, losslessly (no pixel re-encode:
+    JPEG gets an APP1-only rewrite via piexif, PNG a chunk-level eXIf swap).
+    Returns True if the file was modified, False if it was already clean."""
+    import piexif
+    path = str(path)
+    with Image.open(path) as img:
+        fmt = img.format
+        exif = img.getexif()
+        has_gps = bool(exif.get_ifd(GPS_IFD_TAG))
+        raw_exif = img.info.get("exif")
+    if not has_gps:
+        return False
+    if fmt == "JPEG":
+        piexif.insert(_dump_sans_gps(piexif.load(path)), path)
+    elif fmt == "PNG":
+        blob = raw_exif if raw_exif.startswith(_EXIF_PREFIX) else _EXIF_PREFIX + raw_exif
+        _png_replace_exif(path, _dump_sans_gps(piexif.load(blob)))
+    else:
+        raise ValueError(f"unsupported format for GPS strip: {fmt}")
+    return True
+
+
+def run_strip_gps(paths: List[str]) -> int:
+    """CLI worker for --strip-gps. Per-file, never aborts the batch."""
+    rc = 0
+    for f in paths:
+        try:
+            print(f"{f}: {'stripped' if strip_gps(f) else 'clean'}")
+        except Exception as exc:
+            print(f"{f}: ERROR {exc}", file=sys.stderr)
+            rc = 1
+    return rc
+
+
 def standardize(input_path, output_path, do_color=True, do_bg=True, fill=0.85, size=2000,
                 shadow=False, copyright_text=None, sku=None, watermark=False,
                 watermark_logo=DEFAULT_LOGO, wb="background", model=None, allow_rect_mask=False,
@@ -727,6 +822,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--crop-to-face", dest="crop_to_face", action="store_true",
                    help="with --deskew, output the tight full-bleed face crop")
 
+    # ---- GPS scrub (standalone mode) ----
+    p.add_argument("--strip-gps", nargs="+", metavar="FILE",
+                   help="strip GPS EXIF from these photos in place (lossless; "
+                        "pixels/orientation kept) and exit — for detail shots "
+                        "and raw heroes that ship without a standardize() pass")
+
     # ---- misc ----
     p.add_argument("--straighten", action="store_true",
                    help="deprecated alias for --deskew (now implemented via opencv)")
@@ -737,6 +838,9 @@ def _build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     p = _build_parser()
     args = p.parse_args()
+
+    if args.strip_gps:
+        sys.exit(run_strip_gps(args.strip_gps))
 
     if args.straighten:
         # --straighten is now a deprecated alias for --deskew (opencv implemented).

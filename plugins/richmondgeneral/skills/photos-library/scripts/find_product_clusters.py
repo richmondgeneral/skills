@@ -186,7 +186,11 @@ tell application "Photos"
     set out to {{}}
     repeat with u in {uuid_list}
         try
-            set mi to (first media item whose id starts with (contents of u))
+            try
+                set mi to media item id ((contents of u) & "/L0/001")
+            on error
+                set mi to (first media item whose id starts with (contents of u))
+            end try
             set kw to keywords of mi
             if kw is not missing value and kw contains "rg-sorted" then
                 set end of out to (contents of u)

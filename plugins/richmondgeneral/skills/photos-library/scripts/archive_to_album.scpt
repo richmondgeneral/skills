@@ -43,7 +43,13 @@ on run argv
             try
                 -- Photos media item IDs include a suffix (e.g., "/L0/001").
                 -- Upstream UUIDs from Photos.sqlite are bare ZUUID values.
-                set end of itemsToArchive to (first media item whose id starts with (contents of pId))
+                -- Direct id lookup first (instant); `whose id starts with` is a
+                -- whole-library scan per photo (~1.1s each) — fallback only.
+                try
+                    set end of itemsToArchive to (media item id ((contents of pId) & "/L0/001"))
+                on error
+                    set end of itemsToArchive to (first media item whose id starts with (contents of pId))
+                end try
             on error
                 -- UUID not found (deleted or invalid), skip
                 set skippedCount to skippedCount + 1

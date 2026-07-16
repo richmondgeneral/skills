@@ -309,7 +309,13 @@ tell application "Photos"
     set out to {{}}
     repeat with u in {uuid_list}
         try
-            set mi to (first media item whose id starts with (contents of u))
+            -- direct id lookup (media item ids are ZUUID & "/L0/001") — the old
+            -- `whose id starts with` was a per-photo whole-library scan (~1.1s each)
+            try
+                set mi to media item id ((contents of u) & "/L0/001")
+            on error
+                set mi to (first media item whose id starts with (contents of u))
+            end try
             set kw to keywords of mi
             if kw is missing value then set kw to {{}}
             repeat with k in addKw

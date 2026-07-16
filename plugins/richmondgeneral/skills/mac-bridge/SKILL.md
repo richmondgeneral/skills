@@ -64,10 +64,14 @@ Measured 2026-07-16 (binary-searched with sleep probes): an inline bridge call t
    or poll with `--status` before re-running. (`file_cluster` re-runs are manifest-safe, but
    only once the first run has written the manifest.)
 2. **"Bridge timeout" on file_cluster/matte/enhance-sized jobs is deterministic, not flaky.**
-   A full `file_cluster` run (mint + sips export + Photos tag + album) is ~45–60s on an idle
-   library (~1.1s/photo each for the tag and album AppleScript stages — `whose id starts with`
-   is a per-photo library scan) and worse while Photos is mid-iCloud-sync. It can never fit
-   the 30s window for a real cluster.
+   Before plugin 1.12.1 the tag and album AppleScript stages cost ~1.1s/photo each (the old
+   `whose id starts with` did a whole-library scan per photo), putting a full `file_cluster`
+   run (mint + sips export + tag + album) at ~45–60s idle — never inside the 30s window.
+   1.12.1 switched both to direct `media item id (uuid & "/L0/001")` lookups (~0.01s/photo,
+   measured 11 photos: tag 12.5s→0.65s, album 12.3s→0.31s; the scan remains as an on-error
+   fallback), so a typical run is now dominated by mint + sips and usually fits inline. But
+   Photos mid-iCloud-sync and big clusters still push past 30s — the detach SOP below stays
+   the default for full runs.
 
 **SOP for any job that could exceed ~25s:** use the wrapper's detach mode —
 

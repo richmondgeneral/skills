@@ -17,7 +17,10 @@ def read_page_record(item_dir: Union[str, Path]) -> PageRecord:
     label = json.loads((item_dir / "label.json").read_text(encoding="utf-8"))
 
     sku = label["sku"]
-    reference_price = float(label["price"])
+    try:
+        reference_price = float(label.get("price", 0.0)) if label.get("price") else 0.0
+    except ValueError:
+        reference_price = 0.0
 
     status_json: Optional[dict] = None
     status_file = item_dir / "status.json"

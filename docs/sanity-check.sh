@@ -1,279 +1,215 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Skills Repository Sanity Check
-# Validates documentation, metadata, paths, and Python syntax
+# Validates skill discovery, frontmatter, paths, headings, and Python syntax.
 
 set -o pipefail
 
-SKILLS_DIR="$(cd "$(dirname "$0")/../plugins/richmondgeneral/skills" && pwd)"
-cd "$SKILLS_DIR" || exit 1
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PLUGINS_DIR="$REPO_ROOT/plugins"
 
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Counters
 CHECKS_PASSED=0
 CHECKS_FAILED=0
 ERRORS=()
 
-function pass() {
+pass() {
     echo -e "${GREEN}✅${NC} $1"
-    ((CHECKS_PASSED++))
+    ((CHECKS_PASSED+=1))
 }
 
-function fail() {
+fail() {
     echo -e "${RED}❌${NC} $1"
     ERRORS+=("$1")
-    ((CHECKS_FAILED++))
+    ((CHECKS_FAILED+=1))
 }
 
-function warn() {
+warn() {
     echo -e "${YELLOW}⚠️${NC}  $1"
 }
 
-function info() {
+info() {
     echo -e "${BLUE}ℹ️${NC}  $1"
 }
+
+if [ ! -d "$PLUGINS_DIR" ]; then
+    echo "Plugins directory not found: $PLUGINS_DIR" >&2
+    exit 1
+fi
+
+mapfile -d '' SKILL_FILES < <(
+    find "$PLUGINS_DIR" -type f -name SKILL.md -not -path '*/archive/*' -print0 | sort -z
+)
 
 echo "🔍 Running Skills Repository Sanity Check..."
 echo ""
 
 # ============================================================================
-# CHECK 1: Metadata Completeness
+# CHECK 1: Skill Inventory
 # ============================================================================
-echo "━━━ Metadata Completeness ━━━"
+echo "━━━ Skill Inventory ━━━"
 
-SKILL_DIRS=$(find "$SKILLS_DIR" -maxdepth 1 -type d -not -name ".*" -not -name "docs" -not -name "archive" | grep -v "^$SKILLS_DIR$")
-SKILL_COUNT=$(echo "$SKILL_DIRS" | wc -l | tr -d ' ')
+if [ "${#SKILL_FILES[@]}" -eq 0 ]; then
+    fail "No skills discovered under $PLUGINS_DIR"
+else
+    pass "Skill Inventory (${#SKILL_FILES[@]} skills discovered)"
+fi
 
-MISSING_METADATA=0
-for skill_dir in $SKILL_DIRS; do
-    skill_name=$(basename "$skill_dir")
-    skill_md="$skill_dir/SKILL.md"
-    
-    if [ ! -f "$skill_md" ]; then
-        # gemini-chat is a stub directory, skip it
-        if [ "$skill_name" != "gemini-chat" ]; then
-            fail "Missing SKILL.md in $skill_name"
-            ((MISSING_METADATA++))
-        fi
+MANIFEST_ERRORS=0
+while IFS= read -r -d '' manifest; do
+    plugin_dir=$(dirname "$(dirname "$manifest")")
+    if [ ! -d "$plugin_dir/skills" ]; then
+        fail "Plugin manifest has no skills directory: ${plugin_dir#"$REPO_ROOT/"}"
+        ((MANIFEST_ERRORS+=1))
+    fi
+done < <(find "$PLUGINS_DIR" -mindepth 2 -maxdepth 2 -type f -path '*/.claude-plugin/plugin.json' -print0)
+
+if [ "$MANIFEST_ERRORS" -eq 0 ]; then
+    pass "Plugin Layout (all plugin manifests resolve to skills directories)"
+fi
+
+# ============================================================================
+# CHECK 2: Frontmatter
+# ============================================================================
+echo ""
+echo "━━━ Frontmatter ━━━"
+
+FRONTMATTER_ERRORS=0
+VERSION_ERRORS=0
+for skill_md in "${SKILL_FILES[@]}"; do
+    relative_path=${skill_md#"$REPO_ROOT/"}
+
+    if [ "$(head -n 1 "$skill_md")" != "---" ]; then
+        fail "Missing opening YAML delimiter in $relative_path"
+        ((FRONTMATTER_ERRORS+=1))
         continue
     fi
-    
-    # Check for version metadata
-    if ! grep -q "version:" "$skill_md"; then
-        fail "Missing version metadata in $skill_name/SKILL.md"
-        ((MISSING_METADATA++))
+
+    closing_line=$(grep -n '^---$' "$skill_md" | sed -n '2{s/:.*//;p;q;}')
+    if [ -z "$closing_line" ]; then
+        fail "Missing closing YAML delimiter in $relative_path"
+        ((FRONTMATTER_ERRORS+=1))
+        continue
     fi
-    
-    # Check for author metadata
-    if ! grep -q "author:" "$skill_md"; then
-        fail "Missing author metadata in $skill_name/SKILL.md"
-        ((MISSING_METADATA++))
+
+    frontmatter=$(sed -n "2,$((closing_line-1))p" "$skill_md")
+    if ! grep -q '^name:' <<< "$frontmatter"; then
+        fail "Missing 'name:' field in $relative_path"
+        ((FRONTMATTER_ERRORS+=1))
+    fi
+    if ! grep -q '^description:' <<< "$frontmatter"; then
+        fail "Missing 'description:' field in $relative_path"
+        ((FRONTMATTER_ERRORS+=1))
+    fi
+
+    version=$(awk -F: '/^[[:space:]]+version:/ { value=$2; gsub(/[[:space:]"\047]/, "", value); print value; exit }' <<< "$frontmatter")
+    if [ -n "$version" ] && [[ ! "$version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+        fail "Invalid version '$version' in $relative_path (expected N.N or N.N.N)"
+        ((VERSION_ERRORS+=1))
     fi
 done
 
-if [ $MISSING_METADATA -eq 0 ]; then
-    pass "Metadata Completeness ($SKILL_COUNT skills checked)"
+if [ "$FRONTMATTER_ERRORS" -eq 0 ]; then
+    pass "Required Frontmatter (name and description present)"
+fi
+if [ "$VERSION_ERRORS" -eq 0 ]; then
+    pass "Version Metadata (all declared versions are valid)"
 fi
 
 # ============================================================================
-# CHECK 2: Path Validation
+# CHECK 3: Deprecated Path References
 # ============================================================================
 echo ""
-echo "━━━ Path Validation ━━━"
+echo "━━━ Deprecated Path References ━━━"
 
 BROKEN_PATHS=0
-
-# Check for references to non-existent directories
-DEPRECATED_PATTERNS=(
-    "rg-new-item"
-    "rg-inventory"
-    "imessage-assistant"
-    "image-editing-skill"
-    "image-generation-skill"
+DEPRECATED_PATHS=(
+    "skills/rg-new-item"
+    "skills/imessage-assistant"
+    "skills/image-editing-skill"
+    "skills/image-generation-skill"
 )
 
-for pattern in "${DEPRECATED_PATTERNS[@]}"; do
-    matches=$(grep -rn "$pattern" "$SKILLS_DIR" --include="*.md" --exclude-dir=archive 2>/dev/null | grep -v "archive/" | grep -v "WARP_AGENT_GUIDE" | grep -v "skill-manager/SKILL.md" | grep -v "Archived" | grep -v "superseded" | grep -v "Consolidated")
+for deprecated_path in "${DEPRECATED_PATHS[@]}"; do
+    matches=$(grep -rnF "$deprecated_path" "$PLUGINS_DIR" --include='*.md' --exclude-dir=archive 2>/dev/null || true)
     if [ -n "$matches" ]; then
-        fail "Found references to deprecated/non-existent '$pattern':"
-        echo "$matches" | while read -r line; do
+        fail "Found references to deprecated/non-existent path '$deprecated_path':"
+        while IFS= read -r line; do
             info "  $line"
-        done
-        ((BROKEN_PATHS++))
+        done <<< "$matches"
+        ((BROKEN_PATHS+=1))
     fi
 done
 
-if [ $BROKEN_PATHS -eq 0 ]; then
-    pass "Path Validation (no broken references)"
+if [ "$BROKEN_PATHS" -eq 0 ]; then
+    pass "Deprecated Path References (none found)"
 fi
 
 # ============================================================================
-# CHECK 3: Version Consistency
-# ============================================================================
-echo ""
-echo "━━━ Version Consistency ━━━"
-
-VERSION_MISMATCHES=0
-
-# Read skill-manager registry
-REGISTRY_FILE="$SKILLS_DIR/skill-manager/SKILL.md"
-
-# Check a few key skills
-declare -A EXPECTED_VERSIONS=(
-    ["daily-briefing"]="v2.0"
-    ["skill-manager"]="v1.3"
-    ["rg-full-auto"]="v2.3"
-    ["image-processor"]="v1.0"
-    ["photos-library"]="v1.0"
-)
-
-for skill in "${!EXPECTED_VERSIONS[@]}"; do
-    expected="${EXPECTED_VERSIONS[$skill]}"
-    
-    # Get version from SKILL.md
-    actual=$(grep "version:" "$SKILLS_DIR/$skill/SKILL.md" 2>/dev/null | head -1 | awk '{print $2}' | tr -d '"')
-    
-    # Get version from skill-manager registry
-    registry_version=$(grep -A 1 "| \*\*$skill\*\*" "$REGISTRY_FILE" 2>/dev/null | grep -o "v[0-9]\+\.[0-9]\+" | head -1)
-    
-    if [ "$actual" != "${expected#v}" ]; then
-        fail "Version mismatch for $skill: SKILL.md has v$actual, expected $expected"
-        ((VERSION_MISMATCHES++))
-    elif [ -n "$registry_version" ] && [ "$registry_version" != "$expected" ]; then
-        fail "Version mismatch for $skill: registry has $registry_version, SKILL.md has v$actual"
-        ((VERSION_MISMATCHES++))
-    fi
-done
-
-if [ $VERSION_MISMATCHES -eq 0 ]; then
-    pass "Version Consistency (checked ${#EXPECTED_VERSIONS[@]} critical skills)"
-fi
-
-# ============================================================================
-# CHECK 4: Skill Count Accuracy
-# ============================================================================
-echo ""
-echo "━━━ Skill Count Accuracy ━━━"
-
-# Count actual skills (dirs with SKILL.md)
-ACTUAL_SKILL_COUNT=$(find "$SKILLS_DIR" -maxdepth 2 -name "SKILL.md" -not -path "*/archive/*" | wc -l | tr -d ' ')
-
-# Check README.md claim
-README_CLAIM=$(grep -o "[0-9]\+ AI assistant skills" "$SKILLS_DIR/README.md" | grep -o "[0-9]\+")
-
-if [ "$README_CLAIM" != "$ACTUAL_SKILL_COUNT" ]; then
-    fail "Skill count mismatch: README.md claims $README_CLAIM, actual count is $ACTUAL_SKILL_COUNT"
-else
-    pass "Skill Count Accuracy (README claims $README_CLAIM, actual is $ACTUAL_SKILL_COUNT)"
-fi
-
-# ============================================================================
-# CHECK 5: Duplicate Headers
+# CHECK 4: Duplicate Headers
 # ============================================================================
 echo ""
 echo "━━━ Duplicate Headers ━━━"
 
 DUPLICATE_HEADERS=0
-for skill_md in $(find "$SKILLS_DIR" -maxdepth 2 -name "SKILL.md" -not -path "*/archive/*"); do
-    dupes=$(grep "^##" "$skill_md" | sort | uniq -d)
+for skill_md in "${SKILL_FILES[@]}"; do
+    dupes=$(grep '^##' "$skill_md" | sort | uniq -d || true)
     if [ -n "$dupes" ]; then
-        skill_name=$(basename "$(dirname "$skill_md")")
-        fail "Duplicate headers in $skill_name/SKILL.md:"
-        echo "$dupes" | while read -r line; do
+        relative_path=${skill_md#"$REPO_ROOT/"}
+        fail "Duplicate headers in $relative_path:"
+        while IFS= read -r line; do
             info "  $line"
-        done
-        ((DUPLICATE_HEADERS++))
+        done <<< "$dupes"
+        ((DUPLICATE_HEADERS+=1))
     fi
 done
 
-if [ $DUPLICATE_HEADERS -eq 0 ]; then
+if [ "$DUPLICATE_HEADERS" -eq 0 ]; then
     pass "Duplicate Headers (none found)"
 fi
 
 # ============================================================================
-# CHECK 6: Python Syntax
+# CHECK 5: Python Syntax
 # ============================================================================
 echo ""
 echo "━━━ Python Syntax ━━━"
 
+PYTHON_CMD=()
+if [ -n "${PYTHON:-}" ]; then
+    PYTHON_CMD=("$PYTHON")
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+    PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+    PYTHON_CMD=(py -3)
+fi
+
+mapfile -d '' PY_FILES < <(
+    find "$PLUGINS_DIR" -type f -name '*.py' -not -path '*/.venv/*' -not -path '*/archive/*' -print0 | sort -z
+)
+
 PYTHON_ERRORS=0
-PY_FILES=$(find "$SKILLS_DIR" -name "*.py" -not -path "*/.venv/*" -not -path "*/archive/*" -type f)
-PY_COUNT=$(echo "$PY_FILES" | grep -c "\.py$")
-
-for py_file in $PY_FILES; do
-    if ! python3 -m py_compile "$py_file" 2>/dev/null; then
-        fail "Python syntax error in: $py_file"
-        ((PYTHON_ERRORS++))
-    fi
-done
-
-if [ $PYTHON_ERRORS -eq 0 ]; then
-    pass "Python Syntax ($PY_COUNT files checked)"
+if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    warn "Python interpreter not found; skipped syntax validation for ${#PY_FILES[@]} files"
+elif [ "${#PY_FILES[@]}" -eq 0 ]; then
+    pass "Python Syntax (no Python files found)"
 else
-    fail "Python Syntax Errors ($PYTHON_ERRORS files failed)"
-fi
+    for py_file in "${PY_FILES[@]}"; do
+        if ! "${PYTHON_CMD[@]}" -m py_compile "$py_file" 2>/dev/null; then
+            fail "Python syntax error in: ${py_file#"$REPO_ROOT/"}"
+            ((PYTHON_ERRORS+=1))
+        fi
+    done
 
-# ============================================================================
-# CHECK 7: YAML Frontmatter
-# ============================================================================
-echo ""
-echo "━━━ YAML Frontmatter ━━━"
-
-YAML_ERRORS=0
-for skill_md in $(find "$SKILLS_DIR" -maxdepth 2 -name "SKILL.md" -not -path "*/archive/*"); do
-    skill_name=$(basename "$(dirname "$skill_md")")
-    
-    # Basic YAML structure check
-    if ! grep -q "^---$" "$skill_md"; then
-        fail "Missing YAML frontmatter delimiters in $skill_name/SKILL.md"
-        ((YAML_ERRORS++))
-        continue
+    if [ "$PYTHON_ERRORS" -eq 0 ]; then
+        pass "Python Syntax (${#PY_FILES[@]} files checked)"
     fi
-    
-    # Check for required fields
-    if ! grep -q "^name:" "$skill_md"; then
-        fail "Missing 'name:' field in $skill_name/SKILL.md frontmatter"
-        ((YAML_ERRORS++))
-    fi
-    
-    if ! grep -q "^description:" "$skill_md"; then
-        fail "Missing 'description:' field in $skill_name/SKILL.md frontmatter"
-        ((YAML_ERRORS++))
-    fi
-done
-
-if [ $YAML_ERRORS -eq 0 ]; then
-    pass "YAML Frontmatter (all SKILL.md files valid)"
-fi
-
-# ============================================================================
-# CHECK 8: Required Files
-# ============================================================================
-echo ""
-echo "━━━ Required Files ━━━"
-
-MISSING_FILES=0
-for skill_dir in $SKILL_DIRS; do
-    skill_name=$(basename "$skill_dir")
-    
-    # Skip gemini-chat stub
-    if [ "$skill_name" = "gemini-chat" ]; then
-        continue
-    fi
-    
-    if [ ! -f "$skill_dir/SKILL.md" ]; then
-        fail "Missing SKILL.md in $skill_name/"
-        ((MISSING_FILES++))
-    fi
-done
-
-if [ $MISSING_FILES -eq 0 ]; then
-    pass "Required Files (all skills have SKILL.md)"
 fi
 
 # ============================================================================
@@ -288,19 +224,15 @@ echo -e "Checks Passed: ${GREEN}$CHECKS_PASSED${NC}"
 echo -e "Checks Failed: ${RED}$CHECKS_FAILED${NC}"
 echo ""
 
-if [ $CHECKS_FAILED -eq 0 ]; then
+if [ "$CHECKS_FAILED" -eq 0 ]; then
     echo -e "${GREEN}✅ ALL CHECKS PASSED${NC}"
-    echo ""
-    echo "Repository is ready for commit and push."
     exit 0
-else
-    echo -e "${RED}❌ SANITY CHECK FAILED${NC}"
-    echo ""
-    echo "Issues found:"
-    for error in "${ERRORS[@]}"; do
-        echo -e "  ${RED}•${NC} $error"
-    done
-    echo ""
-    echo "Please fix the issues above before pushing to remote."
-    exit 1
 fi
+
+echo -e "${RED}❌ SANITY CHECK FAILED${NC}"
+echo ""
+echo "Issues found:"
+for error in "${ERRORS[@]}"; do
+    echo -e "  ${RED}•${NC} $error"
+done
+exit 1

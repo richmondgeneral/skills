@@ -2,7 +2,7 @@
 
 > **STATUS (2026-06-21): ON HOLD — awaiting eBay developer keys (eBay is NOT blocked).** The
 > developer-account keys aren't issued yet, so steps 1–4 below can't be completed and the API
-> path stays `--dry-run`-only. Meanwhile eBay writes go through the `ebay-chrome` browser skill.
+> path stays `--dry-run`-only. Meanwhile eBay writes go through the `ebay-browser` skill.
 > When the keys arrive, work through this file top to bottom, then flip the status in SKILL.md.
 
 This is the only part Claude can't do — it needs the eBay developer keys and a browser
@@ -54,8 +54,12 @@ If `locations` is empty, create one once via the Inventory API `createInventoryL
 ```bash
 # Safe: builds the payloads, lists any still-missing config, no API call.
 ... ebay_lister.py list --sku RG-0032 --dry-run
-# Live: creates the inventory item + offer, publishes, writes item_id/url into label.json.
+# After a successful sandbox smoke test, explicitly unlock live API writes.
+security add-generic-password -U -a "$USER" -s EBAY_API_LIVE_ENABLED -w '1'
+# Live: creates or updates the inventory item + offer, publishes if needed, and writes back.
 ... ebay_lister.py list --sku RG-0032 --publish
 ```
 
 Once this is in place, listing any item is one command — RG-0031 and RG-0032 included.
+Listings created through the Inventory API must also be revised through the Inventory API; Seller Hub
+cannot edit them. Keep `ebay-browser` for listings originally created in the browser.

@@ -1,13 +1,15 @@
 {
   "name": "richmondgeneral",
-  "version": "1.8.3",
-  "description": "Richmond General's full skill set — Square catalog & storefront ops, item lifecycle (intake, lotting, mark-sold), iMessage/CRM, photo library, image processing, appraisal, and Whatnot tooling. Single source of truth for the Claude desktop app and Cowork.",
+  "version": "1.10.0",
+  "description": "Richmond General's full skill set — Square, eBay, Facebook Marketplace, and Whatnot channel ops; item lifecycle; iMessage/CRM; photo processing; and appraisal. Single source of truth across supported desktop agents.",
   "author": {
     "name": "Scott Beilfuss"
   },
   "keywords": [
     "richmond-general",
     "square",
+    "ebay",
+    "facebook-marketplace",
     "inventory",
     "storefront",
     "imessage",

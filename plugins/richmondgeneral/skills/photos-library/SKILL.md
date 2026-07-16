@@ -6,10 +6,12 @@ metadata:
   author: scottybe
   updated: "2026-07-16"
   changelog: |
-    v1.12 - GPS EXIF wipe at export (privacy): sips_convert now zeroes the GPS IFD
-    of every exported JPEG in place (stdlib-only - runs over the bare bridge shell;
+    v1.12 - GPS EXIF wipe at export (privacy): wipe_gps_jpeg (shared, photos_db.py)
+    zeroes the GPS IFD of every exported JPEG in place, wired into BOTH sips paths
+    into the public items/ repo - file_cluster.sips_convert and
+    intake_to_item.sips_convert. Stdlib-only (runs over the bare bridge shell);
     entry count, entries, and pointed-to value blocks zeroed, so pixels/orientation/
-    other EXIF and file length are untouched; never fatal). Root fix for the
+    other EXIF and file length are untouched; never fatal. Root fix for the
     2026-07-15 leak - originals exported metadata-and-all put iPhone GPS coordinates
     on the public items Pages site. Backstop: items CI scripts/check_gps_exif.py.
 

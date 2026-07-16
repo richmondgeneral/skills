@@ -27,6 +27,7 @@ import sys
 from pathlib import Path
 
 import photos_db
+from photos_db import wipe_gps_jpeg
 
 DEFAULT_ITEMS_DIR = os.path.expanduser("~/workspace/richmondgeneral/items")
 PAGES_BASE = "https://richmondgeneral.github.io/items"
@@ -47,6 +48,7 @@ def sips_convert(src, dst, fmt="jpeg", quality=90, resize=None):
         cmd += ["-Z", str(max(w, h))]
     cmd += [src, "--out", dst]
     subprocess.run(cmd, check=True, capture_output=True)
+    wipe_gps_jpeg(dst)  # public items/ repo: location EXIF must never land there
 
 
 def fetch_assets(conn, album, keyword, limit):

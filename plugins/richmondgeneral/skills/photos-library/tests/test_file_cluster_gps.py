@@ -94,3 +94,22 @@ def test_sips_convert_scrubs_gps(tmp_path, monkeypatch):
     fc.sips_convert(str(src), str(dst))
     with Image.open(dst) as img:
         assert not img.getexif().get_ifd(GPS_IFD)
+
+
+def test_intake_to_item_sips_convert_scrubs_gps(tmp_path, monkeypatch):
+    """intake_to_item.py is the SECOND sips path into public items/ — same wipe."""
+    import subprocess
+    import intake_to_item as iti
+
+    src = tmp_path / "original.jpeg"
+    _make_gps_jpeg(src)
+    dst = tmp_path / "hero.jpeg"
+
+    def fake_run(cmd, check=True, capture_output=True):
+        assert cmd[0] == "sips"
+        shutil.copyfile(cmd[-3], cmd[-1])
+    monkeypatch.setattr(iti.subprocess, "run", fake_run)
+
+    iti.sips_convert(str(src), str(dst))
+    with Image.open(dst) as img:
+        assert not img.getexif().get_ifd(GPS_IFD)

@@ -22,6 +22,7 @@ import subprocess
 import sys
 
 import photos_db
+from photos_db import wipe_gps_jpeg
 
 RG_RE = re.compile(r"^RG-\d{4}$")
 UUID_RE = re.compile(r"^[0-9A-Fa-f-]{8,}$")  # ZUUIDs are hex + hyphens — safe to embed
@@ -246,78 +247,6 @@ def assign_roles(originals, roles):
         if cand is not None:
             cand["role"] = "hero"
     return photos
-
-
-# ---------------------------------------------------------------------------
-# GPS EXIF wipe (privacy) — STDLIB ONLY (this script runs over the bare bridge
-# shell, no piexif). 2026-07-15: 130 published images carried iPhone GPS
-# coordinates because sips exports originals metadata-and-all straight into
-# the public items/ repo. The wipe is in place and offset-stable: the GPS IFD's
-# entry count, its 12-byte entries, and every pointed-to value block are
-# zeroed, so the file length, pixels, orientation tag, and all other EXIF are
-# untouched. Detectors that follow the (now zero) entry count see no GPS.
-# ---------------------------------------------------------------------------
-
-_TIFF_TYPE_SIZES = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8}
-
-
-def wipe_gps_jpeg(path):
-    """Zero the GPS IFD of a JPEG in place. Returns True if GPS data was wiped,
-    False if none found. NEVER raises — filing must not fail on a weird file
-    (the items-repo CI gate is the backstop)."""
-    try:
-        with open(path, "rb") as f:
-            data = bytearray(f.read())
-        if data[:2] != b"\xff\xd8":
-            return False
-        # find the Exif APP1 segment
-        i = 2
-        tiff = None
-        while i + 4 <= len(data):
-            if data[i] != 0xFF:
-                break
-            marker, seglen = data[i + 1], int.from_bytes(data[i + 2:i + 4], "big")
-            if marker == 0xE1 and data[i + 4:i + 10] == b"Exif\x00\x00":
-                tiff = i + 10  # TIFF header offset; all IFD offsets are relative to this
-                break
-            if marker in (0xDA, 0xD9):  # image data — no EXIF
-                break
-            i += 2 + seglen
-        if tiff is None:
-            return False
-        bo = {b"II": "little", b"MM": "big"}.get(bytes(data[tiff:tiff + 2]))
-        if bo is None:
-            return False
-        num = lambda a, n: int.from_bytes(data[a:a + n], bo)
-        ifd0 = tiff + num(tiff + 4, 4)
-        # scan IFD0 entries for the GPS IFD pointer (tag 0x8825)
-        gps = None
-        for e in range(num(ifd0, 2)):
-            ent = ifd0 + 2 + 12 * e
-            if num(ent, 2) == 0x8825:
-                gps = tiff + num(ent + 8, 4)
-                break
-        if gps is None or gps + 2 > len(data):
-            return False
-        count = num(gps, 2)
-        if count == 0 or gps + 2 + 12 * count > len(data):
-            return False
-        # zero every pointed-to value block, then the entries, then the count
-        for e in range(count):
-            ent = gps + 2 + 12 * e
-            vsize = _TIFF_TYPE_SIZES.get(num(ent + 2, 2), 1) * num(ent + 4, 4)
-            if vsize > 4:
-                off = tiff + num(ent + 8, 4)
-                if off + vsize <= len(data):
-                    data[off:off + vsize] = bytes(vsize)
-            data[ent:ent + 12] = bytes(12)
-        data[gps:gps + 2] = (0).to_bytes(2, bo)
-        with open(path, "wb") as f:
-            f.write(bytes(data))
-        return True
-    except Exception as exc:  # pragma: no cover - belt and suspenders
-        print(f"[gps-wipe] WARNING {os.path.basename(path)}: {exc}", file=sys.stderr)
-        return False
 
 
 def sips_convert(src, dst, quality=90):

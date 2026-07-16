@@ -52,6 +52,37 @@ The script's stdout (pass `--json` where the script supports it) comes back as t
 | Find product-photo clusters | `rg-skill.sh photos-library find_product_clusters.py --days 14 --json` |
 | Clean an image (Gemini) | `rg-skill.sh image-processor clean.py --input '<in>' --output '<out>' --remove 'price tag'` |
 
+## ⚠️ The bridge call window is ~30 SECONDS — detach anything longer
+
+Measured 2026-07-16 (binary-searched with sleep probes): an inline bridge call that takes
+**28s returns fine; 30s errors** — the MCP client abandons the call at ~30s. Two facts follow:
+
+1. **The error is an ABANDONMENT, not a kill.** The shell command keeps running on the Mac
+   to completion (verified: a 120s heartbeat loop ran all 24 beats after the call "failed").
+   So after a timeout, do NOT blind-retry — the first run is likely still going and a retry
+   races it. Wait, then check for its artifacts (e.g. `file_cluster`'s `.filed.json` manifest)
+   or poll with `--status` before re-running. (`file_cluster` re-runs are manifest-safe, but
+   only once the first run has written the manifest.)
+2. **"Bridge timeout" on file_cluster/matte/enhance-sized jobs is deterministic, not flaky.**
+   A full `file_cluster` run (mint + sips export + Photos tag + album) is ~45–60s on an idle
+   library (~1.1s/photo each for the tag and album AppleScript stages — `whose id starts with`
+   is a per-photo library scan) and worse while Photos is mid-iCloud-sync. It can never fit
+   the 30s window for a real cluster.
+
+**SOP for any job that could exceed ~25s:** use the wrapper's detach mode —
+
+```
+do shell script ".../rg-skill.sh --detach photos-library file_cluster.py --mint --uuids '...'"
+  → returns immediately: {"ok":true,"pid":NNN,"log":"...scratch/bridge-jobs/<ts>.log","poll":"..."}
+do shell script ".../rg-skill.sh --status NNN <log>"
+  → {"running":true/false,"exit":code-or-null} + the last 20 log lines; poll every ~15-30s
+```
+
+The job's `RGEXIT:<code>` trailer in the log records the real exit code (e.g. file_cluster's
+exit 3 = tag failures). Logs land in `~/workspace/richmondgeneral/scratch/bridge-jobs/`.
+Safe inline: probes, `--list`, `query_photos`, `--plan` dry-runs, single-image sips/enhance.
+Detach: `file_cluster` (non-plan), `intake_to_item`, batch matte/enhance/upres, anything Square-bound that loops.
+
 ## Rules & gotchas
 
 - **Paths must be Mac-visible.** Inputs/outputs Cowork also needs go under the shared workspace mount (`~/workspace/richmondgeneral/...`) so both sides see them.

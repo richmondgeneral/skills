@@ -1,0 +1,372 @@
+#!/usr/bin/env python3
+"""
+AI catalog-image cleanup / inpaint CLI.
+
+One universal prompt produces a clean storefront-ready catalog photo from
+any source image. Damage is preserved by default (documentary truth for
+appraisal/provenance); --fix-damage swaps in restoration; --both produces
+two outputs side-by-side.
+
+Examples:
+  clean.py -i photo.jpg -o cleaned.jpg                    # default: preserve damage
+  clean.py -i photo.jpg -o cleaned.jpg --fix-damage       # restoration mode
+  clean.py -i photo.jpg -o cleaned.jpg --both             # two outputs (-preserved/-fixed)
+  clean.py -i photo.jpg -o cleaned.jpg --pro              # gemini-3-pro-image-preview (~$2.13)
+  clean.py -i photo.jpg -o cleaned.jpg --agentic          # LLM judge Best-of-3 loop
+  clean.py -i photo.jpg -o cleaned.jpg --remove "the dust on the rim"
+
+Prompt sections live in ../lib/cleanup_prompts.md. The Cowork
+square-image-upload-cowork skill calls this script over the osascript bridge.
+"""
+import argparse
+import json
+import os
+import re
+import shutil
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
+
+from PIL import Image  # noqa: E402
+
+from models import TaskConfig  # noqa: E402
+from models.base import safe_save_image  # noqa: E402
+from router import create_default_router  # noqa: E402
+from models.judge import AgentJudge  # noqa: E402
+
+
+PROMPTS_FILE = Path(__file__).resolve().parent.parent / 'lib' / 'cleanup_prompts.md'
+MODEL_PRO = "gemini-3-pro-image-preview"
+DEFAULT_MAX_LONG_EDGE = 2048           # pre-Gemini input size cap
+DEFAULT_MAX_LONG_EDGE_OUTPUT = 1800    # post-Gemini output size cap; Square storefront displays max ~1500px
+
+
+def maybe_downscale(input_path: Path, max_long_edge: int = DEFAULT_MAX_LONG_EDGE) -> Path:
+    """Downscale source to max_long_edge if larger; return new (or original) path."""
+    if max_long_edge <= 0:
+        return input_path
+    with Image.open(input_path) as im:
+        w, h = im.size
+        if max(w, h) <= max_long_edge:
+            return input_path
+        source_info = dict(im.info)  # capture ICC/EXIF before resize
+        scale = max_long_edge / max(w, h)
+        new_w = round(w * scale)
+        new_h = round(h * scale)
+        resized = im.resize((new_w, new_h), Image.LANCZOS)
+        ext = input_path.suffix or '.png'
+        tmp = Path(tempfile.gettempdir()) / f"{input_path.stem}-ds{max_long_edge}{ext}"
+        safe_save_image(resized, tmp, source_info=source_info)
+        return tmp
+
+
+def _read_size(path: Path) -> tuple[int, int]:
+    with Image.open(path) as im:
+        return im.size
+
+
+def downscale_output_in_place(path: Path, max_long_edge: int) -> str | None:
+    """Resize `path` in-place if its long edge exceeds `max_long_edge`."""
+    if max_long_edge <= 0:
+        return None
+    with Image.open(path) as im:
+        w, h = im.size
+        if max(w, h) <= max_long_edge:
+            return None
+        source_info = dict(im.info)
+        scale = max_long_edge / max(w, h)
+        new_w = round(w * scale)
+        new_h = round(h * scale)
+        resized = im.resize((new_w, new_h), Image.LANCZOS)
+    safe_save_image(resized, path, source_info=source_info)
+    return f"{new_w}x{new_h}"
+
+
+def load_sections():
+    """Parse cleanup_prompts.md into {section_name: body}."""
+    if not PROMPTS_FILE.exists():
+        raise SystemExit(f"prompts file missing: {PROMPTS_FILE}")
+
+    sections = {}
+    current = None
+    buf = []
+    in_block = False
+    for line in PROMPTS_FILE.read_text(encoding='utf-8').splitlines():
+        stripped = line.lstrip()
+        if in_block:
+            if '-->' in stripped:
+                in_block = False
+            continue
+        if stripped.startswith('<!--'):
+            if '-->' not in stripped:
+                in_block = True
+            continue
+        m = re.match(r'^##\s+(\S.*?)\s*$', line)
+        if m:
+            if current is not None:
+                sections[current] = '\n'.join(buf).strip()
+            current = m.group(1).strip()
+            buf = []
+        elif current is not None:
+            buf.append(line)
+    if current is not None:
+        sections[current] = '\n'.join(buf).strip()
+    return sections
+
+
+def build_prompt(sections, fix_damage: bool, extra: str = "") -> str:
+    """Compose final prompt: base + damage clause [+ extra]."""
+    base = sections.get('base')
+    damage = sections.get('damage-fix' if fix_damage else 'damage-preserve')
+    if not base or not damage:
+        raise SystemExit("cleanup_prompts.md missing 'base' or damage sections")
+    parts = [base, damage]
+    if extra:
+        parts.append(f"Additional direction: {extra}")
+    return "\n\n".join(parts)
+
+
+def run_one(input_path: Path, output_path: Path, instruction: str,
+            quality: str, verbose: bool) -> dict:
+    """Single cleanup call. Returns dict with success/model/time/output/error."""
+    task_config = TaskConfig.for_edit(
+        instruction=instruction,
+        output_path=str(output_path),
+        quality=quality,
+        references=[],
+    )
+    router = create_default_router()
+    if verbose:
+        print(f"  → {output_path.name}  (model: "
+              f"{os.environ.get('GEMINI_IMAGE_MODEL', 'flash-default')})",
+              file=sys.stderr)
+    t0 = time.time()
+    result = router.process(str(input_path), task_config)
+    elapsed = time.time() - t0
+    return {
+        'success': result.success,
+        'model': result.model_used,
+        'output_path': result.output_path,
+        'processing_time': elapsed,
+        'error': result.error if not result.success else None,
+    }
+
+
+def run_agentic(input_path: Path, output_path: Path, instruction: str,
+                quality: str, verbose: bool, max_loops: int = 3, n_candidates: int = 3) -> dict:
+    """Agentic Best-of-N evaluation loop."""
+    judge = AgentJudge()
+    t0 = time.time()
+    
+    for loop_idx in range(max_loops):
+        if loop_idx == 1:
+            if verbose: print(f"  [Agentic] Escalating to {MODEL_PRO} for better fidelity...", file=sys.stderr)
+            os.environ['GEMINI_IMAGE_MODEL'] = MODEL_PRO
+            
+        candidate_paths = []
+        for i in range(n_candidates):
+            cand_path = output_path.with_name(f"{output_path.stem}_cand{i}{output_path.suffix}")
+            if verbose: print(f"  [Agentic Loop {loop_idx+1}] Generating candidate {i+1}/{n_candidates}...", file=sys.stderr)
+            r = run_one(input_path, cand_path, instruction, quality, verbose)
+            if r['success']:
+                candidate_paths.append(str(cand_path))
+                
+        if not candidate_paths:
+            return {'success': False, 'error': 'Failed to generate any candidates.'}
+            
+        if verbose: print(f"  [Agentic] Evaluating {len(candidate_paths)} candidates against original...", file=sys.stderr)
+        best_idx, reasoning = judge.evaluate_candidates(str(input_path), candidate_paths)
+        
+        if verbose: 
+            print(f"  [Agentic] Judge reasoning:\n{reasoning}", file=sys.stderr)
+        
+        if best_idx is not None and 0 <= best_idx < len(candidate_paths):
+            if verbose: print(f"  [Agentic] Selected candidate {best_idx+1}!", file=sys.stderr)
+            shutil.move(candidate_paths[best_idx], str(output_path))
+            for i, p in enumerate(candidate_paths):
+                if i != best_idx and os.path.exists(p):
+                    os.remove(p)
+            
+            return {
+                'success': True,
+                'model': os.environ.get('GEMINI_IMAGE_MODEL', 'flash-default'),
+                'output_path': str(output_path),
+                'processing_time': time.time() - t0,
+                'error': None,
+            }
+        else:
+            if verbose: print(f"  [Agentic] All candidates rejected in loop {loop_idx+1}.", file=sys.stderr)
+            for p in candidate_paths:
+                if os.path.exists(p):
+                    os.remove(p)
+                    
+    return {
+        'success': False,
+        'model': os.environ.get('GEMINI_IMAGE_MODEL', 'flash-default'),
+        'output_path': '',
+        'processing_time': time.time() - t0,
+        'error': f'Agentic loop failed to produce an acceptable image after {max_loops} loops.'
+    }
+
+
+def with_suffix(path: Path, suffix: str) -> Path:
+    """foo.jpg + 'preserved' -> foo-preserved.jpg"""
+    return path.with_name(f"{path.stem}-{suffix}{path.suffix}")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="AI catalog-image cleanup (Gemini).",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    parser.add_argument('--input', '-i', required=True, help='Input image path')
+    parser.add_argument('--output', '-o', required=True,
+                        help='Output image path (with --both: produces -preserved/-fixed variants)')
+    parser.add_argument('--fix-damage', action='store_true',
+                        help='Repair visible damage as part of cleanup (default: preserve)')
+    parser.add_argument('--both', action='store_true',
+                        help='Produce both preserved-damage and damage-fixed versions')
+    parser.add_argument('--pro', action='store_true',
+                        help='Use gemini-3-pro-image-preview for higher quality (more expensive)')
+    parser.add_argument('--agentic', action='store_true',
+                        help='Use LLM judge to evaluate 3 candidates and loop until satisfied')
+    parser.add_argument('--remove', '-r', dest='extra',
+                        help='Freeform additional direction appended to the prompt')
+    parser.add_argument('--quality', '-q', default='auto',
+                        choices=['auto', 'fast', 'pro'])
+    parser.add_argument('--max-long-edge', type=int, default=DEFAULT_MAX_LONG_EDGE,
+                        metavar='N',
+                        help=f'Downscale input so long edge ≤ N before sending to Gemini '
+                             f'(default: {DEFAULT_MAX_LONG_EDGE}; 0 disables). Gemini downsamples '
+                             f'to ~2048 internally, so pre-shrinking cuts upload time without '
+                             f'affecting output quality.')
+    parser.add_argument('--no-downscale', action='store_true',
+                        help='Alias for --max-long-edge 0')
+    parser.add_argument('--max-long-edge-output', type=int, default=DEFAULT_MAX_LONG_EDGE_OUTPUT,
+                        metavar='N',
+                        help=f'Downscale Gemini output so long edge ≤ N (default: '
+                             f'{DEFAULT_MAX_LONG_EDGE_OUTPUT}; 0 disables). Symmetric to '
+                             f'the input-side knob — Flash 3.1 can emit up to 4K but '
+                             f'Square displays at most ~1500px, so we trim before upload.')
+    parser.add_argument('--no-downscale-output', action='store_true',
+                        help='Alias for --max-long-edge-output 0')
+    parser.add_argument('--json', action='store_true', help='Emit JSON result')
+    parser.add_argument('--verbose', '-v', action='store_true')
+    args = parser.parse_args()
+
+    if args.both and args.fix_damage:
+        parser.error('--both already produces both versions; --fix-damage is redundant')
+
+    if not os.path.exists(args.input):
+        print(f"Error: input image not found: {args.input}", file=sys.stderr)
+        sys.exit(1)
+
+    sections = load_sections()
+    if args.pro:
+        os.environ['GEMINI_IMAGE_MODEL'] = MODEL_PRO
+
+    max_long_edge = 0 if args.no_downscale else args.max_long_edge
+    source_path = Path(args.input)
+    orig_w, orig_h = _read_size(source_path)
+    effective_input = maybe_downscale(source_path, max_long_edge=max_long_edge)
+    if effective_input != source_path:
+        ds_w, ds_h = _read_size(effective_input)
+        downscaled_to = f"{ds_w}x{ds_h}"
+        pct = round((ds_w * ds_h - orig_w * orig_h) / (orig_w * orig_h) * 100)
+    else:
+        ds_w = ds_h = None
+        downscaled_to = None
+        pct = 0
+
+    output_path = Path(args.output)
+    runs = []
+
+    if args.both:
+        preserved_path = with_suffix(output_path, 'preserved')
+        fixed_path = with_suffix(output_path, 'fixed')
+        runs.append(('preserved', preserved_path, False))
+        runs.append(('fixed', fixed_path, True))
+    else:
+        runs.append(('single', output_path, args.fix_damage))
+
+    if args.verbose:
+        print(f"Input: {args.input}", file=sys.stderr)
+        if downscaled_to:
+            print(f"Scale: downscaled {orig_w}x{orig_h} → {ds_w}x{ds_h} ({pct}%)",
+                  file=sys.stderr)
+        elif max_long_edge > 0:
+            print(f"Scale: source ≤ {max_long_edge}px, no downscale", file=sys.stderr)
+        else:
+            print("Scale: downscaling disabled", file=sys.stderr)
+        print(f"Mode:  {'both' if args.both else ('fix-damage' if args.fix_damage else 'preserve-damage')}",
+              file=sys.stderr)
+        print(f"Agentic: {'enabled (LLM judge best-of-3 loop)' if args.agentic else 'disabled'}", file=sys.stderr)
+        print(f"Model: {'pro (gemini-3-pro-image-preview)' if args.pro else 'flash (gemini-3.1-flash-image-preview)'}",
+              file=sys.stderr)
+        if args.extra:
+            print(f"Extra: {args.extra}", file=sys.stderr)
+
+    max_long_edge_output = 0 if args.no_downscale_output else args.max_long_edge_output
+    results = []
+    for tag, out_path, fix in runs:
+        instruction = build_prompt(sections, fix_damage=fix, extra=args.extra or "")
+        if args.verbose:
+            print(f"\n[{tag}] processing...", file=sys.stderr)
+            
+        if args.agentic:
+            r = run_agentic(effective_input, out_path, instruction, args.quality, args.verbose)
+        else:
+            r = run_one(effective_input, out_path, instruction, args.quality, args.verbose)
+            
+        r['variant'] = tag
+        r['downscaled_to'] = downscaled_to
+        r['output_downscaled_to'] = None
+        
+        if r['success'] and max_long_edge_output > 0:
+            written = Path(r['output_path'])
+            try:
+                gem_w, gem_h = _read_size(written)
+                new_dims = downscale_output_in_place(written, max_long_edge_output)
+                if new_dims is not None:
+                    r['output_downscaled_to'] = new_dims
+                    if args.verbose:
+                        print(f"  output downscaled {gem_w}x{gem_h} → {new_dims}",
+                              file=sys.stderr)
+            except Exception as e:
+                # Don't fail the cleanup just because the post-resize hit a snag.
+                print(f"  warn: output downscale failed ({e}); leaving original output",
+                      file=sys.stderr)
+        results.append(r)
+        if not r['success']:
+            break  # don't run --both's second pass if first failed
+
+    overall_ok = all(r['success'] for r in results)
+
+    if args.json:
+        payload = {
+            'success': overall_ok,
+            'mode': 'both' if args.both else ('fix-damage' if args.fix_damage else 'preserve-damage'),
+            'model_class': 'pro' if args.pro else 'flash',
+            'agentic': args.agentic,
+            'input_image': args.input,
+            'results': results,
+        }
+        print(json.dumps(payload, indent=2))
+    else:
+        for r in results:
+            label = r['variant']
+            if r['success']:
+                print(f"  [{label}] {r['output_path']}  "
+                      f"({r['model']}, {r['processing_time']:.1f}s)")
+            else:
+                print(f"  [{label}] FAILED: {r['error']}", file=sys.stderr)
+
+    sys.exit(0 if overall_ok else 1)
+
+
+if __name__ == '__main__':
+    main()

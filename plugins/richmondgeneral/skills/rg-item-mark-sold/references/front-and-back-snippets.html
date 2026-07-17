@@ -1,0 +1,59 @@
+<!-- ============================================================
+     Reference markup for marking an RG item sold.
+     Paste these in place of the active-listing equivalents.
+
+     PLACEHOLDER CONVENTION: anything in {{DOUBLE_BRACES}} is a
+     substitution slot. Use {{}} rather than <angle brackets>
+     because angle brackets parse as HTML tags and render
+     invisibly if accidentally left unreplaced — a missed {{}}
+     stays loudly visible on the page so the bug surfaces in QA.
+
+     The PRICE_DISPLAY_FORMATTER at the bottom of every item
+     page strips trailing .00 from .item-price and .sold-meta
+     only. Keep .00 in source for those two elements; do NOT
+     put dollar amounts into .sold-status.
+     ============================================================ -->
+
+<!-- ===== FRONT SIDE — image container + front-info ===== -->
+<div class="card-face card-front">
+    <div class="item-image-container">
+        <span class="sku-badge sold-badge">{{SKU}} · SOLD</span>
+        <img src="hero.jpeg" alt="{{ITEM_TITLE}}" class="item-image">
+    </div>
+    <div class="front-info">
+        <h1 class="item-title">{{ITEM_TITLE}}</h1>
+        <p class="item-era">{{ERA_LINE}}</p>
+        <div class="front-footer">
+            <span class="item-price sold-price">Sold · ${{SOLD_PRICE}}.00</span>
+            <span class="flip-hint">
+                <svg class="flip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                    <path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                </svg>
+                Tap for story
+            </span>
+        </div>
+    </div>
+</div>
+
+
+<!-- ===== BACK SIDE — back-footer only (rest of back stays) ===== -->
+<!-- Replace the existing <div class="back-footer">...</div> with this: -->
+<div class="back-footer">
+    <div class="sold-status-panel">
+        <span class="sold-status">Sold on {{SOLD_DATE_LONG}}</span>
+        <span class="sold-meta">Final sale price: ${{SOLD_PRICE}}.00</span>
+        <a href="../" class="archive-link">Browse available items</a>
+    </div>
+</div>
+
+<!-- Substitution slots:
+       {{SKU}}              e.g. RG-0002
+       {{ITEM_TITLE}}       e.g. Kings of the Forest and Their Kindred Tribes
+       {{ERA_LINE}}         e.g. 1892 • Victorian Natural History • 235 Wood Engravings
+       {{SOLD_PRICE}}       integer dollars, no $ sign, no decimal — e.g. 35
+       {{SOLD_DATE_LONG}}   month-name format, e.g. May 20, 2026
+
+     If the user opted out of recording a specific date, drop the
+     entire <span class="sold-status">…</span> line — keep just
+     the "Final sale price" line and the Browse link. -->

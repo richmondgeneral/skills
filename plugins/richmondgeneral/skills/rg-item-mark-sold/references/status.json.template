@@ -1,0 +1,23 @@
+{
+  "sku": "{{SKU}}",
+  "status": "sold",
+  "listed_price": null,
+  "sold_price": null,
+  "sold_currency": "USD",
+  "sold_at": "{{SOLD_DATE_ISO}}",
+  "notes": "{{SALES_CHANNEL_AND_CONTEXT}}"
+}
+
+# Substitution slots (delete this comment block before writing the file —
+# JSON does not support comments, so it would break json.loads):
+#
+#   {{SKU}}                       e.g. RG-0002
+#   listed_price / sold_price     NUMBERS (not strings), no $ sign — e.g. 35.0
+#                                 must be substituted; null is a tripwire that
+#                                 forces the executor to write a real value
+#   {{SOLD_DATE_ISO}}             YYYY-MM-DD, e.g. 2026-05-20
+#   {{SALES_CHANNEL_AND_CONTEXT}} e.g. "Sold via Square checkout. Payment link
+#                                 deactivated post-sale."
+#
+# If listed_price === sold_price, write both anyway — downstream reporting
+# expects both keys present.

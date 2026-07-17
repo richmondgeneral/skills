@@ -1,0 +1,20 @@
+{
+  "name": "richmondgeneral",
+  "version": "1.12.3",
+  "description": "Richmond General's full skill set — Square, eBay, Facebook Marketplace, and Whatnot channel ops; item lifecycle; iMessage/CRM; photo processing; and appraisal. Single source of truth across supported desktop agents.",
+  "author": {
+    "name": "Scott Beilfuss"
+  },
+  "keywords": [
+    "richmond-general",
+    "square",
+    "ebay",
+    "facebook-marketplace",
+    "inventory",
+    "storefront",
+    "imessage",
+    "photos",
+    "appraisal",
+    "whatnot"
+  ]
+}

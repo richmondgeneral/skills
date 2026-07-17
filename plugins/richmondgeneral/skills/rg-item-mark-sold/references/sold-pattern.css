@@ -1,0 +1,46 @@
+/* SOLD STATE — paste this block into the item's <style> section,
+   replacing any prior "SOLD STATE" block (RG-0002 pre-2026-05-20 style).
+   Pairs with the markup in front-and-back-snippets.html. */
+
+.sku-badge.sold-badge {
+    background: #8A5A3B;
+}
+
+.item-price.sold-price {
+    font-size: 1.05rem;
+    color: #8A5A3B;
+    font-weight: 700;
+}
+
+.sold-status-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    width: 100%;
+}
+
+.sold-status {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--rg-charcoal);
+    letter-spacing: 0.3px;
+}
+
+.sold-meta {
+    font-size: 0.72rem;
+    color: #666;
+}
+
+.archive-link {
+    display: inline-flex;
+    width: fit-content;
+    margin-top: 0.15rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--rg-brown);
+    text-decoration: none;
+}
+
+.archive-link:hover {
+    text-decoration: underline;
+}

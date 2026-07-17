@@ -1,0 +1,538 @@
+---
+name: rg-full-auto
+description: >
+  End-to-end 10-phase workflow for onboarding NEW items to Richmond General from acquisition through sale.
+  Covers appraisal, lot/acquisition cost tracking, photography, Square catalog creation, image upload,
+  payment links, labels, info card publishing, Whatnot CSV listing, and Photos library cleanup.
+  Use when processing a new acquisition from scratch, doing a complete item redo, or user says
+  "list this item" or "sell this". Triggers on "new item", "full workflow", "onboard",
+  "process acquisition", "add to inventory", "process this photo", "list item", "sell this",
+  "add to whatnot". NOT for simple edits to existing items -- use rg-item-update (edits), rg-reprice (price
+  cascade), or rg-square-list (just get an intaken item live on Square) instead.
+metadata:
+  version: "6.6"
+  author: scottybe
+  updated: "2026-07-15"
+  changelog: |
+    v6.6 - Phase 0.7/0.8/4/7 modernized: matte.py cutout master, BLOCKING hero_qa gate, square.png primary, two-QR, build_gallery.py (audit 2026-07-15)
+
+    v6.5 - Path migration + library-intake front door:
+    - Repointed the dead ~/workspace/square/{items,ops} paths to
+      ~/workspace/richmondgeneral/{items,ops} across SKILL.md, references, and the
+      scripts' DEFAULT_ITEMS_DIR (the items repo moved during the monorepo
+      consolidation; the workflow still targeted the old, non-existent location).
+    - Wired intake_to_item.py into Phase 0 as the library-based intake front door.
+
+    v6.4 - Workflow docs aligned to current intake standards: definition of done
+    (full real photo set + final pricing), dedupe-first, pricing-report step
+    (ops/pricing/), and New Arrivals as the default tier across SKILL.md +
+    references/square-catalog.md (which still documented New Finds as default).
+
+    v6.3 - Intake category fix: new items default to the New Arrivals tier
+    (was New Finds). process_new_item.py tier default + docstring updated to the
+    current type=reporting + New-Arrivals-default model; re-tier as items age.
+
+    v6.2 - Generated item cards include the optional detail gallery: the
+    .gallery CSS is baked into the card template (references/info-card-template.html)
+    with a commented 2-up gallery block authors uncomment for multi-photo items.
+    Previously the gallery CSS had to be hand-added to every multi-photo item.
+
+    v6.1 - Fix: generated item-card .sku-badge now has z-index:2 so the SKU
+    chip stays above the hero image. Raw/un-removed-background heroes were
+    painting over the badge (first seen on RG-0021). Mirrors the items-repo fix.
+
+    v6.0 - Autonomous batch mode is now the default.
+    - process_batch.py orchestrates multi-item runs end-to-end
+    - audit_log.py captures every decision + correction + review timing
+    - --interactive is the opt-out flag for the legacy v3.7 supervised flow
+    - All v3.7 phase ordering and recent bugfixes preserved
+    See docs/plans/2026-05-13-v6-* for the full design + PR history.
+
+    v3.7 - Packaging refactor for Mac app compatibility:
+    - Moved JSON payloads, formatting rules, troubleshooting, and publishing commands to references/
+    - SKILL.md trimmed from 987 to ~500 lines for reliable .skill import
+    - No workflow changes; all content preserved in references/
+    See CHANGELOG.md for full history.
+---
+
+# Richmond General Full Auto
+
+Complete 10-phase workflow for onboarding new vintage/antique items from acquisition to sale-ready.
+
+## Architecture Note
+
+**Two environments:** Claude's container (text files via Filesystem tools) and User's Mac (binary operations via osascript). Use osascript for all file operations on user's Mac to avoid path case sensitivity issues.
+
+## v6.0 Autonomous Mode (default)
+
+Agent decides everything; user reviews post-onboard. Audit trail captures every decision so review time is bounded and corrections feed the L3 pattern detector (deferred to v6.1+).
+
+### Invocation
+
+```bash
+# Single item — autonomous by default
+uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_new_item.py \
+    --image ~/Desktop/photo.jpeg
+
+# Single item — opt-out to legacy v3.7 supervised flow
+uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_new_item.py \
+    --image ~/Desktop/photo.jpeg --interactive
+
+# Batch
+uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_batch.py \
+    ingest --photos ~/Desktop/batch/*.jpeg
+uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_batch.py run
+uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_batch.py status
+uv run python ${CLAUDE_PLUGIN_ROOT}/skills/rg-full-auto/scripts/process_batch.py resume
+```
+
+### Review flow
+
+After a batch completes:
+
+1. `audit_log.py review-stats` shows where time was spent on prior reviews.
+2. For each item: open `<items_dir>/RG-XXXX/.state.json` to see the decisions.
+3. Edit any field — price, category, description — through the existing
+   `rg-item-update` skill or directly in Square.
+4. `audit_log.py correct --sku RG-XXXX --decision dec-001 --new 22.00 \
+   --reason "underpriced"` to record the correction (TODO: this subcommand
+   gets wired up in a v6.1 follow-up).
+
+### What changed from v3.7
+
+- `prompt()` and `confirm()` interactive checkpoints are now gated by the
+  `--interactive` flag. Default flow is fully autonomous.
+- New `.state.json` per item; new `ops/inventory/onboarding-queue.json` for
+  the dashboard view; new JSONL audit streams.
+- Phase 0 (image processing) runs first, before Phase 1 (appraisal) — same
+  ordering as v3.7's most recent fixes.
+
+### What stayed the same
+
+- `description_html` field with `<p>` tags
+- `ROOM_BY_TYPE` map with `TOP_LEVEL_ROOMS` handling
+- `sync_to_whatnot.py` literal-`\n` fix
+- `remove_background.py` response.text leak fix
+- Square Location, SKU prefix, GitHub Pages URL — all unchanged
+
+Design: `docs/plans/2026-05-13-v6-super-full-auto-design.md`
+v5.0 portability (deferred): `docs/plans/2026-05-13-v5-portability-deferred.md`
+PR #2 plan: `docs/plans/2026-05-13-v6-pr2-orchestrator.md`
+PR #3 plan (this one): `docs/plans/2026-05-13-v6-pr3-flip-default.md`
+
+## Quick Reference
+
+| Key | Value |
+|-----|-------|
+| Square Location | B87BAEZ0NWV34 (Richmond General) |
+| Merchant ID | 7MM9AFJAD0XHW |
+| SKU Prefix | RG-XXXX (sequential) |
+| GitHub Pages | https://richmondgeneral.github.io/items/ |
+| Working Directory | `/Users/scottybe/workspace/richmondgeneral/items/` |
+
+### Intake standards (definition of done)
+
+An item is **not** intake-complete (don't list it or call it done) until **both**:
+1. **Full real photo set** — a real hero + required angles (back/marks, condition, scale). Staging/AI placeholders don't count; download iCloud-offloaded originals first (`photos-library extract_photos.py` reports offloaded ones).
+2. **Final, research-based pricing** — set during Phase 1 appraisal and refined as facts firm up, never deferred to "after."
+
+- **Dedupe first.** Before minting a SKU, run the duplicate check (GitHub `items/` → live Square → other channels). See `RG-intake-dedupe-SOP.md`.
+- **Pricing report** for every **unsigned** or **judgment-/higher-value** item: `ops/pricing/RG-XXXX-pricing.md` (template `ops/pricing/_TEMPLATE.md`) — ID basis, comps + sources, condition adjustment, final price + date. Quick-flip (<$15) items are exempt. A confirmed maker's mark can move price 30–100%+.
+
+### Category Assignment
+
+Pick one **type** (primary, sets `reporting_category`) + one **tier** (secondary). See `references/square-catalog.md` for full category ID table.
+
+| Type | Use For |
+|------|---------|
+| Books & Paper | Books, magazines, paper ephemera |
+| Furniture | Stools, trunks, tables, chairs |
+| Pottery & Ceramics | Mugs, vases, plaques, figurines |
+| Collectibles | Games, toys, dolls, vintage misc |
+| Art & Craft Kits | Watercolor kits, craft supplies |
+| Wellness & Apothecary | Teas, serums, natural products |
+| The Apothecary Cabinet | Sage, ritual items, candles |
+| Gifts | Giftable items, home decor (also: Home for general-purpose home goods) |
+| Analog | Vinyl, pinball, analog tech |
+
+**Tiers (market tier):** **New Arrivals** is the default on intake — every new item lands there and is re-tiered later (The New Finds / The Real Rarities for genuinely special) as it ages.
+
+### Channel Classification By Phase
+
+- **Phase 2 (Square):** Use Square category IDs from `references/square-catalog.md`.
+- **Phase 7 (GitHub Pages):** Use website filter slugs in `data-category` (not Square IDs).
+- **Phase 8 (Whatnot):** Use Whatnot CSV category labels (not Square IDs, not website slugs).
+
+## Python Environment
+
+All scripts use **uv**: `uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/<skill>/scripts/<script>.py <args>`
+
+---
+
+## Phase 0: Image Processing
+
+**All image processing runs on USER'S MAC via osascript.** Binary files cannot transfer between environments.
+
+### Step 0.1: Allocate the SKU (authority = Square)
+
+SKUs are allocated atomically by `sku_authority.allocate_sku()`, which reserves the next `RG-XXXX` on Square via a hidden `__RG_SKU_COUNTER__` sentinel object using catalog-object **version compare-and-set**. This is the single source of truth for allocation and is safe across concurrent, multi-machine writers.
+
+- In the batch/auto flow the scripts call it for you (`process_batch.py` / `process_new_item.py` → `default_next_sku()`), so you do **not** allocate a SKU by hand.
+- To mint one manually:
+  ```
+  uv run --project plugins/richmondgeneral python plugins/richmondgeneral/skills/rg-full-auto/scripts/sku_authority.py allocate
+  ```
+
+Do **NOT** look up the next SKU from the Square cache or by globbing the items dir — those lag and reintroduce the cross-machine collision this replaced. The returned SKU is already reserved, so there is **no separate "verify not taken" step**. If Square is unreachable the call raises `SkuAllocationError` and intake stops by design (no colliding local fallback).
+
+> One-time setup: the sentinel is created once via `… sku_authority.py bootstrap --items-dir /Users/scottybe/workspace/richmondgeneral/items`. `… sku_authority.py peek` prints the current high-water N without allocating.
+
+### Step 0.3: Create item folder
+
+```applescript
+do shell script "mkdir -p /Users/scottybe/workspace/richmondgeneral/items/RG-XXXX"
+```
+
+> **Library-based intake (preferred front door when the item has its own Intake album/tag).**
+> `intake_to_item.py` does Steps 0.3–0.4 + a `label.json` stub in one shot — it pulls the
+> album's on-disk originals via `sips` into the item folder (`hero` + `detail-N`) and reports
+> any iCloud-offloaded ones:
+> ```applescript
+> do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/photos-library/scripts/intake_to_item.py --sku RG-XXXX --album 'Intake RG-XXXX' --items-dir /Users/scottybe/workspace/richmondgeneral/items"
+> ```
+> The hero is the raw original — Step 0.7 background removal still applies. Otherwise use the cluster-discovery flow below.
+
+### Step 0.4: Auto-discover product photo cluster (preferred)
+
+```applescript
+do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/photos-library/scripts/find_product_clusters.py --days 14 --type product"
+```
+
+If clusters found: confirm with user, copy best image by UUID:
+```applescript
+do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/photos.py --copy 'PHOTO_UUID' --output '/Users/scottybe/workspace/richmondgeneral/items/RG-XXXX/source-original.EXT' 2>&1"
+```
+
+If no cluster found, fall back to Step 0.5.
+
+### Step 0.5: Locate user's image (manual fallback)
+
+Check both Desktop and Downloads:
+```applescript
+do shell script "ls -lt ~/Desktop/*.jpg ~/Desktop/*.jpeg ~/Desktop/*.png ~/Desktop/*.heic ~/Downloads/*.jpg ~/Downloads/*.jpeg ~/Downloads/*.png 2>/dev/null | head -10"
+```
+
+### Step 0.6: Check file size & prepare input
+
+Check size (`stat -f%z`). If > 20MB, compress first: `sips -Z 3000 source --out hero_temp.png`. Convert HEIC to PNG if needed: `sips -s format png source --out hero_temp.png`.
+
+### Step 0.7: Cutout master via matte.py (local, non-generative — the DEFAULT path)
+
+`matte.py` (BiRefNet, dedicated `~/.cache/rg-matte` venv — absolute interpreter path, never
+`uv run --project`) produces the transparent cutout MASTER and derives `square.png` (1:1,
+Square primary) + `card.png` (5:7 gallery card). Free, local, safe on labeled goods.
+
+```applescript
+do shell script "$HOME/.cache/rg-matte/bin/python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/matte.py --item-dir /Users/scottybe/workspace/richmondgeneral/items/RG-XXXX 2>&1"
+```
+
+**Flat rectangular goods** (books, paper, boxed, framed) skip the cutout — use the flat-goods
+profile instead: `standardize.py --deskew --perspective-correct --crop-to-face`.
+
+Legacy fallback (API, only if the matte venv is unavailable): `process.py --model removebg`
+(needs `REMOVEBG_API_KEY`; monitor credits). Never improvise an untracked cutout (Vision/
+Preview) — see the RG-0031 postmortem.
+
+### Step 0.8: Hero QA gate (BLOCKING)
+
+```applescript
+do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/image-processor/scripts/hero_qa.py /Users/scottybe/workspace/richmondgeneral/items/RG-XXXX 2>&1"
+```
+
+`label.json → hero_qa.status` must be `"pass"` (or `photo_overrides.status:"approved"` after a
+visual check) before Phase 4 (Square primary) or Phase 7 (GitHub publish) — process_batch
+enforces this; don't route around it. ALWAYS visually Read the hero too (the gate has a known
+sideways-pixels gap on text-sparse covers).
+
+---
+
+## Phase 1: Appraisal & Research
+
+Run `pricing_preflight.ensure_fresh_cache()` before reading any cached price.
+
+### Step 1.0: View image for appraisal
+
+Compress on Mac (`sips -Z 1500`), transfer via `Filesystem:copy_file_user_to_claude`, view with `view` tool.
+
+### USER CHECKPOINTS (Do Not Assume)
+
+**STOP and ask the user before proceeding:**
+
+| Question | Why It Matters |
+|----------|----------------|
+| **Quantity** -- How many pieces? | Set of 9 vs single = different listing |
+| **Selling strategy** -- Set or individual? | Changes title, pricing, inventory count |
+| **Condition specifics** -- Chips, cracks, wear? | Affects price and disclosures |
+| **Original elements** -- Stickers, labels, boxes? | Adds provenance value |
+| **Lot assignment** -- Track acquisition cost? | Needed for margin analysis via `rg-lot-tracker` |
+
+Do research first, then ask with context. Never assume quantity=1 or condition=excellent.
+
+### Step 1.1: Assign lot & record acquisition cost
+
+Delegate to `rg-lot-tracker` skill. Store `allocated_cost` for pricing validation. If user skips lot tracking, skip margin validation in Step 1.5.
+
+### Step 1.2: Route to specialized appraiser if needed
+
+| Item Type | Skill to Use |
+|-----------|--------------|
+| Books dated 1970 or earlier | `book-appraiser` -- **MUST USE** |
+| Carnival glass (iridescent pressed glass) | `carnival-glass-appraiser` |
+| Maker's marks (stamps, hallmarks) | `maker-mark-identifier` |
+| General vintage | Continue here |
+
+### Step 1.3: Research
+
+1. Identify maker/manufacturer, 2. Date the piece, 3. Assess condition, 4. Research comps, 5. Determine price point.
+
+Pricing tiers: quick flip 2.5-3x, mid-range 3-4x, showcase research-based. See `rg-lot-tracker` for full margin targets.
+
+### Step 1.4: Determine shipping eligibility
+
+Ships easily: books, paper, small collectibles, sturdy standard-box items. Pickup only: furniture, large/awkward, extremely fragile, heavy (shipping cost ~ item value). Flat rate: Small $10.20 | Medium $17.10 | Large $21.90.
+
+### Step 1.5: Validate pricing against cost basis
+
+If `allocated_cost` available, delegate to `rg-lot-tracker` for margin analysis. If below target, present analysis -- user decides. Skip if lot tracking was skipped.
+
+**Output from Phase 1:** Item title, description (HTML for `description_html`), price in cents, condition, SEO data, shippable YES/NO.
+
+---
+
+## Phase 2: Square Catalog Creation
+
+**Method:** Use `catalog.batchInsertObjects` (the Square MCP exposes no `upsertCatalogObject` — a single object is just a one-element batch, inserted all-or-nothing). `idempotency_key` stays at TOP LEVEL. Variation MUST have `present_at_all_locations: false`. To UPDATE an existing item later, use `catalog.batchUpdateObjects` with `sparse_update: true` (see `references/square-catalog.md`).
+
+**Description format:** Use `description_html` (NOT `description`). Use `<p>` tags + `<p>&nbsp;</p>` spacers + Unicode chars (not HTML entities). See `references/description-formatting.md` for full rules and template.
+
+**Payloads:** See `references/api-payloads.md` for the complete JSON template (Payload A — `batchInsertObjects`).
+
+```
+mcp_square_api:make_api_request
+  service: catalog
+  method: batchInsertObjects   (create; single object = one-element batch)
+```
+
+**Capture IDs:** Prefer `id_mappings` by temp IDs (`#RG-XXXX` -> CATALOG_ITEM_ID, `#RG-XXXX-var` -> VARIATION_ID). See `references/api-payloads.md` for fallback extraction logic.
+
+---
+
+## Phase 3: Set Inventory
+
+```
+mcp_square_api:make_api_request
+  service: inventory
+  method: batchChange
+```
+
+Do NOT include `catalog_object_type`. `quantity` is a STRING. `occurred_at` must be a current ISO timestamp (generate dynamically). See `references/api-payloads.md` for full JSON.
+
+---
+
+## Phase 4: Image Upload
+
+**Precondition: Hero QA pass (Step 0.8).** Upload `square.png` (the 1:1 derived from the matte
+master; falls back to hero.png for legacy items) via the `square-image-upload` skill:
+
+```applescript
+do shell script "source ~/.local/bin/env && source ~/.env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/square-image-upload/scripts/upload_image.py --image '/Users/scottybe/workspace/richmondgeneral/items/RG-XXXX/square.png' --item-id 'CATALOG_ITEM_ID' --name 'RG-XXXX Hero' --caption 'Front view' --primary 2>&1"
+```
+
+WebP not supported -- convert if needed: `sips -s format png image.webp --out hero.png`
+
+### Step 4.1: Sync and verify square-cache
+
+After Phase 2/3/4 writes, reconcile cache:
+
+**Primary:** `square_cache_mcp:square_cache_sync`
+**Fallback:** Run cache wrapper script via osascript.
+
+Verify: 1. Exact SKU exists in cache (`square_cache_search`). 2. Cached item includes uploaded image ID (`square_cache_get_item`). If missing, sync once more.
+
+---
+
+## Phase 5: Payment Link
+
+Shipping decision from Phase 1 determines `ask_for_shipping_address` (true for shippable, false for pickup).
+
+```
+mcp_square_api:make_api_request
+  service: checkout
+  method: createPaymentLink
+```
+
+See `references/api-payloads.md` for full JSON (shippable and pickup variants).
+
+**Capture:** `payment_link.url` -> `https://square.link/u/XXXXXXXX`
+
+---
+
+## Phase 6: Generate Label
+
+Append row to batch CSV at `/Users/scottybe/workspace/richmondgeneral/items/rg-labels-batch.csv`:
+
+```csv
+Product Name,Attributes,Price,Condition,Condition Notes,SKU,QR Code URL
+"Item Title","Era . Type . Feature",55.00,Good,"Wear notes",RG-XXXX,https://richmondgeneral.github.io/items/RG-XXXX/
+```
+
+Every item gets a QR code linking to the info card. See `references/label-format.md` for Print Master settings.
+
+---
+
+## Phase 7: Info Card & Publishing
+
+Run only if item should be published to GitHub Pages. Site: https://richmondgeneral.github.io/items/ | Repo: `/Users/scottybe/workspace/richmondgeneral/items/`
+
+### Step 7.1: Write index.html (FLIP CARD TEMPLATE REQUIRED)
+
+Use the flip card template from `references/info-card-template.html`. Do NOT use detail-page layouts.
+
+Write populated template to `/Users/scottybe/workspace/richmondgeneral/items/RG-XXXX/index.html` via `Filesystem:write_file`.
+
+**Requirements:** `.flip-card`/`.card-front`/`.card-back` structure, `aspect-ratio: 5 / 7`, CSS variables `--rg-gold`/`--rg-cream`/`--rg-charcoal`, flip animation, keyboard accessibility, ARIA, responsive breakpoints, print styles.
+
+**Placeholders:** `{{SKU}}`, `{{ITEM_TITLE}}`, `{{ERA_LINE}}`, `{{PRICE}}`, `{{STORY_TEXT}}`, `{{DETAIL_N_LABEL}}`, `{{DETAIL_N_VALUE}}`, `{{CONDITION}}`, `{{PAYMENT_LINK}}`, `{{SEO_DESCRIPTION}}`, `{{OG_DESCRIPTION}}`
+
+**DO NOT** use traditional multi-section layouts, simplified CSS variables, or omit the flip animation / 5x7 ratio.
+
+### Steps 7.2-7.6: QR code, gallery, count, cleanup, git push
+
+See `references/info-card-publishing.md` for exact commands:
+- **7.2:** Generate BOTH QR codes — `qr-info.png` (GitHub item page, printed on the price tag)
+  and `qr-buy.png` (Square checkout link) — and record them in `label.json → qr_codes`.
+  (`rg-square-list` already emits qr-buy.png when it creates the payment link.)
+- **7.3:** Add the item card to the gallery via `python items/scripts/build_gallery.py --apply`
+  (idempotent reconciler — NEVER hand-`sed`; that path silently dropped 6 cards, see the
+  2026-06-21 postmortem). Gate: `build_gallery.py --check` must exit 0 — a live item page
+  absent from the grid is NOT done.
+- **7.4:** Item count is recomputed by build_gallery.py automatically.
+- **7.5:** Cleanup temp files
+- **7.6:** `git add <explicit paths>`, `git commit`, `git push origin main`
+
+**Customer flow:** QR on label -> Info card -> Read story -> Buy Now -> Square checkout
+
+---
+
+## Phase 8: Whatnot Item Library Listing
+
+Run only if item should be listed on Whatnot.
+
+**Dependencies:** Read `whatnot-catalog` (field values, categories, shipping) and `whatnot-chrome` (Chrome automation) skills.
+
+**Account:** richmondgeneral on whatnot.com. Images must be pushed (Step 7.6) before Whatnot can fetch them.
+
+### Step 8.1: Build CSV Row
+
+Look up in `whatnot-catalog`: Category/Sub Category, Shipping Profile (weight heuristic), Price via `ceil(square_price_cents / 100)`, Condition, Hazmat.
+
+Append to `/Users/scottybe/workspace/richmondgeneral/items/rg-inventory/whatnot-import.csv`. Create headers first if file doesn't exist.
+
+### Step 8.2: Upload CSV to Whatnot
+
+Ensure git push (Step 7.6) completed. Follow `whatnot-chrome` "CSV Import via Chrome" steps: get tab context, navigate, find import button, inject CSV via DataTransfer API, click Import, verify drafts.
+
+### Step 8.3: Fill Category-Specific Metadata
+
+Read `whatnot-catalog` "Category-Specific Metadata Fields" for valid values. Follow `whatnot-chrome` "React Combobox Interaction" pattern for each field. Verify Shipping Profile matches weight heuristic.
+
+If `whatnot-catalog` has a TODO for this category: screenshot edit page, ask user, fill manually, then update `whatnot-catalog` with discovered fields.
+
+### Step 8.4: Publish Drafts
+
+Follow `whatnot-chrome` "Publish Drafts Pass": navigate to drafts, open each, publish, confirm, verify live.
+
+---
+
+## Phase 9: Photos Library Archive (Cleanup)
+
+Organize source photos into per-item albums in Photos.app (`Richmond General Archive/RG-XXXX/`).
+
+Prerequisite: Git push (Step 7.6) must be complete.
+
+### Step 9.1: Archive photos
+
+**Mode A -- Direct UUID** (from Step 0.4 cluster discovery):
+```applescript
+do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/photos-library/scripts/archive_photos.py --item-id RG-XXXX --uuids UUID1 UUID2 UUID3 --json 2>&1"
+```
+
+**Mode B -- Reverse filename lookup** (from Step 0.5 manual):
+```applescript
+do shell script "source ~/.local/bin/env && uv run --project ${CLAUDE_PLUGIN_ROOT} python ${CLAUDE_PLUGIN_ROOT}/skills/photos-library/scripts/archive_photos.py --item-id RG-XXXX --reverse --include 'IMG_*' --json 2>&1"
+```
+
+Add `--dry-run` to preview without touching Photos.
+
+### Step 9.2: Verify archive
+
+Confirm output JSON shows `archived > 0`. This does NOT delete photos -- only adds to album. User can bulk-delete from "Richmond General Archive" folder when satisfied.
+
+---
+
+## Quick Tasks (Single Phase)
+
+| Request | Action |
+|---------|--------|
+| "make a label for..." | Phase 6 only |
+| "price this" / "what's this worth" | Phase 1 only |
+| "upload this image to Square" | Phase 4 only |
+| "create a payment link" | Phase 5 only |
+| "what's the SKU for..." | Cache lookup only |
+| "add to whatnot" / "list on whatnot" | Phase 8 only |
+| "archive photos" / "clean up photos" | Phase 9 only |
+
+---
+
+## Workflow Summary Output
+
+After completing full workflow, print summary. See `references/workflow-summary.md` for template.
+
+---
+
+## Troubleshooting
+
+See `references/troubleshooting.md` for common issues (image size, upload failures, API errors, path case mismatches).
+
+---
+
+## Related Skills
+
+| Skill | Use For |
+|-------|---------|
+| `rg-item-update` | Quick edits to existing items |
+| `square-image-upload` | Image upload via API |
+| `square-webhook-monitor` | Webhook subscription operations and local monitoring |
+| `book-appraiser` | Antiquarian books, LOC cross-reference |
+| `carnival-glass-appraiser` | Pressed iridescent glass 1908-1930s |
+| `maker-mark-identifier` | Pottery, silver, furniture marks |
+| `product-labeler` | Label generation, Square descriptions |
+| `square-cache` | Fast catalog lookups |
+| `photos-library` | Auto-discover and cluster local Photos shoots |
+| `rg-lot-tracker` | Lot tracking, cost allocation, margin validation |
+| `whatnot-catalog` | Whatnot category data, allowed values, shipping heuristics (Phase 8) |
+| `whatnot-chrome` | Whatnot Chrome automation patterns (Phase 8) |
+
+## References
+
+- `references/square-catalog.md` - Category IDs, location/merchant IDs, API details
+- `references/api-payloads.md` - JSON templates for Phase 2/3/5
+- `references/description-formatting.md` - HTML formatting rules for `description_html`
+- `references/info-card-template.html` - Flip card HTML template for Phase 7
+- `references/info-card-publishing.md` - two-QR generation, build_gallery.py, git commands for Phase 7
+- `references/label-format.md` - Print Master CSV settings
+- `references/marketplace-templates.md` - Title/description templates across platforms
+- `references/mcp-connectors.md` - MCP connector quick reference
+- `references/system-paths.md` - Canonical absolute paths
+- `references/troubleshooting.md` - Common issues and fixes
+- `references/workflow-summary.md` - Post-workflow output template

@@ -1,3 +1,5 @@
+> **Plugin SoT:** monorepo `packages/richmondgeneral-plugin` — see [MOVED.md](./MOVED.md).
+
 # Richmond General Skills
 
 A comprehensive collection of AI assistant skills for managing Richmond General's vintage and antique inventory system. These skills integrate with Square Catalog, Apple ecosystem (iMessage, Contacts, Notes), and external identification databases to streamline operations.

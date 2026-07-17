@@ -76,8 +76,8 @@ def plan_item(item_dir):
             # oversized → resize to cap + recompress
             work.append({"file": name, "px": long_edge, "cap": cap, "q": q,
                          "bytes": size})
-        elif size > 2_500_000:
-            # within cap but absurdly heavy → recompress at current size
+        elif size > (1_200_000 if name.lower().endswith(".png") else 2_500_000):
+            # within cap but heavy → recompress at current size (PNGs get pngquant)
             work.append({"file": name, "px": long_edge, "cap": long_edge, "q": q,
                          "bytes": size})
     return work
@@ -95,12 +95,20 @@ def prep_item(item_dir, dry_run=False):
         if w["file"].lower().endswith(".png"):
             # PNG heroes can be transparent cutouts — resize ONLY, never convert
             # to jpeg (that would bake a background over the alpha channel).
-            cmd = ["sips", "-Z", str(w["cap"]), path, "--out", path]
+            if w["px"] > w["cap"]:
+                subprocess.run(["sips", "-Z", str(w["cap"]), path, "--out", path],
+                               check=True, capture_output=True)
+            # pngquant (if installed) palette-quantizes in place — keeps alpha +
+            # extension, typically 60-70% smaller (2026-07-15 sweep: 63 PNGs, -83MB)
+            import shutil
+            if shutil.which("pngquant"):
+                subprocess.run(["pngquant", "--quality=70-90", "--speed", "1",
+                                "--force", "--output", path, path],
+                               capture_output=True)  # rc 99 = quality floor; keep original
         else:
-            cmd = ["sips", "-Z", str(w["cap"]),
-                   "-s", "format", "jpeg", "-s", "formatOptions", str(w["q"]),
-                   path, "--out", path]
-        subprocess.run(cmd, check=True, capture_output=True)
+            subprocess.run(["sips", "-Z", str(w["cap"]),
+                            "-s", "format", "jpeg", "-s", "formatOptions", str(w["q"]),
+                            path, "--out", path], check=True, capture_output=True)
         new = os.path.getsize(path)
         saved += max(0, w["bytes"] - new)
         print(f"  {w['file']}: {w['bytes']//1024}KB -> {new//1024}KB")

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Facebook Marketplace"
-  short_description: "Create and verify agent-reviewed Marketplace listings"
-  default_prompt: "Use $facebook-marketplace to achieve an accurate Richmond General Facebook Marketplace listing, with independent review and explicit authorization before publishing."

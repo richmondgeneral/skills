@@ -1,37 +1,66 @@
 # Playwright fallback
 
-Use the existing local seller-agent only after the native route in `native-surfaces.md` is unavailable or
-fails its bounded retry.
+Use the local seller-agent only after the native route in `native-surfaces.md` is unavailable or fails
+its bounded retry.
 
 ## Authentication model
 
-The publisher uses the persistent profile at `ops/seller-agent/playwright_profile/`. It requires one
-headed interactive login, then reuses the saved eBay session. Never copy cookies from another profile or
-ask the user to provide credentials. If the session expired, pause the headed run for user login and 2FA.
+Persistent profile: `ops/seller-agent/playwright_profile/`. One headed interactive login, then reuse.
+Never copy cookies from another profile or ask for credentials. If expired, pause for user login + 2FA.
+
+## Shared UI helpers
+
+`ops/seller-agent/ebay_ui.py` implements driver-side settle/fill/verify helpers used by fast paths:
+
+- Hang URL detection (reject `keyword=` Active deep-links, ReviseItem deep-links)
+- `fill_and_verify` / `click_revise_or_list` patterns
+- Live item page price/title reads for post-submit proof
+
+Fast paths:
+
+| Module | Role |
+|---|---|
+| `fast_paths/ebay_UPDATE_fast_path.py` | UPDATE revise with live verification |
+| `fast_paths/ebay_CREATE_fast_path.py` | CREATE happy path (pickup-oriented); draft-safe |
+
+The main `publish_item.py` orchestrator uses the reviewed Vision agent loop; fast paths are the
+**deterministic** entry when invoked explicitly or re-wired by the orchestrator. Prefer them over
+ad-hoc scripts.
 
 ## Commands
 
-From the local `richmondgeneral/ops/seller-agent` checkout:
+From `richmondgeneral/ops/seller-agent`:
 
 ```bash
-# Resolve the item and prompt without opening a browser.
+# Resolve the item and goal without opening a browser.
 uv run publish_item.py --item ../../items/RG-XXXX --platform ebay --dry-run
 
-# Fill through the persistent profile and stop for review (safe default).
+# Deterministic fast path first (UPDATE live-verifies; CREATE stops before List it
+# unless --yes-publish). Falls back to Vision agent unless --fast-path-only.
 uv run publish_item.py --item ../../items/RG-XXXX --platform ebay
 
-# Publish only when the user explicitly authorized going live.
-uv run publish_item.py --item ../../items/RG-XXXX --platform ebay --yes-publish
+# Fast path only (no Vision fallback) — good for smoke:
+uv run publish_item.py --item ../../items/RG-XXXX --platform ebay --fast-path-only
+
+# Skip fast path; Vision agent loop only:
+uv run publish_item.py --item ../../items/RG-XXXX --platform ebay --force-agent
+
+# CREATE/List it only when the user explicitly authorized going live.
+uv run publish_item.py --item ../../items/RG-XXXX --platform ebay --yes-publish --fast-path-only
+
+# Non-destructive Seller Hub probe (Active, End listings labels, hang guards):
+uv run python ebay_smoke_probe.py
+
+# Unit tests for pure ebay_ui helpers (no browser):
+uv run python test_ebay_ui.py
 ```
 
 ## Guardrails
 
-- Keep CREATE/UPDATE idempotency based on `channels.ebay.url`; never load a CREATE fast path for UPDATE.
-- The publisher tries a cached deterministic fast path first. If none exists, its Vision Agent fallback
-  may use Gemini and incur cost/latency; this is why native browser control is preferred.
-- Do not delete or reset `playwright_profile/`. Do not clear profile locks while another browser run is
-  active.
-- Do not interrupt a live automation unless it requests help; a half-completed CREATE may already have
-  auto-saved a draft or submitted.
-- Apply the same live-page verification as the native route. Neither the agent's success claim nor eBay's
-  confirmation dialog proves that fields landed.
+- CREATE vs UPDATE from `channels.ebay.url`; never run CREATE when an owned URL exists without
+  Active+Drafts reconcile.
+- Do not delete or reset `playwright_profile/` while a run is active.
+- Do not interrupt a live automation unless it requests help; half-completed CREATE may have auto-saved
+  a draft or submitted.
+- Apply the same live-page verification as native: **dialog is not proof**.
+- On uncertainty: mark reconcile; never re-click List it / Revise it.

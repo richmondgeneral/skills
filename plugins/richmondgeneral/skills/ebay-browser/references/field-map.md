@@ -4,7 +4,10 @@ Driver-neutral knowledge for eBay Seller Hub and its create/revise forms: where 
 it, and the allowed values observed. Translate these operations into the current host's native browser
 tools; see `native-surfaces.md`. Add only behavior verified on the live form.
 
-Last updated: 2026-06-20 (seeded from the RG-0023 Weiss brooch revise).
+**Protocol:** Mandatory settle→edit→verify→live-page rules live in `../SKILL.md` and
+`failure-matrix.md`. Combobox steps: `combobox.md`. Account sitemap: `seller-hub-map.md`.
+
+Last updated: 2026-07-16 (v3 skill cross-links; field detail still from 2026-06/07 sessions).
 
 ---
 

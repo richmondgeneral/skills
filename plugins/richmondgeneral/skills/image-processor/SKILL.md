@@ -248,6 +248,18 @@ uv pip install --python ~/.cache/rg-enhance torch torchvision pillow numpy spand
 upres/restore (SUPIR / genai) is a SEPARATE, **showcase-only** path that MUST keep the `clean.py
 --agentic` marks/text judge — never auto-run it on items with printed labels.
 
+## Web-size normalization (web_prep.py — run before publish/commit)
+
+`items/RG-XXXX/` files are PUBLIC derivatives (the raw archive is the Photos library) — cap them:
+```bash
+python3 scripts/web_prep.py items/RG-XXXX          # hero ≤2000px q88, details ≤1600px q85, in place
+python3 scripts/web_prep.py --all items/           # catalog sweep (Listed/In Intake/Priced)
+```
+PNG heroes are resized only (never jpeg-converted — transparency survives). Pipeline products
+(square.png/cutout.png/card.png) and QRs are never touched. Un-prepped 48MP exports made item
+dirs 30–88MB → slow GitHub Pages loads + oversized Square uploads (2026-07-15 audit); the
+intake exporter now caps at 2000px, so this mainly serves the back-catalog + hand-added photos.
+
 ## Pre-publish Hero QA Gate (BLOCKING)
 
 **No hero publishes without `label.json → hero_qa.status == "pass"`.** `hero_qa.py` runs 5

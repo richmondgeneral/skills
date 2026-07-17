@@ -2,10 +2,14 @@
 name: rg-square-list
 description: List a Richmond General item on Square in one command — create (or idempotently update) the catalog ITEM from its label.json, set inventory, upload square.png as the primary image, mint a payment link, generate qr-buy.png + qr-info.png (BOTH QR codes, recorded in label.json → qr_codes), and write all IDs back into label.json. Use when an item is already intake-complete (priced + photographed, has items/RG-XXXX/label.json) and needs to go live on Square. Triggers on "list this on Square", "create the Square item", "push RG-XXXX to Square", "rg-square-list". NOT for full onboarding from a raw photo (use rg-full-auto), NOT for price changes on an already-listed item (use rg-reprice), NOT for sold items (use rg-item-mark-sold). Always preview with --dry-run before a live run; live runs mutate the production Square catalog.
 metadata:
-  version: "1.4"
+  version: "1.5"
   author: scottybe
   updated: "2026-07-15"
   changelog: |
+    v1.5 - CREATE also uploads detail-*.jpeg as non-primary images (photo SET on Square;
+    26 listings had 1 image vs 2-19 local details, 2026-07-15 audit). --skip-details opt-out;
+    details >3.5MB skipped with a web_prep warning.
+
     v1.4 - Store description = brand voice: composed from label.json page.story (+ Condition
     line); CREATE warns when page.story is empty (store copy was shipping as bare condition
     notes — RG-0061 etc., 2026-07-15). _sparse_update_item latent 400 FIXED: /v2/catalog/object

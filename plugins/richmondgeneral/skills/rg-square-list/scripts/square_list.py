@@ -431,7 +431,8 @@ def _write_label(label_path: Path, label: dict) -> None:
 # -----------------------------------------------------------------------------
 
 def list_item(item_dir: str, dry_run: bool = False, force: bool = False,
-              skip_hero_qa: bool = False, allow_raw_image: bool = False) -> dict:
+              skip_hero_qa: bool = False, allow_raw_image: bool = False,
+              skip_details: bool = False) -> dict:
     """Create or update the item's Square listing; return a summary dict.
 
     See the module docstring for the full idempotency contract. In ``dry_run``
@@ -519,6 +520,7 @@ def list_item(item_dir: str, dry_run: bool = False, force: bool = False,
 
     # --- Image: only on create, or on an explicit --force update -------------
     image_uploaded = False
+    details_uploaded = 0
     if created or force:
         img = _find_image(item_path)
         if img is not None and not _image_is_processed(img) and not allow_raw_image:
@@ -536,6 +538,22 @@ def list_item(item_dir: str, dry_run: bool = False, force: bool = False,
                 is_primary=True,
             )
             image_uploaded = True
+        # Detail images: the photo SET sells the item — 26 listings shipped with a
+        # single image while 2–19 details sat local (2026-07-15 audit). Uploaded
+        # non-primary, in name order, on CREATE only (re-runs would duplicate).
+        if created and not skip_details:
+            for dpath in sorted(item_path.glob("detail-*.jp*g")) + sorted(item_path.glob("detail-*.png")):
+                if dpath.stat().st_size > 3_500_000:
+                    print(f"  [warn] {dpath.name} skipped: {dpath.stat().st_size//1_000_000}MB "
+                          f"(web-prep it first: image-processor/scripts/web_prep.py)",
+                          file=sys.stderr)
+                    continue
+                _create_catalog_image(
+                    token, str(dpath), object_id=item_id,
+                    name=f"{sku} {dpath.stem}", caption=label.get("product_name"),
+                    is_primary=False,
+                )
+                details_uploaded += 1
 
     # --- Payment link: idempotent on price -----------------------------------
     link = _ensure_payment_link(
@@ -627,6 +645,7 @@ def list_item(item_dir: str, dry_run: bool = False, force: bool = False,
         "order_id": order_id,
         "price": price_str,
         "image_uploaded": image_uploaded,
+        "details_uploaded": details_uploaded,
         "qr_buy": qr_buy_recorded,
         "qr_info": qr_info_recorded,
     }
@@ -658,6 +677,10 @@ def main(argv=None) -> int:
         help="Override the pre-publish Hero QA gate (conscious override only).",
     )
     parser.add_argument(
+        "--skip-details", action="store_true",
+        help="Skip uploading detail-*.jpeg images after the primary (CREATE only).",
+    )
+    parser.add_argument(
         "--allow-raw-image", action="store_true",
         help="Allow uploading a raw (non-pipeline) image — square.jpg/hero.* "
              "(conscious override; the default requires the matte/flat-goods square.png).",
@@ -666,7 +689,8 @@ def main(argv=None) -> int:
 
     summary = list_item(args.item_dir, dry_run=args.dry_run, force=args.force,
                         skip_hero_qa=args.skip_hero_qa,
-                        allow_raw_image=args.allow_raw_image)
+                        allow_raw_image=args.allow_raw_image,
+                        skip_details=args.skip_details)
 
     if summary.get("dry_run"):
         print(f"[dry-run] {summary['sku']}: would {summary['action']} "

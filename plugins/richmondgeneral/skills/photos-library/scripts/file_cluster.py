@@ -249,9 +249,13 @@ def assign_roles(originals, roles):
     return photos
 
 
-def sips_convert(src, dst, quality=90):
-    _run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", str(quality),
-          src, "--out", dst], stage=f"sips export -> {os.path.basename(dst)}")
+def sips_convert(src, dst, quality=88, max_edge=2000):
+    """Export capped at max_edge px (long side): the items/ copies are PUBLIC
+    derivatives (raw archive = the Photos library), and uncapped 48MP exports made
+    item dirs 30–88MB — slow pages + oversized Square uploads (2026-07-15 audit)."""
+    _run(["sips", "-Z", str(max_edge), "-s", "format", "jpeg",
+          "-s", "formatOptions", str(quality), src, "--out", dst],
+         stage=f"sips export -> {os.path.basename(dst)}")
     wipe_gps_jpeg(dst)  # public items/ repo: location EXIF must never land there
 
 

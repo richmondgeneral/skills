@@ -894,3 +894,42 @@ def test_update_description_preserves_variations(item_dir, monkeypatch):
     assert posted["item_data"]["variations"][0]["id"] == "VAR_1"      # not dropped
     assert "A fine story." in posted["item_data"]["description_html"]  # story-first
     assert "description_plaintext" not in posted["item_data"]          # derived field stripped
+
+
+# ---------------------------------------------------------------------------
+# Detail-image uploads (26 single-image listings, 2026-07-15 audit).
+# ---------------------------------------------------------------------------
+
+def test_create_uploads_details_nonprimary(item_dir, monkeypatch):
+    (item_dir / "detail-1.jpeg").write_bytes(b"x")
+    (item_dir / "detail-2.jpeg").write_bytes(b"x")
+    _write_label(item_dir)
+    _patch_token(monkeypatch)
+    _patch_request(monkeypatch, _create_handler)
+    uploads = _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
+    s = sl.list_item(str(item_dir))
+    assert s["details_uploaded"] == 2
+    assert [u["is_primary"] for u in uploads] == [True, False, False]
+
+
+def test_skip_details_flag(item_dir, monkeypatch):
+    (item_dir / "detail-1.jpeg").write_bytes(b"x")
+    _write_label(item_dir)
+    _patch_token(monkeypatch)
+    _patch_request(monkeypatch, _create_handler)
+    uploads = _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
+    s = sl.list_item(str(item_dir), skip_details=True)
+    assert s["details_uploaded"] == 0 and len(uploads) == 1
+
+
+def test_oversized_detail_skipped_with_warning(item_dir, monkeypatch):
+    (item_dir / "detail-1.jpeg").write_bytes(b"x" * 4_000_000)
+    _write_label(item_dir)
+    _patch_token(monkeypatch)
+    _patch_request(monkeypatch, _create_handler)
+    uploads = _patch_image(monkeypatch)
+    _patch_qr(monkeypatch)
+    s = sl.list_item(str(item_dir))
+    assert s["details_uploaded"] == 0 and len(uploads) == 1  # primary only

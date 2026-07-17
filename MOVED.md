@@ -1,14 +1,17 @@
-# Plugin source of truth moved
+# Moved — do not develop here
 
-**Claude plugin SoT:** monorepo  
-`richmondgeneral/workspace` → `packages/richmondgeneral-plugin` (`@rg/richmondgeneral-plugin`)
+**Source of truth:** monorepo only  
+[`richmondgeneral/workspace`](https://github.com/richmondgeneral/workspace) → **`packages/richmondgeneral-plugin`**
 
-Develop and test skills in the monorepo. This `skills` repository remains a
-**compatibility / marketplace publish mirror** until CI re-exports from monorepo.
+All skills and slash commands live there, including former **square-online**
+(storefront + brand-guidelines/voice + catalog-voice + storefront-*).
 
 ```bash
 cd path/to/richmondgeneral/workspace
 pnpm --filter @rg/richmondgeneral-plugin test
 ```
 
-Seller-agent: `apps/seller-agent` (not `ops/seller-agent`).
+Claude marketplace: monorepo `.claude-plugin/marketplace.json` → single plugin.
+
+This repository is a **dead mirror**. Do not rsync back. Prefer archiving.
+Absorbed / dual retired 2026-07-17.

@@ -52,7 +52,10 @@ def test_payload_contains_publish_requirements(tmp_path, monkeypatch):
     assert ebay_lister._missing_requirements(payloads) == []
 
 
-def test_missing_requirements_rejects_invalid_price_and_images(monkeypatch):
+def test_missing_requirements_rejects_invalid_price_and_images(tmp_path, monkeypatch):
+    # Isolate from the real items/ tree — otherwise _image_urls(RG-0032) may
+    # pick up a live hero.png and skip the product.imageUrls requirement.
+    monkeypatch.setattr(ebay_lister, "ITEMS_DIR", tmp_path)
     monkeypatch.setattr(ebay_lister.auth, "resolve", _config)
     payloads = ebay_lister.build_payloads(
         "RG-0032",

@@ -53,6 +53,9 @@ uv run python ebay_smoke_probe.py
 
 # Unit tests for pure ebay_ui helpers (no browser):
 uv run python test_ebay_ui.py
+
+# Headless e2e against mock Seller Hub (no credentials):
+uv run python tests/test_ebay_e2e.py
 ```
 
 ## Guardrails

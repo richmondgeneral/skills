@@ -5,12 +5,12 @@ its bounded retry.
 
 ## Authentication model
 
-Persistent profile: `ops/seller-agent/playwright_profile/`. One headed interactive login, then reuse.
+Persistent profile: `apps/seller-agent/playwright_profile/`. One headed interactive login, then reuse.
 Never copy cookies from another profile or ask for credentials. If expired, pause for user login + 2FA.
 
 ## Shared UI helpers
 
-`ops/seller-agent/ebay_ui.py` implements driver-side settle/fill/verify helpers used by fast paths:
+`apps/seller-agent/ebay_ui.py` implements driver-side settle/fill/verify helpers used by fast paths:
 
 - Hang URL detection (reject `keyword=` Active deep-links, ReviseItem deep-links)
 - `fill_and_verify` / `click_revise_or_list` patterns
@@ -29,7 +29,7 @@ ad-hoc scripts.
 
 ## Commands
 
-From `richmondgeneral/ops/seller-agent`:
+From `richmondgeneral/apps/seller-agent`:
 
 ```bash
 # Resolve the item and goal without opening a browser.

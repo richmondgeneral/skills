@@ -57,7 +57,7 @@ These are chips/toggles, not comboboxes — click the correct Yes/No. Prefer ind
 ## Playwright sketch (fallback)
 
 ```python
-# Conceptual — prefer helpers in ops/seller-agent/ebay_ui.py
+# Conceptual — prefer helpers in apps/seller-agent/ebay_ui.py
 await page.get_by_text("Shipping policy", exact=False).click()
 await page.keyboard.type("Local Pickup Only")
 await page.get_by_role("option", name=re.compile("Local Pickup Only", re.I)).click()

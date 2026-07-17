@@ -23,7 +23,7 @@ compatibility:
 > **Idempotency first:** check `label.json → channels.whatnot` before creating — if already
 > registered, update the existing product instead. Record the new product id/url back into
 > `channels.whatnot` after a create. Deterministic alternative:
-> `ops/seller-agent/publish_item.py --platform whatnot` (review-by-default).
+> `apps/seller-agent/publish_item.py --platform whatnot` (review-by-default).
 
 ## Overview
 

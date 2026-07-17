@@ -22,7 +22,7 @@ metadata:
 > form → `whatnot-create-product`; field/category reference → `whatnot-catalog`.
 > **Idempotency first:** before importing a CSV row / creating a draft, check that SKU's
 > `label.json → channels.whatnot` — skip SKUs already registered (blind imports = duplicate
-> listings). Deterministic alternative: `ops/seller-agent/publish_item.py --platform whatnot`.
+> listings). Deterministic alternative: `apps/seller-agent/publish_item.py --platform whatnot`.
 
 Reusable Chrome automation primitives for Whatnot's dashboard. This skill owns the *how* — how to interact with Whatnot's React UI. For field values and category data, see `whatnot-catalog`.
 

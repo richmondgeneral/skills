@@ -1,10 +1,10 @@
 # Playwright fallback
 
-Use `ops/seller-agent/publish_item.py` when native Chrome control is unavailable or unreliable. The local
+Use `apps/seller-agent/publish_item.py` when native Chrome control is unavailable or unreliable. The local
 fallback uses a persistent browser profile; the first run may require the user to complete Facebook login
 or 2FA in the headed browser.
 
-From `ops/seller-agent`:
+From `apps/seller-agent`:
 
 ```bash
 # Resolve and validate the goal without opening Facebook.

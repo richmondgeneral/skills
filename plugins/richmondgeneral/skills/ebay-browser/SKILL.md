@@ -35,7 +35,7 @@ Keep field knowledge independent of the browser driver.
 | `references/combobox.md` | Shipping policy, brand, country React comboboxes |
 | `references/seller-hub-map.md` | Navigation sitemap, safe vs hang URLs, drafts/end/relist |
 | `references/native-surfaces.md` | Pick Claude / Codex / Gemini / Grok Chrome route |
-| `references/playwright-fallback.md` | Native route unavailable — `ops/seller-agent` |
+| `references/playwright-fallback.md` | Native route unavailable — `apps/seller-agent` |
 
 ---
 

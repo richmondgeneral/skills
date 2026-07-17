@@ -36,7 +36,7 @@ page.
 
 The same safety contract applies as with the fallback: frozen evidence, independent facts and quality
 review, overseer approval, a durable pre-submit reservation, one final action, live verification, and
-evidence-correlated writeback. Use `ops/seller-agent/record_verified_marketplace.py` for reservation,
+evidence-correlated writeback. Use `apps/seller-agent/record_verified_marketplace.py` for reservation,
 reconciliation, and finalization.
 
 Do not switch browser writers after either one has edited the form. Do not describe a prompt-only

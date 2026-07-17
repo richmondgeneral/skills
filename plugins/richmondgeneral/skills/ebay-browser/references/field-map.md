@@ -148,7 +148,7 @@ The full browser CREATE flow. Batch native browser actions where the active host
   (duplicate risk) — open a FRESH tab → `/sh/lst/active` → confirm the new listing exists.
 
 ### Cross-channel: FB photos → eBay
-- FB-only listings (no items/RG-XXXX dir): `ops/seller-agent/save_item_photos.py <fb_item_url>
+- FB-only listings (no items/RG-XXXX dir): `apps/seller-agent/save_item_photos.py <fb_item_url>
   <out_dir>` downloads the listing photos via the logged-in Playwright profile (headless +
   `--disable-blink-features=AutomationControlled`; a HEADED launch over the osascript bridge dies
   with TargetClosedError; clear stale `playwright_profile/Singleton*` locks first).

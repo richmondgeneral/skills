@@ -36,7 +36,7 @@ click / type / upload / screenshot / read-back into that host's native tools.
 ## Grok Build / CLI notes (2026-07-16)
 
 - Grok sessions may have GitHub/MCP tools without Chrome control. Treat missing browser tools as
-  **native unavailable** → `ops/seller-agent` Playwright, or ask the user to run the task in Claude
+  **native unavailable** → `apps/seller-agent` Playwright, or ask the user to run the task in Claude
   Desktop / Codex / Spark with Chrome connected.
 - Never invent CDP endpoints. If the user provides a Chrome DevTools URL, use only documented host
   integrations.
